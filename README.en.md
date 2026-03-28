@@ -28,6 +28,8 @@ ScreenMemo is a local-first smart screenshot memo and retrieval tool. It automat
 
 ## Screenshots
 
+The screenshots below cover some of the pages people use most often. More details and screens are not shown here, and you are welcome to try the app yourself.
+
 <table>
   <tr>
     <td align="center" valign="top">
