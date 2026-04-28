@@ -283,7 +283,7 @@ flutter build linux -t lib/main_desktop_merger.dart --release
 当前 README 与应用界面都维护以下四种语言：
 
 - 简体中文
-- English
+- 英文
 - 日本語
 - 한국어
 
@@ -301,12 +301,6 @@ dart run tool/i18n_audit.dart --update-baseline
 ```
 
 `flutter test` 会自动运行 `test/i18n_audit_test.dart`，用于阻止新的多语言回归。
-
-## 赞助鸣谢
-
-| 赞助者 | 展示链接 |
-| --- | --- |
-| 暂无 | 暂无 |
 
 ## 贡献指南
 
