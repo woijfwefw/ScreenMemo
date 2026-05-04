@@ -3515,4 +3515,109 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get promptAddonSectionTitle => '补充说明';
+
+  @override
+  String get modelMetaContextLabel => '上下文';
+
+  @override
+  String get modelMetaInputLabel => '输入';
+
+  @override
+  String get modelMetaOutputLabel => '输出';
+
+  @override
+  String get modelMetaFallback32k => '默认 272K';
+
+  @override
+  String get modelMetaUnknownValue => '未知';
+
+  @override
+  String get modelMetaCostLabel => '费用';
+
+  @override
+  String get modelMetaCostInputLabel => '输入';
+
+  @override
+  String get modelMetaCostOutputLabel => '输出';
+
+  @override
+  String get modelMetaCostReasoningLabel => '推理';
+
+  @override
+  String get modelMetaCostCacheReadLabel => '缓存读取';
+
+  @override
+  String get modelMetaCostCacheWriteLabel => '缓存创建';
+
+  @override
+  String get modelMetaCostAudioInputLabel => '音频输入';
+
+  @override
+  String get modelMetaCostAudioOutputLabel => '音频输出';
+
+  @override
+  String get modelMetaKnowledgeLabel => '知识截止';
+
+  @override
+  String get modelMetaReleaseLabel => '发布日期';
+
+  @override
+  String get modelCapabilityReasoningLabel => '推理';
+
+  @override
+  String get modelCapabilityToolsLabel => '工具调用';
+
+  @override
+  String get modelCapabilityStructuredOutputLabel => '结构化输出';
+
+  @override
+  String get modelCapabilityAttachmentsLabel => '附件';
+
+  @override
+  String get modelModalityTextLabel => '文本';
+
+  @override
+  String get modelModalityImageLabel => '图片';
+
+  @override
+  String get modelModalityAudioLabel => '音频';
+
+  @override
+  String get modelModalityVideoLabel => '视频';
+
+  @override
+  String get modelModalityPdfLabel => 'PDF';
+
+  @override
+  String get modelModalityInputTooltip => '输入模态';
+
+  @override
+  String get modelModalityOutputTooltip => '输出模态';
+
+  @override
+  String get modelCapabilitySectionLabel => '能力';
+
+  @override
+  String get modelInputSupportSectionLabel => '输入支持';
+
+  @override
+  String get modelOutputSupportSectionLabel => '输出支持';
+
+  @override
+  String get modelStatusFlagship => '旗舰';
+
+  @override
+  String get modelStatusPreview => '预览';
+
+  @override
+  String get modelStatusBeta => '测试';
+
+  @override
+  String get modelStatusDeprecated => '已弃用';
+
+  @override
+  String get modelStatusExperimental => '实验';
+
+  @override
+  String get modelStatusStable => '稳定';
 }

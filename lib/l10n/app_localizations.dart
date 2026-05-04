@@ -6360,6 +6360,216 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Extra instructions'**
   String get promptAddonSectionTitle;
+
+  /// No description provided for @modelMetaContextLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Context'**
+  String get modelMetaContextLabel;
+
+  /// No description provided for @modelMetaInputLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Input'**
+  String get modelMetaInputLabel;
+
+  /// No description provided for @modelMetaOutputLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Output'**
+  String get modelMetaOutputLabel;
+
+  /// No description provided for @modelMetaFallback32k.
+  ///
+  /// In en, this message translates to:
+  /// **'Fallback 272K'**
+  String get modelMetaFallback32k;
+
+  /// No description provided for @modelMetaUnknownValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get modelMetaUnknownValue;
+
+  /// No description provided for @modelMetaCostLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost'**
+  String get modelMetaCostLabel;
+
+  /// No description provided for @modelMetaCostInputLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'input'**
+  String get modelMetaCostInputLabel;
+
+  /// No description provided for @modelMetaCostOutputLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'output'**
+  String get modelMetaCostOutputLabel;
+
+  /// No description provided for @modelMetaCostReasoningLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'reasoning'**
+  String get modelMetaCostReasoningLabel;
+
+  /// No description provided for @modelMetaCostCacheReadLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'cache read'**
+  String get modelMetaCostCacheReadLabel;
+
+  /// No description provided for @modelMetaCostCacheWriteLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'cache create'**
+  String get modelMetaCostCacheWriteLabel;
+
+  /// No description provided for @modelMetaCostAudioInputLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'audio in'**
+  String get modelMetaCostAudioInputLabel;
+
+  /// No description provided for @modelMetaCostAudioOutputLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'audio out'**
+  String get modelMetaCostAudioOutputLabel;
+
+  /// No description provided for @modelMetaKnowledgeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Knowledge'**
+  String get modelMetaKnowledgeLabel;
+
+  /// No description provided for @modelMetaReleaseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Release'**
+  String get modelMetaReleaseLabel;
+
+  /// No description provided for @modelCapabilityReasoningLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reasoning'**
+  String get modelCapabilityReasoningLabel;
+
+  /// No description provided for @modelCapabilityToolsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tools'**
+  String get modelCapabilityToolsLabel;
+
+  /// No description provided for @modelCapabilityStructuredOutputLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Structured output'**
+  String get modelCapabilityStructuredOutputLabel;
+
+  /// No description provided for @modelCapabilityAttachmentsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachments'**
+  String get modelCapabilityAttachmentsLabel;
+
+  /// No description provided for @modelModalityTextLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get modelModalityTextLabel;
+
+  /// No description provided for @modelModalityImageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get modelModalityImageLabel;
+
+  /// No description provided for @modelModalityAudioLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio'**
+  String get modelModalityAudioLabel;
+
+  /// No description provided for @modelModalityVideoLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Video'**
+  String get modelModalityVideoLabel;
+
+  /// No description provided for @modelModalityPdfLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF'**
+  String get modelModalityPdfLabel;
+
+  /// No description provided for @modelModalityInputTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Input modality'**
+  String get modelModalityInputTooltip;
+
+  /// No description provided for @modelModalityOutputTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Output modality'**
+  String get modelModalityOutputTooltip;
+
+  /// No description provided for @modelCapabilitySectionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Capabilities'**
+  String get modelCapabilitySectionLabel;
+
+  /// No description provided for @modelInputSupportSectionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Input support'**
+  String get modelInputSupportSectionLabel;
+
+  /// No description provided for @modelOutputSupportSectionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Output support'**
+  String get modelOutputSupportSectionLabel;
+
+  /// No description provided for @modelStatusFlagship.
+  ///
+  /// In en, this message translates to:
+  /// **'Flagship'**
+  String get modelStatusFlagship;
+
+  /// No description provided for @modelStatusPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get modelStatusPreview;
+
+  /// No description provided for @modelStatusBeta.
+  ///
+  /// In en, this message translates to:
+  /// **'Beta'**
+  String get modelStatusBeta;
+
+  /// No description provided for @modelStatusDeprecated.
+  ///
+  /// In en, this message translates to:
+  /// **'Deprecated'**
+  String get modelStatusDeprecated;
+
+  /// No description provided for @modelStatusExperimental.
+  ///
+  /// In en, this message translates to:
+  /// **'Experimental'**
+  String get modelStatusExperimental;
+
+  /// No description provided for @modelStatusStable.
+  ///
+  /// In en, this message translates to:
+  /// **'Stable'**
+  String get modelStatusStable;
 }
 
 class _AppLocalizationsDelegate

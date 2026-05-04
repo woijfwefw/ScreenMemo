@@ -2,13 +2,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:screen_memo/core/widgets/ui_components.dart';
 import 'package:screen_memo/l10n/app_localizations.dart';
+import 'package:screen_memo/features/ai/application/ai_context_budgets.dart';
 import 'package:screen_memo/features/ai/application/ai_providers_service.dart';
+import 'package:screen_memo/features/ai/application/models_dev_catalog_service.dart';
 import 'package:screen_memo/features/ai/application/provider_key_batch_maintenance_service.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:screen_memo/core/utils/model_icon_utils.dart';
+import 'package:screen_memo/core/widgets/model_logo.dart';
 import 'package:screen_memo/core/widgets/ui_dialog.dart';
 import 'package:screen_memo/core/logging/flutter_logger.dart';
+import 'package:screen_memo/models/models_dev_limits.dart';
 
 enum _ProviderKeySortMode {
   runtime,
@@ -19,6 +21,13 @@ enum _ProviderKeySortMode {
   failureDesc,
   continuousFailureDesc,
   newestDesc,
+}
+
+class _ModelCostDisplayItem {
+  const _ModelCostDisplayItem({required this.label, required this.value});
+
+  final String label;
+  final String value;
 }
 
 /// 提供商编辑页（新建/编辑）
@@ -34,6 +43,7 @@ class ProviderEditPage extends StatefulWidget {
 class _ProviderEditPageState extends State<ProviderEditPage> {
   final _svc = AIProvidersService.instance;
   final _batchSvc = ProviderKeyBatchMaintenanceService.instance;
+  final _modelsDev = ModelsDevCatalogService.instance;
 
   final _nameCtrl = TextEditingController();
   final _baseUrlCtrl = TextEditingController();
@@ -62,9 +72,12 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
   _ProviderKeySortMode _keySortMode = _ProviderKeySortMode.runtime;
 
   List<String> _models = <String>[];
+  final Map<String, ModelsDevModelInfo> _modelInfoByName =
+      <String, ModelsDevModelInfo>{};
   List<AIProviderKey> _keys = <AIProviderKey>[];
   AIProvider? _loaded;
   bool _geminiNoticeShown = false;
+  int _modelInfoLoadSeq = 0;
 
   Future<void> _showGeminiRegionDialog() async {
     if (!mounted) return;
@@ -137,6 +150,7 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
       } else {
         _applyTypeDefaults(AIProviderTypes.openai, initial: true);
       }
+      unawaited(_loadModelMetadataFor(_models));
     } catch (e) {
       if (mounted) {
         UINotifier.error(context, AppLocalizations.of(context).pleaseTryAgain);
@@ -178,6 +192,38 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
     setState(() {
       _keys = keys;
       _models = _aggregateKeyModels(keys);
+    });
+    unawaited(_loadModelMetadataFor(_models));
+  }
+
+  Future<void> _loadModelMetadataFor(List<String> models) async {
+    final int seq = ++_modelInfoLoadSeq;
+    final List<String> target = List<String>.from(models);
+    if (target.isEmpty) {
+      if (!mounted || seq != _modelInfoLoadSeq) return;
+      setState(() => _modelInfoByName.clear());
+      return;
+    }
+    final Map<String, ModelsDevModelInfo> info = await _modelsDev.findModels(
+      target,
+      providerTypeHint: _type,
+      providerBaseUrl: _baseUrlCtrl.text,
+      providerName: _nameCtrl.text,
+    );
+    // 手动添加模型时也顺带把可解析到的上下文写入本地 prompt cap override。
+    unawaited(
+      _modelsDev.cachePromptCapsForModels(
+        target,
+        providerTypeHint: _type,
+        providerBaseUrl: _baseUrlCtrl.text,
+        providerName: _nameCtrl.text,
+      ),
+    );
+    if (!mounted || seq != _modelInfoLoadSeq) return;
+    setState(() {
+      _modelInfoByName
+        ..clear()
+        ..addAll(info);
     });
   }
 
@@ -415,6 +461,7 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
           : _chatPathCtrl.text;
     }
     _models = <String>[];
+    _modelInfoByName.clear();
   }
 
   bool get _supportsModelsPath {
@@ -834,12 +881,15 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
   void _addModelChip() {
     final m = _modelInputCtrl.text.trim();
     if (m.isEmpty) return;
+    bool added = false;
     setState(() {
       if (!_models.contains(m)) {
         _models = List<String>.from(_models)..add(m);
+        added = true;
       }
       _modelInputCtrl.clear();
     });
+    if (added) unawaited(_loadModelMetadataFor(_models));
   }
 
   List<String> _parseApiKeys(String raw) {
@@ -864,6 +914,606 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
       }
     }
     return out;
+  }
+
+  ModelsDevModelInfo? _metadataForModel(String model) {
+    return _modelInfoByName[model.trim().toLowerCase()];
+  }
+
+  String _formatTokens(int? tokens, AppLocalizations l10n) {
+    if (tokens == null || tokens <= 0) return l10n.modelMetaUnknownValue;
+    if (tokens >= 1000000) {
+      final double m = tokens / 1000000;
+      return '${m.toStringAsFixed(m >= 10 ? 0 : 1)}M';
+    }
+    if (tokens >= 1000) {
+      final double k = tokens / 1000;
+      return '${k.toStringAsFixed(k >= 100 ? 0 : 1)}K';
+    }
+    return '$tokens';
+  }
+
+  String _modelLimitLine(String model, AppLocalizations l10n) {
+    final ModelsDevModelInfo? meta = _metadataForModel(model);
+    final int? localContext = ModelsDevModelLimits.contextTokens(model);
+    final bool usingFallbackContext = meta == null && localContext == null;
+    final int context =
+        meta?.contextTokens ??
+        localContext ??
+        AIContextBudgets.forModel(model).promptCapTokens;
+    final int? input =
+        meta?.inputTokens ?? ModelsDevModelLimits.inputTokens(model);
+    final int? output =
+        meta?.outputTokens ?? ModelsDevModelLimits.outputTokens(model);
+    final parts = <String>[
+      '${l10n.modelMetaContextLabel} ${_formatTokens(context, l10n)}',
+    ];
+    if (input != null && input > 0) {
+      parts.add('${l10n.modelMetaInputLabel} ${_formatTokens(input, l10n)}');
+    }
+    if (output != null && output > 0) {
+      parts.add('${l10n.modelMetaOutputLabel} ${_formatTokens(output, l10n)}');
+    }
+    if (usingFallbackContext) {
+      parts.add(l10n.modelMetaFallback32k);
+    }
+    return parts.join(' · ');
+  }
+
+  String _formatUsdPerMillion(double value) {
+    final String text = value
+        .toStringAsFixed(value.abs() >= 100 ? 2 : 4)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
+    return '\$$text/M';
+  }
+
+  List<_ModelCostDisplayItem> _modelCostItems(
+    ModelsDevModelInfo? meta,
+    AppLocalizations l10n,
+  ) {
+    if (meta == null || meta.cost.isEmpty) return const [];
+
+    final labels = <String, String>{
+      'input': l10n.modelMetaCostInputLabel,
+      'output': l10n.modelMetaCostOutputLabel,
+      'reasoning': l10n.modelMetaCostReasoningLabel,
+      'cache_read': l10n.modelMetaCostCacheReadLabel,
+      'cache_write': l10n.modelMetaCostCacheWriteLabel,
+      'cache_create': l10n.modelMetaCostCacheWriteLabel,
+      'cache_creation': l10n.modelMetaCostCacheWriteLabel,
+      'cache_creation_input': l10n.modelMetaCostCacheWriteLabel,
+      'input_cache_write': l10n.modelMetaCostCacheWriteLabel,
+      'input_audio': l10n.modelMetaCostAudioInputLabel,
+      'output_audio': l10n.modelMetaCostAudioOutputLabel,
+    };
+
+    final items = <_ModelCostDisplayItem>[];
+    final seen = <String>{};
+    for (final entry in labels.entries) {
+      final value = meta.cost[entry.key];
+      if (value == null) continue;
+      seen.add(entry.key);
+      items.add(
+        _ModelCostDisplayItem(
+          label: entry.value,
+          value: _formatUsdPerMillion(value),
+        ),
+      );
+    }
+    for (final entry in meta.cost.entries) {
+      if (seen.contains(entry.key)) continue;
+      items.add(
+        _ModelCostDisplayItem(
+          label: entry.key.replaceAll('_', ' '),
+          value: _formatUsdPerMillion(entry.value),
+        ),
+      );
+    }
+    return items;
+  }
+
+  Widget? _buildModelLifecycleRow(
+    ModelsDevModelInfo? meta,
+    AppLocalizations l10n,
+  ) {
+    if (meta == null) return null;
+    final knowledge = (meta.knowledge ?? '').trim();
+    final releaseDate = (meta.releaseDate ?? '').trim();
+    if (knowledge.isEmpty && releaseDate.isEmpty) return null;
+
+    final releaseItem = releaseDate.isEmpty
+        ? null
+        : _buildLifecycleItem(
+            icon: Icons.event_available_outlined,
+            label: l10n.modelMetaReleaseLabel,
+            value: releaseDate,
+          );
+    final knowledgeItem = knowledge.isEmpty
+        ? null
+        : _buildLifecycleItem(
+            icon: Icons.calendar_today_outlined,
+            label: l10n.modelMetaKnowledgeLabel,
+            value: knowledge,
+            alignEnd: true,
+          );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+      child: Row(
+        children: [
+          if (releaseItem != null)
+            Expanded(child: releaseItem)
+          else
+            const Spacer(),
+          if (knowledgeItem != null && releaseItem != null)
+            const SizedBox(width: AppTheme.spacing4),
+          if (knowledgeItem != null)
+            Expanded(child: knowledgeItem)
+          else
+            const Spacer(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLifecycleItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    bool alignEnd = false,
+  }) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisAlignment: alignEnd
+          ? MainAxisAlignment.end
+          : MainAxisAlignment.start,
+      children: [
+        Icon(icon, size: 15, color: theme.colorScheme.onSurfaceVariant),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: alignEnd ? TextAlign.end : TextAlign.start,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface,
+              fontWeight: FontWeight.w700,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModelCard(
+    BuildContext context,
+    String model, {
+    required VoidCallback onRemove,
+  }) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
+    final meta = _metadataForModel(model);
+    final costItems = _modelCostItems(meta, l10n);
+    final lifecycleRow = _buildModelLifecycleRow(meta, l10n);
+    final status = _modelStatusLabel(meta?.status, l10n);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppTheme.spacing2),
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+          border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.55),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildModelLogoBox(model: model, meta: meta),
+                  const SizedBox(width: AppTheme.spacing3),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                model,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (status != null) ...[
+                              const SizedBox(width: AppTheme.spacing2),
+                              _buildModelStatusBadge(status, theme),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _modelLimitLine(model, l10n),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            height: 1.25,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: AppLocalizations.of(context).actionDelete,
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    visualDensity: VisualDensity.compact,
+                    color: theme.colorScheme.onSurfaceVariant,
+                    onPressed: onRemove,
+                  ),
+                ],
+              ),
+            ),
+            if (costItems.isNotEmpty) _buildModelCostBand(context, costItems),
+            if (lifecycleRow != null) lifecycleRow,
+            _buildModelCapabilitySection(context, meta),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModelLogoBox({
+    required String model,
+    required ModelsDevModelInfo? meta,
+  }) {
+    final theme = Theme.of(context);
+    return Container(
+      width: 46,
+      height: 46,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.42),
+          width: 0.7,
+        ),
+      ),
+      child: ModelLogo(modelId: model, metadata: meta, size: 24),
+    );
+  }
+
+  String? _modelStatusLabel(String? status, AppLocalizations l10n) {
+    final raw = (status ?? '').trim();
+    if (raw.isEmpty) return null;
+    final normalized = raw.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+    switch (normalized) {
+      case 'flagship':
+        return l10n.modelStatusFlagship;
+      case 'preview':
+        return l10n.modelStatusPreview;
+      case 'beta':
+        return l10n.modelStatusBeta;
+      case 'deprecated':
+        return l10n.modelStatusDeprecated;
+      case 'experimental':
+        return l10n.modelStatusExperimental;
+      case 'stable':
+        return l10n.modelStatusStable;
+      default:
+        return raw;
+    }
+  }
+
+  Widget _buildModelStatusBadge(String status, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppTheme.warning.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+        border: Border.all(
+          color: AppTheme.warning.withValues(alpha: 0.4),
+          width: 0.7,
+        ),
+      ),
+      child: Text(
+        status,
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: AppTheme.warning,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModelCostBand(
+    BuildContext context,
+    List<_ModelCostDisplayItem> items,
+  ) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      color: theme.scaffoldBackgroundColor.withValues(alpha: 0.72),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.spacing3,
+        vertical: AppTheme.spacing2,
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool fillWidth =
+              items.length <= 4 && constraints.maxWidth.isFinite;
+          final double cellWidth = fillWidth
+              ? (constraints.maxWidth - (items.length - 1)) / items.length
+              : 112;
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (int i = 0; i < items.length; i++) ...[
+                  SizedBox(
+                    width: fillWidth
+                        ? cellWidth.clamp(0.0, double.infinity)
+                        : (cellWidth < 92.0 ? 92.0 : cellWidth),
+                    child: _buildModelCostCell(context, items[i]),
+                  ),
+                  if (i != items.length - 1) _buildThinVerticalDivider(theme),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildModelCostCell(BuildContext context, _ModelCostDisplayItem item) {
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          item.value,
+          style: theme.textTheme.titleMedium?.copyWith(
+            color: theme.colorScheme.onSurface,
+            fontWeight: FontWeight.w800,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 3),
+        Text(
+          item.label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w500,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModelCapabilitySection(
+    BuildContext context,
+    ModelsDevModelInfo? meta,
+  ) {
+    if (meta == null) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context);
+    final abilityChips = <Widget>[];
+    final inputChips = <Widget>[];
+    final outputChips = <Widget>[];
+
+    if (meta.reasoning == true) {
+      abilityChips.add(
+        _buildMetaChip(
+          context,
+          icon: Icons.psychology,
+          label: l10n.modelCapabilityReasoningLabel,
+          tooltip: l10n.modelCapabilityReasoningLabel,
+        ),
+      );
+    }
+    if (meta.toolCall == true) {
+      abilityChips.add(
+        _buildMetaChip(
+          context,
+          icon: Icons.build,
+          label: l10n.modelCapabilityToolsLabel,
+          tooltip: l10n.modelCapabilityToolsLabel,
+        ),
+      );
+    }
+    if (meta.structuredOutput == true) {
+      abilityChips.add(
+        _buildMetaChip(
+          context,
+          icon: Icons.code,
+          label: l10n.modelCapabilityStructuredOutputLabel,
+          tooltip: l10n.modelCapabilityStructuredOutputLabel,
+        ),
+      );
+    }
+    if (meta.attachment == true) {
+      inputChips.add(
+        _buildMetaChip(
+          context,
+          icon: Icons.attach_file,
+          label: l10n.modelCapabilityAttachmentsLabel,
+          tooltip: l10n.modelCapabilityAttachmentsLabel,
+        ),
+      );
+    }
+    for (final modality in _uniqueModalities(meta.inputModalities)) {
+      inputChips.add(_buildModalityChip(context, modality, l10n: l10n));
+    }
+    for (final modality in _uniqueModalities(meta.outputModalities)) {
+      outputChips.add(_buildModalityChip(context, modality, l10n: l10n));
+    }
+
+    final rows = <Widget>[
+      if (abilityChips.isNotEmpty)
+        _buildModelChipRow(l10n.modelCapabilitySectionLabel, abilityChips),
+      if (inputChips.isNotEmpty)
+        _buildModelChipRow(l10n.modelInputSupportSectionLabel, inputChips),
+      if (outputChips.isNotEmpty)
+        _buildModelChipRow(l10n.modelOutputSupportSectionLabel, outputChips),
+    ];
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      child: Column(
+        children: [
+          for (int i = 0; i < rows.length; i++) ...[
+            if (i > 0) const SizedBox(height: 8),
+            rows[i],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModelChipRow(String label, List<Widget> chips) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 62,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              label,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+                height: 1.1,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Expanded(child: Wrap(spacing: 6, runSpacing: 6, children: chips)),
+      ],
+    );
+  }
+
+  Iterable<String> _uniqueModalities(List<String> modalities) sync* {
+    final seen = <String>{};
+    for (final raw in modalities) {
+      final value = raw.trim();
+      if (value.isEmpty) continue;
+      if (seen.add(value.toLowerCase())) yield value;
+    }
+  }
+
+  Widget _buildModalityChip(
+    BuildContext context,
+    String modality, {
+    required AppLocalizations l10n,
+  }) {
+    final label = _modelModalityLabel(modality, l10n);
+    return _buildMetaChip(
+      context,
+      icon: _modelModalityIcon(modality),
+      label: label,
+      tooltip: label,
+    );
+  }
+
+  String _modelModalityLabel(String modality, AppLocalizations l10n) {
+    final normalized = modality.trim().toLowerCase();
+    if (normalized.isEmpty) return l10n.modelMetaUnknownValue;
+    if (normalized.contains('image')) return l10n.modelModalityImageLabel;
+    if (normalized.contains('audio')) return l10n.modelModalityAudioLabel;
+    if (normalized.contains('video')) return l10n.modelModalityVideoLabel;
+    if (normalized.contains('pdf')) return l10n.modelModalityPdfLabel;
+    if (normalized.contains('text')) return l10n.modelModalityTextLabel;
+    return modality.trim();
+  }
+
+  IconData _modelModalityIcon(String modality) {
+    final normalized = modality.trim().toLowerCase();
+    if (normalized.contains('image')) return Icons.image;
+    if (normalized.contains('audio')) return Icons.graphic_eq;
+    if (normalized.contains('video')) return Icons.videocam;
+    if (normalized.contains('pdf')) return Icons.picture_as_pdf;
+    if (normalized.contains('text')) return Icons.text_fields;
+    return Icons.extension;
+  }
+
+  Widget _buildMetaChip(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String tooltip,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textStyle = theme.textTheme.labelSmall?.copyWith(
+      color: colorScheme.onSurfaceVariant,
+      fontWeight: FontWeight.w700,
+    );
+
+    // 用紧凑 chip 承载模型能力，Tooltip 保留完整本地化说明。
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        label: tooltip,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.42),
+            borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+            border: Border.all(
+              color: colorScheme.outline.withValues(alpha: 0.62),
+              width: 0.7,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 13, color: colorScheme.onSurfaceVariant),
+              const SizedBox(width: 4),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 120),
+                child: Text(
+                  label,
+                  style: textStyle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   String _keyNameForBatch({
@@ -2038,7 +2688,7 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
   }
 
   Widget _buildKeysHeaderCard(ThemeData theme) {
-    final badgeText = _keys.length > 99 ? '99+' : '${_keys.length}';
+    final keyCountText = _keys.length > 99 ? '99+' : '${_keys.length}';
     final balanceSummary = _keysBalanceSummary();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2059,32 +2709,9 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
                 runSpacing: AppTheme.spacing1,
                 children: [
                   Text(
-                    'API Key',
+                    'APIKey（$keyCountText）',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surface,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: theme.colorScheme.outline.withValues(
-                          alpha: 0.65,
-                        ),
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      badgeText,
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w700,
-                      ),
                     ),
                   ),
                   if (balanceSummary != null)
@@ -2096,7 +2723,7 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
                       decoration: BoxDecoration(
                         color: theme.colorScheme.surfaceContainerHighest
                             .withValues(alpha: 0.22),
-                        borderRadius: BorderRadius.circular(999),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                         border: Border.all(
                           color: theme.colorScheme.outline.withValues(
                             alpha: 0.35,
@@ -2309,132 +2936,119 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
   }
 
   Widget _buildModelsCard(ThemeData theme) {
-    return _buildSectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                AppLocalizations.of(context).modelsCountLabel(_models.length),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              AppLocalizations.of(context).modelsCountLabel(_models.length),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: (_fetching || _batchRunning) ? null : _refreshModels,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTheme.spacing2,
+                  vertical: AppTheme.spacing1,
                 ),
               ),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: (_fetching || _batchRunning) ? null : _refreshModels,
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppTheme.spacing2,
-                    vertical: AppTheme.spacing1,
-                  ),
-                ),
-                icon: _fetching
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.refresh, size: 18),
-                label: Text(AppLocalizations.of(context).actionRefresh),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppTheme.spacing3),
-          Text(
-            AppLocalizations.of(context).manualAddModelLabel,
-            style: Theme.of(
-              context,
-            ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: AppTheme.spacing1),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 40,
-                  child: TextField(
-                    controller: _modelInputCtrl,
-                    textAlignVertical: TextAlignVertical.center,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                    decoration: InputDecoration(
-                      isDense: false,
-                      hintText: AppLocalizations.of(
-                        context,
-                      ).inputAndAddModelHint,
-                      hintStyle: Theme.of(context).textTheme.bodySmall
-                          ?.copyWith(color: AppTheme.mutedForeground),
-                      filled: true,
-                      fillColor: Theme.of(context).brightness == Brightness.dark
-                          ? Theme.of(context).colorScheme.surface
-                          : Theme.of(context).scaffoldBackgroundColor,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: AppTheme.spacing3,
-                        vertical: 0,
-                      ),
-                    ),
-                    onSubmitted: (_) => _addModelChip(),
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppTheme.spacing2),
-              SizedBox(
-                height: 40,
-                child: ElevatedButton(
-                  onPressed: _addModelChip,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppTheme.spacing4,
-                    ),
-                  ),
-                  child: Text(AppLocalizations.of(context).actionAdd),
-                ),
-              ),
-            ],
-          ),
-          if (_models.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: AppTheme.spacing3),
-              child: Text(
-                AppLocalizations.of(context).fetchModelsHint,
-                style: theme.textTheme.bodySmall,
-              ),
-            )
-          else ...[
-            const SizedBox(height: AppTheme.spacing3),
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _models.length,
-              separatorBuilder: (c, i) => Container(
-                height: 1,
-                color: Theme.of(c).colorScheme.outline.withValues(alpha: 0.6),
-              ),
-              itemBuilder: (c, i) {
-                final m = _models[i];
-                return ListTile(
-                  leading: SvgPicture.asset(
-                    ModelIconUtils.getIconPath(m),
-                    width: 20,
-                    height: 20,
-                  ),
-                  title: Text(m, style: Theme.of(c).textTheme.bodyMedium),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.close, size: 18),
-                    onPressed: () {
-                      setState(() {
-                        _models = List<String>.from(_models)..removeAt(i);
-                      });
-                    },
-                  ),
-                );
-              },
+              icon: _fetching
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh, size: 18),
+              label: Text(AppLocalizations.of(context).actionRefresh),
             ),
           ],
+        ),
+        const SizedBox(height: AppTheme.spacing3),
+        Text(
+          AppLocalizations.of(context).manualAddModelLabel,
+          style: Theme.of(
+            context,
+          ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: AppTheme.spacing1),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 40,
+                child: TextField(
+                  controller: _modelInputCtrl,
+                  textAlignVertical: TextAlignVertical.center,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  decoration: InputDecoration(
+                    isDense: false,
+                    hintText: AppLocalizations.of(context).inputAndAddModelHint,
+                    hintStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTheme.mutedForeground,
+                    ),
+                    filled: true,
+                    fillColor: Theme.of(context).brightness == Brightness.dark
+                        ? Theme.of(context).colorScheme.surface
+                        : Theme.of(context).scaffoldBackgroundColor,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppTheme.spacing3,
+                      vertical: 0,
+                    ),
+                  ),
+                  onSubmitted: (_) => _addModelChip(),
+                ),
+              ),
+            ),
+            const SizedBox(width: AppTheme.spacing2),
+            SizedBox(
+              height: 40,
+              child: ElevatedButton(
+                onPressed: _addModelChip,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTheme.spacing4,
+                  ),
+                ),
+                child: Text(AppLocalizations.of(context).actionAdd),
+              ),
+            ),
+          ],
+        ),
+        if (_models.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: AppTheme.spacing3),
+            child: Text(
+              AppLocalizations.of(context).fetchModelsHint,
+              style: theme.textTheme.bodySmall,
+            ),
+          )
+        else ...[
+          const SizedBox(height: AppTheme.spacing3),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _models.length,
+            itemBuilder: (c, i) {
+              final m = _models[i];
+              return _buildModelCard(
+                c,
+                m,
+                onRemove: () {
+                  setState(() {
+                    _models = List<String>.from(_models)..removeAt(i);
+                    _modelInfoByName.remove(m.trim().toLowerCase());
+                  });
+                },
+              );
+            },
+          ),
         ],
-      ),
+      ],
     );
   }
 
@@ -2461,27 +3075,6 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildSectionCard({required Widget child}) {
-    final theme = Theme.of(context);
-    final bool isDark = theme.brightness == Brightness.dark;
-    final Color surface = isDark
-        ? theme.colorScheme.surface
-        : theme.scaffoldBackgroundColor;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppTheme.spacing3),
-      decoration: BoxDecoration(
-        color: surface,
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.3),
-          width: 1,
-        ),
-        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-      ),
-      child: child,
     );
   }
 

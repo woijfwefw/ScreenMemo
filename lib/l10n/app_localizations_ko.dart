@@ -3549,4 +3549,109 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get promptAddonSectionTitle => '추가 설명';
+
+  @override
+  String get modelMetaContextLabel => '컨텍스트';
+
+  @override
+  String get modelMetaInputLabel => '입력';
+
+  @override
+  String get modelMetaOutputLabel => '출력';
+
+  @override
+  String get modelMetaFallback32k => '기본 272K';
+
+  @override
+  String get modelMetaUnknownValue => '알 수 없음';
+
+  @override
+  String get modelMetaCostLabel => '비용';
+
+  @override
+  String get modelMetaCostInputLabel => '입력';
+
+  @override
+  String get modelMetaCostOutputLabel => '출력';
+
+  @override
+  String get modelMetaCostReasoningLabel => '추론';
+
+  @override
+  String get modelMetaCostCacheReadLabel => '캐시 읽기';
+
+  @override
+  String get modelMetaCostCacheWriteLabel => '캐시 생성';
+
+  @override
+  String get modelMetaCostAudioInputLabel => '오디오 입력';
+
+  @override
+  String get modelMetaCostAudioOutputLabel => '오디오 출력';
+
+  @override
+  String get modelMetaKnowledgeLabel => '지식 기준일';
+
+  @override
+  String get modelMetaReleaseLabel => '출시일';
+
+  @override
+  String get modelCapabilityReasoningLabel => '추론';
+
+  @override
+  String get modelCapabilityToolsLabel => '도구 호출';
+
+  @override
+  String get modelCapabilityStructuredOutputLabel => '구조화 출력';
+
+  @override
+  String get modelCapabilityAttachmentsLabel => '첨부';
+
+  @override
+  String get modelModalityTextLabel => '텍스트';
+
+  @override
+  String get modelModalityImageLabel => '이미지';
+
+  @override
+  String get modelModalityAudioLabel => '오디오';
+
+  @override
+  String get modelModalityVideoLabel => '비디오';
+
+  @override
+  String get modelModalityPdfLabel => 'PDF';
+
+  @override
+  String get modelModalityInputTooltip => '입력 모달리티';
+
+  @override
+  String get modelModalityOutputTooltip => '출력 모달리티';
+
+  @override
+  String get modelCapabilitySectionLabel => '능력';
+
+  @override
+  String get modelInputSupportSectionLabel => '입력 지원';
+
+  @override
+  String get modelOutputSupportSectionLabel => '출력 지원';
+
+  @override
+  String get modelStatusFlagship => '플래그십';
+
+  @override
+  String get modelStatusPreview => '미리보기';
+
+  @override
+  String get modelStatusBeta => '베타';
+
+  @override
+  String get modelStatusDeprecated => '지원 중단';
+
+  @override
+  String get modelStatusExperimental => '실험';
+
+  @override
+  String get modelStatusStable => '안정';
 }

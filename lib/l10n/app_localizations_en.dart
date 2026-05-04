@@ -3638,4 +3638,109 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get promptAddonSectionTitle => 'Extra instructions';
+
+  @override
+  String get modelMetaContextLabel => 'Context';
+
+  @override
+  String get modelMetaInputLabel => 'Input';
+
+  @override
+  String get modelMetaOutputLabel => 'Output';
+
+  @override
+  String get modelMetaFallback32k => 'Fallback 272K';
+
+  @override
+  String get modelMetaUnknownValue => 'Unknown';
+
+  @override
+  String get modelMetaCostLabel => 'Cost';
+
+  @override
+  String get modelMetaCostInputLabel => 'input';
+
+  @override
+  String get modelMetaCostOutputLabel => 'output';
+
+  @override
+  String get modelMetaCostReasoningLabel => 'reasoning';
+
+  @override
+  String get modelMetaCostCacheReadLabel => 'cache read';
+
+  @override
+  String get modelMetaCostCacheWriteLabel => 'cache create';
+
+  @override
+  String get modelMetaCostAudioInputLabel => 'audio in';
+
+  @override
+  String get modelMetaCostAudioOutputLabel => 'audio out';
+
+  @override
+  String get modelMetaKnowledgeLabel => 'Knowledge';
+
+  @override
+  String get modelMetaReleaseLabel => 'Release';
+
+  @override
+  String get modelCapabilityReasoningLabel => 'Reasoning';
+
+  @override
+  String get modelCapabilityToolsLabel => 'Tools';
+
+  @override
+  String get modelCapabilityStructuredOutputLabel => 'Structured output';
+
+  @override
+  String get modelCapabilityAttachmentsLabel => 'Attachments';
+
+  @override
+  String get modelModalityTextLabel => 'Text';
+
+  @override
+  String get modelModalityImageLabel => 'Image';
+
+  @override
+  String get modelModalityAudioLabel => 'Audio';
+
+  @override
+  String get modelModalityVideoLabel => 'Video';
+
+  @override
+  String get modelModalityPdfLabel => 'PDF';
+
+  @override
+  String get modelModalityInputTooltip => 'Input modality';
+
+  @override
+  String get modelModalityOutputTooltip => 'Output modality';
+
+  @override
+  String get modelCapabilitySectionLabel => 'Capabilities';
+
+  @override
+  String get modelInputSupportSectionLabel => 'Input support';
+
+  @override
+  String get modelOutputSupportSectionLabel => 'Output support';
+
+  @override
+  String get modelStatusFlagship => 'Flagship';
+
+  @override
+  String get modelStatusPreview => 'Preview';
+
+  @override
+  String get modelStatusBeta => 'Beta';
+
+  @override
+  String get modelStatusDeprecated => 'Deprecated';
+
+  @override
+  String get modelStatusExperimental => 'Experimental';
+
+  @override
+  String get modelStatusStable => 'Stable';
 }

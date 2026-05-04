@@ -3548,4 +3548,109 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get promptAddonSectionTitle => '補足説明';
+
+  @override
+  String get modelMetaContextLabel => 'コンテキスト';
+
+  @override
+  String get modelMetaInputLabel => '入力';
+
+  @override
+  String get modelMetaOutputLabel => '出力';
+
+  @override
+  String get modelMetaFallback32k => '既定 272K';
+
+  @override
+  String get modelMetaUnknownValue => '不明';
+
+  @override
+  String get modelMetaCostLabel => '料金';
+
+  @override
+  String get modelMetaCostInputLabel => '入力';
+
+  @override
+  String get modelMetaCostOutputLabel => '出力';
+
+  @override
+  String get modelMetaCostReasoningLabel => '推論';
+
+  @override
+  String get modelMetaCostCacheReadLabel => 'キャッシュ読取';
+
+  @override
+  String get modelMetaCostCacheWriteLabel => 'キャッシュ作成';
+
+  @override
+  String get modelMetaCostAudioInputLabel => '音声入力';
+
+  @override
+  String get modelMetaCostAudioOutputLabel => '音声出力';
+
+  @override
+  String get modelMetaKnowledgeLabel => '知識期限';
+
+  @override
+  String get modelMetaReleaseLabel => 'リリース日';
+
+  @override
+  String get modelCapabilityReasoningLabel => '推論';
+
+  @override
+  String get modelCapabilityToolsLabel => 'ツール呼び出し';
+
+  @override
+  String get modelCapabilityStructuredOutputLabel => '構造化出力';
+
+  @override
+  String get modelCapabilityAttachmentsLabel => '添付';
+
+  @override
+  String get modelModalityTextLabel => 'テキスト';
+
+  @override
+  String get modelModalityImageLabel => '画像';
+
+  @override
+  String get modelModalityAudioLabel => '音声';
+
+  @override
+  String get modelModalityVideoLabel => '動画';
+
+  @override
+  String get modelModalityPdfLabel => 'PDF';
+
+  @override
+  String get modelModalityInputTooltip => '入力モダリティ';
+
+  @override
+  String get modelModalityOutputTooltip => '出力モダリティ';
+
+  @override
+  String get modelCapabilitySectionLabel => '機能';
+
+  @override
+  String get modelInputSupportSectionLabel => '入力対応';
+
+  @override
+  String get modelOutputSupportSectionLabel => '出力対応';
+
+  @override
+  String get modelStatusFlagship => '旗艦';
+
+  @override
+  String get modelStatusPreview => 'プレビュー';
+
+  @override
+  String get modelStatusBeta => 'ベータ';
+
+  @override
+  String get modelStatusDeprecated => '非推奨';
+
+  @override
+  String get modelStatusExperimental => '実験';
+
+  @override
+  String get modelStatusStable => '安定';
 }
