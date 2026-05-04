@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 
 import 'package:screen_memo/data/database/screenshot_database.dart';
 import 'package:screen_memo/core/logging/flutter_logger.dart';
+import 'package:screen_memo/features/ai/application/models_dev_catalog_service.dart';
 
 String defaultModelsPathForType(String type) {
   final normalized = type.trim().toLowerCase();
@@ -1206,32 +1207,36 @@ class AIProvidersService {
     required String apiKey,
   }) async {
     final type = provider.type.trim().toLowerCase();
+    late final List<String> models;
     switch (type) {
       case AIProviderTypes.openai:
       case AIProviderTypes.custom:
-        return _fetchOpenAIModels(
+        models = await _fetchOpenAIModels(
           baseUrl: _baseUrlOrDefaultOpenAI(provider.baseUrl),
           apiKey: apiKey,
           modelsPath: provider.modelsPath,
         );
+        break;
       case AIProviderTypes.claude:
-        return _fetchClaudeModels(
+        models = await _fetchClaudeModels(
           baseUrl: _ensureBase(provider.baseUrl, 'https://api.anthropic.com'),
           apiKey: apiKey,
           modelsPath: provider.modelsPath,
         );
+        break;
       case AIProviderTypes.gemini:
-        return _fetchGeminiModels(
+        models = await _fetchGeminiModels(
           baseUrl: _ensureBase(
             provider.baseUrl,
             'https://generativelanguage.googleapis.com',
           ),
           apiKey: apiKey,
         );
+        break;
       case AIProviderTypes.azureOpenAI:
         final apiVersion =
             (provider.extra['azure_api_version'] as String?) ?? '2024-02-15';
-        return _fetchAzureOpenAIModels(
+        models = await _fetchAzureOpenAIModels(
           baseUrl: _requireBase(
             provider.baseUrl,
             hint: 'https://{resource}.openai.azure.com',
@@ -1239,13 +1244,41 @@ class AIProvidersService {
           apiKey: apiKey,
           apiVersion: apiVersion,
         );
+        break;
       default:
         // 兜底：按 OpenAI 兼容尝试
-        return _fetchOpenAIModels(
+        models = await _fetchOpenAIModels(
           baseUrl: _baseUrlOrDefaultOpenAI(provider.baseUrl),
           apiKey: apiKey,
           modelsPath: provider.modelsPath,
         );
+        break;
+    }
+    await _cacheModelsDevPromptCaps(provider, models);
+    return models;
+  }
+
+  Future<void> _cacheModelsDevPromptCaps(
+    AIProvider provider,
+    List<String> models,
+  ) async {
+    if (models.isEmpty) return;
+    try {
+      final int updated = await ModelsDevCatalogService.instance
+          .cachePromptCapsForModels(
+            models,
+            providerTypeHint: provider.type,
+            providerBaseUrl: provider.baseUrl,
+            providerName: provider.name,
+          );
+      if (updated > 0) {
+        await FlutterLogger.nativeInfo(
+          'AI',
+          'models.dev prompt caps cached provider=${provider.name} count=$updated',
+        );
+      }
+    } catch (_) {
+      // 元数据只用于增强上下文上限，不影响原模型列表刷新。
     }
   }
 

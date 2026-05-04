@@ -53,8 +53,8 @@ class AIContextBudgets {
   /// Target summary budget.
   final int maxSummaryTokens;
 
-  // Previous fixed constants were tuned around a ~32k context model.
-  static const int _fallbackPromptCapTokens = 32000;
+  // 默认按现代长上下文模型处理，避免未知中转模型落到过小窗口。
+  static const int _fallbackPromptCapTokens = 272000;
 
   // Codex policy defaults:
   // - effective window: 95%

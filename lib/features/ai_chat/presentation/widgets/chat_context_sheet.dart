@@ -775,7 +775,8 @@ class _ChatContextPanelState extends State<ChatContextPanel> {
     final String model = _activeModel.trim().isNotEmpty
         ? _activeModel.trim()
         : (await AISettingsService.instance.getModel()).trim();
-    final AIContextBudgets budgets = AIContextBudgets.forModel(model);
+    final AIContextBudgets budgets =
+        await AIContextBudgets.forModelWithOverrides(model);
     final int capTokens = budgets.promptCapTokens;
     final int? outTokens = ModelsDevModelLimits.outputTokens(model);
 
