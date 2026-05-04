@@ -570,10 +570,11 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
                           final p = items[i];
                           final selected = p.id == currentId;
                           return ListTile(
-                            leading: SvgPicture.asset(
-                              ModelIconUtils.getProviderIconPath(p.type),
-                              width: 20,
-                              height: 20,
+                            leading: ProviderLogo(
+                              providerType: p.type,
+                              providerName: p.name,
+                              baseUrl: p.baseUrl,
+                              size: 20,
                             ),
                             title: Text(
                               p.name,
@@ -791,11 +792,7 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
                           final m = items[i];
                           final selected = m == active;
                           return ListTile(
-                            leading: SvgPicture.asset(
-                              ModelIconUtils.getIconPath(m),
-                              width: 20,
-                              height: 20,
-                            ),
+                            leading: ModelLogo(modelId: m, size: 20),
                             title: Text(
                               m,
                               style: Theme.of(c).textTheme.bodyMedium,

@@ -1,13 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:screen_memo/l10n/app_localizations.dart';
 
 import 'package:screen_memo/features/ai/application/ai_providers_service.dart';
 import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
-import 'package:screen_memo/core/utils/model_icon_utils.dart';
+import 'package:screen_memo/core/widgets/model_logo.dart';
 import 'package:screen_memo/core/widgets/screenshot_style_tab_bar.dart';
 import 'package:screen_memo/core/widgets/search_styles.dart';
 import 'package:screen_memo/core/widgets/ui_components.dart';
@@ -183,10 +182,11 @@ class _NocturneMemoryPageState extends State<NocturneMemoryPage>
                             final p = filtered[i];
                             final selected = p.id == currentId;
                             return ListTile(
-                              leading: SvgPicture.asset(
-                                ModelIconUtils.getProviderIconPath(p.type),
-                                width: 20,
-                                height: 20,
+                              leading: ProviderLogo(
+                                providerType: p.type,
+                                providerName: p.name,
+                                baseUrl: p.baseUrl,
+                                size: 20,
                               ),
                               title: Text(p.name),
                               trailing: selected
@@ -330,11 +330,7 @@ class _NocturneMemoryPageState extends State<NocturneMemoryPage>
                             final m = filtered[i];
                             final selected = m == active;
                             return ListTile(
-                              leading: SvgPicture.asset(
-                                ModelIconUtils.getIconPath(m),
-                                width: 20,
-                                height: 20,
-                              ),
+                              leading: ModelLogo(modelId: m, size: 20),
                               title: Text(m),
                               trailing: selected
                                   ? Icon(
@@ -391,11 +387,7 @@ class _NocturneMemoryPageState extends State<NocturneMemoryPage>
       mainAxisSize: MainAxisSize.min,
       children: [
         if (modelName.trim().isNotEmpty && modelName != '—') ...[
-          SvgPicture.asset(
-            ModelIconUtils.getIconPath(modelName),
-            width: 18,
-            height: 18,
-          ),
+          ModelLogo(modelId: modelName, size: 18),
           const SizedBox(width: 6),
         ],
         Flexible(

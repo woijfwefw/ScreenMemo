@@ -1,13 +1,12 @@
 // ignore_for_file: prefer_const_constructors, prefer_const_literals_to_create_immutables
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:screen_memo/core/widgets/ui_components.dart';
 import 'package:screen_memo/core/widgets/ui_dialog.dart';
+import 'package:screen_memo/core/widgets/model_logo.dart';
 import 'package:screen_memo/l10n/app_localizations.dart';
 
 import 'package:screen_memo/features/ai/application/ai_providers_service.dart';
-import 'package:screen_memo/core/utils/model_icon_utils.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
 import 'package:screen_memo/features/ai_providers/presentation/pages/provider_edit_page.dart';
 
@@ -33,8 +32,6 @@ class _ProviderListPageState extends State<ProviderListPage> {
   @override
   void initState() {
     super.initState();
-    // 预加载图标清单，确保首屏动态图标匹配（含无 -color 后缀）
-    ModelIconUtils.preload();
     _load();
   }
 
@@ -470,11 +467,6 @@ class _ProviderListPageState extends State<ProviderListPage> {
     await _load();
   }
 
-  // 厂商 SVG 图标路径（使用公共工具）
-  String _vendorIconPath(String type) {
-    return ModelIconUtils.getProviderIconPath(type);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -562,10 +554,11 @@ class _ProviderListPageState extends State<ProviderListPage> {
                                             ),
                                           ),
                                           padding: const EdgeInsets.all(10),
-                                          child: SvgPicture.asset(
-                                            _vendorIconPath(p.type),
-                                            width: 24,
-                                            height: 24,
+                                          child: ProviderLogo(
+                                            providerType: p.type,
+                                            providerName: p.name,
+                                            baseUrl: p.baseUrl,
+                                            size: 24,
                                           ),
                                         ),
                                         const SizedBox(

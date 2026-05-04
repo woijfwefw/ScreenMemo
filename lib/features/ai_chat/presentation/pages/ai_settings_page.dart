@@ -18,7 +18,7 @@ import 'package:screen_memo/features/ai/application/chat_context_service.dart';
 import 'package:screen_memo/core/widgets/ui_dialog.dart';
 import 'package:screen_memo/l10n/app_localizations.dart';
 import 'package:screen_memo/features/ai/application/ai_providers_service.dart';
-import 'package:screen_memo/core/utils/model_icon_utils.dart';
+import 'package:screen_memo/core/widgets/model_logo.dart';
 import 'package:screen_memo/features/ai_chat/presentation/widgets/markdown_math.dart';
 import 'package:screen_memo/app/navigation/widgets/app_side_drawer.dart';
 import 'package:screen_memo/features/gallery/presentation/widgets/screenshot_image_widget.dart';
@@ -419,8 +419,6 @@ class _AISettingsPageState extends State<AISettingsPage>
     _uiPerf.clear(restart: true);
     _uiPerf.log('page.initState');
     unawaited(_loadPerfOverlayEnabled());
-    // 预加载图标清单，确保首屏动态图标匹配生效
-    ModelIconUtils.preload();
     _loadAll();
     _loadChatContextSelection();
     _warmChatAppIconCache();

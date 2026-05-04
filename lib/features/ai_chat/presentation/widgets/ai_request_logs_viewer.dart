@@ -4,14 +4,13 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:talker/talker.dart';
 
 import 'package:screen_memo/l10n/app_localizations.dart';
 import 'package:screen_memo/models/ai_request_log.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
 import 'package:screen_memo/features/ai/application/ai_request_log_parser.dart';
-import 'package:screen_memo/core/utils/model_icon_utils.dart';
+import 'package:screen_memo/core/widgets/model_logo.dart';
 import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_request_logs_action.dart';
 import 'package:screen_memo/features/gallery/presentation/widgets/screenshot_image_widget.dart';
 import 'package:screen_memo/core/widgets/screenshot_style_tab_bar.dart';
@@ -1861,11 +1860,7 @@ class _AIRequestLogsViewerState extends State<AIRequestLogsViewer>
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SvgPicture.asset(
-                ModelIconUtils.getIconPath(model),
-                width: 16,
-                height: 16,
-              ),
+              ModelLogo(modelId: model, size: 16),
               const SizedBox(width: 8),
               Expanded(
                 child: SelectableText(

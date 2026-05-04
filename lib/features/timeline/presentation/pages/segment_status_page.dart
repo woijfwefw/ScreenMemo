@@ -7,7 +7,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:screen_memo/l10n/app_localizations.dart';
 import 'package:talker/talker.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -27,7 +26,7 @@ import 'package:screen_memo/core/constants/user_settings_keys.dart';
 import 'package:screen_memo/features/ai/application/ai_request_log_parser.dart';
 import 'package:screen_memo/features/ai/application/native_ai_request_log_parser.dart';
 import 'package:screen_memo/core/utils/merged_event_summary.dart';
-import 'package:screen_memo/core/utils/model_icon_utils.dart';
+import 'package:screen_memo/core/widgets/model_logo.dart';
 import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_request_logs_action.dart';
 import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_request_logs_viewer.dart';
 import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_request_logs_sheet.dart';
@@ -596,10 +595,11 @@ class _SegmentStatusPageState extends State<SegmentStatusPage>
                             final p = filtered[i];
                             final selected = p.id == currentId;
                             return ListTile(
-                              leading: SvgPicture.asset(
-                                ModelIconUtils.getProviderIconPath(p.type),
-                                width: 20,
-                                height: 20,
+                              leading: ProviderLogo(
+                                providerType: p.type,
+                                providerName: p.name,
+                                baseUrl: p.baseUrl,
+                                size: 20,
                               ),
                               title: Text(
                                 p.name,
@@ -740,11 +740,7 @@ class _SegmentStatusPageState extends State<SegmentStatusPage>
                             final m = filtered[i];
                             final selected = m == active;
                             return ListTile(
-                              leading: SvgPicture.asset(
-                                ModelIconUtils.getIconPath(m),
-                                width: 20,
-                                height: 20,
-                              ),
+                              leading: ModelLogo(modelId: m, size: 20),
                               title: Text(
                                 m,
                                 style: Theme.of(c).textTheme.bodyMedium,
@@ -802,11 +798,7 @@ class _SegmentStatusPageState extends State<SegmentStatusPage>
       mainAxisSize: MainAxisSize.min,
       children: [
         if (modelName.trim().isNotEmpty && modelName != '—') ...[
-          SvgPicture.asset(
-            ModelIconUtils.getIconPath(modelName),
-            width: 18,
-            height: 18,
-          ),
+          ModelLogo(modelId: modelName, size: 18),
           const SizedBox(width: 6),
         ],
         Flexible(

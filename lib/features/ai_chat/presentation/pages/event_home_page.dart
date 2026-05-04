@@ -6,11 +6,11 @@ import 'package:screen_memo/features/settings/presentation/pages/settings_page.d
 import 'package:screen_memo/features/ai_chat/presentation/pages/ai_settings_page.dart';
 import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
 import 'package:screen_memo/core/widgets/ui_components.dart';
+import 'package:screen_memo/core/widgets/model_logo.dart';
 import 'package:screen_memo/features/ai/application/ai_chat_service.dart';
 import 'package:screen_memo/l10n/app_localizations.dart';
 import 'package:screen_memo/app/navigation/widgets/app_side_drawer.dart';
 import 'package:screen_memo/features/ai_providers/presentation/pages/provider_list_page.dart';
-import 'package:screen_memo/core/utils/model_icon_utils.dart';
 import 'package:screen_memo/features/ai/application/ai_providers_service.dart';
 import 'package:screen_memo/features/timeline/application/dynamic_entry_perf_service.dart';
 import 'package:screen_memo/core/widgets/ui_dialog.dart';
@@ -29,7 +29,6 @@ class EventHomePage extends StatefulWidget {
 class _EventHomePageState extends State<EventHomePage> {
   final AISettingsService _settings = AISettingsService.instance;
   String? _model;
-  String? _iconAsset;
   bool _loading = true;
 
   // 基于提供商表的“对话(chat)”上下文（置于 AppBar 顶部）
@@ -129,11 +128,9 @@ class _EventHomePageState extends State<EventHomePage> {
   Future<void> _loadModel() async {
     try {
       final m = await _settings.getModel();
-      String? icon = _pickIconFor(m);
       if (!mounted) return;
       setState(() {
         _model = m;
-        _iconAsset = icon;
         _loading = false;
       });
     } catch (_) {
@@ -142,11 +139,6 @@ class _EventHomePageState extends State<EventHomePage> {
         _loading = false;
       });
     }
-  }
-
-  String? _pickIconFor(String? model) {
-    if (model == null || model.trim().isEmpty) return null;
-    return ModelIconUtils.getIconPath(model);
   }
 
   // 载入“动态(segments)”的提供商/模型选择（顶部 AppBar 使用）
@@ -348,10 +340,11 @@ class _EventHomePageState extends State<EventHomePage> {
                             final p = filtered[i];
                             final selected = p.id == currentId;
                             return ListTile(
-                              leading: SvgPicture.asset(
-                                ModelIconUtils.getProviderIconPath(p.type),
-                                width: 20,
-                                height: 20,
+                              leading: ProviderLogo(
+                                providerType: p.type,
+                                providerName: p.name,
+                                baseUrl: p.baseUrl,
+                                size: 20,
                               ),
                               title: Text(
                                 p.name,
@@ -495,11 +488,7 @@ class _EventHomePageState extends State<EventHomePage> {
                             final m = filtered[i];
                             final selected = m == active;
                             return ListTile(
-                              leading: SvgPicture.asset(
-                                ModelIconUtils.getIconPath(m),
-                                width: 20,
-                                height: 20,
-                              ),
+                              leading: ModelLogo(modelId: m, size: 20),
                               title: Text(
                                 m,
                                 style: Theme.of(c).textTheme.bodyMedium,
@@ -558,11 +547,7 @@ class _EventHomePageState extends State<EventHomePage> {
       children: [
         // 左侧 SVG 图标（基于模型名的正则匹配方法）
         if (modelName.trim().isNotEmpty && modelName != '—') ...[
-          SvgPicture.asset(
-            ModelIconUtils.getIconPath(modelName),
-            width: 18,
-            height: 18,
-          ),
+          ModelLogo(modelId: modelName, size: 18),
           const SizedBox(width: 6),
         ],
         // Provider 名称（下划线，可点击）
@@ -604,8 +589,8 @@ class _EventHomePageState extends State<EventHomePage> {
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        if (_iconAsset != null) ...[
-          SvgPicture.asset(_iconAsset!, width: 18, height: 18),
+        if (titleText.trim().isNotEmpty && titleText != '—') ...[
+          ModelLogo(modelId: titleText, size: 18),
           const SizedBox(width: 6),
         ],
         Flexible(child: Text(titleText, overflow: TextOverflow.ellipsis)),
@@ -1038,12 +1023,7 @@ class _EventHomePageState extends State<EventHomePage> {
                   child: model.isNotEmpty
                       ? Padding(
                           padding: const EdgeInsets.all(8.0),
-                          child: SvgPicture.asset(
-                            ModelIconUtils.getIconPath(model),
-                            width: 20,
-                            height: 20,
-                            // 不使用colorFilter，保留原始颜色
-                          ),
+                          child: ModelLogo(modelId: model, size: 20),
                         )
                       : Icon(
                           Icons.chat_bubble_outline,

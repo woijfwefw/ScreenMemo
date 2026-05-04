@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:screen_memo/l10n/app_localizations.dart';
 import 'package:screen_memo/core/theme/theme_service.dart';
 import 'package:screen_memo/features/ai_providers/presentation/pages/provider_list_page.dart';
@@ -7,7 +6,7 @@ import 'package:screen_memo/features/ai_chat/presentation/pages/prompt_manager_p
 import 'package:screen_memo/features/nocturne_memory/presentation/pages/nocturne_memory_page.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
 import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
-import 'package:screen_memo/core/utils/model_icon_utils.dart';
+import 'package:screen_memo/core/widgets/model_logo.dart';
 import 'package:screen_memo/core/widgets/ui_components.dart';
 import 'package:screen_memo/core/widgets/ui_dialog.dart';
 import 'package:screen_memo/core/logging/flutter_logger.dart';
@@ -374,12 +373,7 @@ class AppSideDrawer extends StatelessWidget {
                 child: model.isNotEmpty
                     ? Padding(
                         padding: const EdgeInsets.all(8.0),
-                        child: SvgPicture.asset(
-                          ModelIconUtils.getIconPath(model),
-                          width: 20,
-                          height: 20,
-                          // 不使用colorFilter，保留原始颜色
-                        ),
+                        child: ModelLogo(modelId: model, size: 20),
                       )
                     : Icon(
                         Icons.chat_bubble_outline,
