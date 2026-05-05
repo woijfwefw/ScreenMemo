@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:screen_memo/l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:screen_memo/core/theme/app_theme.dart';
 import 'package:screen_memo/core/widgets/ui_components.dart';
 import 'package:screen_memo/core/widgets/ui_dialog.dart';
@@ -24,6 +25,7 @@ import 'package:screen_memo/features/backup/presentation/pages/export_backup_pag
 import 'package:screen_memo/features/daily_summary/application/daily_summary_service.dart';
 import 'package:screen_memo/features/nsfw/application/nsfw_preference_service.dart';
 import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
+import 'package:screen_memo/features/app_health/application/app_health_service.dart';
 
 part 'settings_page_backup_part.dart';
 part 'settings_page_permissions_part.dart';
@@ -33,6 +35,7 @@ part 'settings_page_display_advanced_part.dart';
 part 'settings_page_screenshot_part.dart';
 part 'settings_page_nsfw_part.dart';
 part 'settings_page_daily_notify_part.dart';
+part 'settings_page_app_health_part.dart';
 
 enum _ImportMode { overwrite, merge }
 
@@ -43,6 +46,7 @@ enum _SettingsSubPage {
   screenshot,
   segmentSummary,
   dailyReminder,
+  appHealth,
   dataBackup,
   advanced,
 }
@@ -148,6 +152,13 @@ class _SettingsPageState extends State<SettingsPage>
   // 最近一次导入模式，默认合并
   _ImportMode _lastImportMode = _ImportMode.merge;
   bool _recalculatingAll = false;
+  bool _appHealthLoading = false;
+  AppHealthDashboardSnapshot? _appHealthSnapshot;
+  String _appHealthEventFilter = 'all';
+  Duration _appHealthRange = AppHealthService.defaultRange;
+  Duration _appHealthSlotSize = AppHealthService.defaultSlotSize;
+  Timer? _appHealthWindowDebounce;
+  bool _appHealthReloadQueued = false;
 
   // NSFW 设置 - 域名清单管理
   final TextEditingController _nsfwDomainController = TextEditingController();
@@ -248,6 +259,9 @@ class _SettingsPageState extends State<SettingsPage>
       case _SettingsSubPage.dailyReminder:
         unawaited(_loadDailyNotifySettings());
         break;
+      case _SettingsSubPage.appHealth:
+        unawaited(_loadAppHealthStatus(refresh: true));
+        break;
       case _SettingsSubPage.dataBackup:
         break;
       case _SettingsSubPage.advanced:
@@ -279,6 +293,7 @@ class _SettingsPageState extends State<SettingsPage>
   @override
   void dispose() {
     _stopBatteryPermissionCheck();
+    _appHealthWindowDebounce?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _nsfwDomainController.dispose();
     widget.controller?._detach(this);

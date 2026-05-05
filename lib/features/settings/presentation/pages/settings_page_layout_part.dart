@@ -15,6 +15,8 @@ extension _SettingsLayoutPart on _SettingsPageState {
       title = l10n.segmentSummarySectionTitle;
     } else if (_subPage == _SettingsSubPage.dailyReminder) {
       title = l10n.dailyReminderSectionTitle;
+    } else if (_subPage == _SettingsSubPage.appHealth) {
+      title = 'App 运行状态';
     } else if (_subPage == _SettingsSubPage.dataBackup) {
       title = l10n.dataBackupSectionTitle;
     } else if (_subPage == _SettingsSubPage.advanced) {
@@ -54,7 +56,20 @@ extension _SettingsLayoutPart on _SettingsPageState {
             onPressed: _loadAllPermissions,
             tooltip: l10n.refreshPermissionStatus,
           ),
-        if (_subPage != _SettingsSubPage.permissions)
+        if (_subPage == _SettingsSubPage.appHealth)
+          IconButton(
+            icon: const Icon(Icons.tune_rounded),
+            onPressed: _showAppHealthTimelineSheet,
+            tooltip: '时间线设置',
+          ),
+        if (_subPage == _SettingsSubPage.appHealth)
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => _loadAppHealthStatus(refresh: true),
+            tooltip: '刷新状态',
+          ),
+        if (_subPage != _SettingsSubPage.permissions &&
+            _subPage != _SettingsSubPage.appHealth)
           const SizedBox(width: kToolbarHeight),
       ],
     );
@@ -110,6 +125,14 @@ extension _SettingsLayoutPart on _SettingsPageState {
                   showBottomBorder: true,
                   isRootPageItem: true,
                   onTap: () => _switchSubPage(_SettingsSubPage.dailyReminder),
+                ),
+                _buildNavItem(
+                  context: context,
+                  icon: Icons.monitor_heart_outlined,
+                  title: 'App 运行状态',
+                  showBottomBorder: true,
+                  isRootPageItem: true,
+                  onTap: () => _switchSubPage(_SettingsSubPage.appHealth),
                 ),
                 _buildNavItem(
                   context: context,
@@ -211,6 +234,8 @@ extension _SettingsLayoutPart on _SettingsPageState {
             ),
           ],
         );
+      case _SettingsSubPage.appHealth:
+        return _buildAppHealthPage(context);
       case _SettingsSubPage.dataBackup:
         return ListView(
           padding: _settingsListPadding(),
