@@ -1,0 +1,897 @@
+part of 'segment_status_page.dart';
+
+// ========== 动态重建任务控制 ==========
+extension _SegmentStatusDynamicTaskPart on _SegmentStatusPageState {
+  Future<void> _loadDynamicRebuildDayConcurrency() async {
+    try {
+      final int raw = await UserSettingsService.instance.getInt(
+        UserSettingKeys.dynamicRebuildDayConcurrency,
+        defaultValue: 1,
+      );
+      if (!mounted) return;
+      final int normalized = math.max(1, math.min(10, raw));
+      _segmentStatusSetState(
+        () => _selectedDynamicRebuildDayConcurrency = normalized,
+      );
+      _publishDynamicRebuildUiSnapshot();
+    } catch (_) {}
+  }
+
+  bool _canEditDynamicRebuildDayConcurrency(
+    _DynamicRebuildUiSnapshot snapshot,
+  ) {
+    return !snapshot.status.isActive &&
+        !snapshot.starting &&
+        !snapshot.stopping &&
+        !snapshot.savingDayConcurrency;
+  }
+
+  int _effectiveDynamicRebuildDayConcurrency(
+    _DynamicRebuildUiSnapshot snapshot,
+  ) {
+    final int preferred = snapshot.status.isActive
+        ? (snapshot.status.dayConcurrency > 0
+              ? snapshot.status.dayConcurrency
+              : snapshot.selectedDayConcurrency)
+        : snapshot.selectedDayConcurrency;
+    return math.max(1, math.min(10, preferred));
+  }
+
+  Future<void> _setDynamicRebuildDayConcurrency(int value) async {
+    final _DynamicRebuildUiSnapshot snapshot =
+        _currentDynamicRebuildUiSnapshot();
+    if (!_canEditDynamicRebuildDayConcurrency(snapshot)) return;
+    final int normalized = math.max(1, math.min(10, value));
+    if (normalized == _selectedDynamicRebuildDayConcurrency) return;
+    final int previous = _selectedDynamicRebuildDayConcurrency;
+    _segmentStatusSetState(() {
+      _selectedDynamicRebuildDayConcurrency = normalized;
+      _savingDynamicRebuildDayConcurrency = true;
+    });
+    _publishDynamicRebuildUiSnapshot();
+    try {
+      await UserSettingsService.instance.setInt(
+        UserSettingKeys.dynamicRebuildDayConcurrency,
+        normalized,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      _segmentStatusSetState(
+        () => _selectedDynamicRebuildDayConcurrency = previous,
+      );
+      UINotifier.error(
+        context,
+        AppLocalizations.of(context).segmentDynamicConcurrencySaveFailed,
+      );
+    } finally {
+      if (!mounted) return;
+      _segmentStatusSetState(() => _savingDynamicRebuildDayConcurrency = false);
+      _publishDynamicRebuildUiSnapshot();
+    }
+  }
+
+  Future<void> _changeDynamicRebuildDayConcurrency(int delta) async {
+    await _setDynamicRebuildDayConcurrency(
+      _selectedDynamicRebuildDayConcurrency + delta,
+    );
+  }
+
+  void _publishDynamicRebuildUiSnapshot() {
+    _dynamicRebuildUiSnapshotNotifier.value =
+        _currentDynamicRebuildUiSnapshot();
+    _syncDynamicRebuildIconAnimation();
+  }
+
+  void _syncDynamicRebuildIconAnimation() {
+    final bool shouldSpin =
+        _startingDynamicRebuild ||
+        _stoppingDynamicRebuild ||
+        _dynamicRebuildTaskStatus.isActive;
+    if (shouldSpin) {
+      if (!_dynamicRebuildIconController.isAnimating) {
+        _dynamicRebuildIconController.repeat();
+      }
+      return;
+    }
+    if (_dynamicRebuildIconController.isAnimating) {
+      _dynamicRebuildIconController.stop();
+    }
+    _dynamicRebuildIconController.value = 0;
+  }
+
+  Future<void> _refreshDynamicAutoRepairEnabled({
+    bool showLoading = false,
+  }) async {
+    if (_loadingDynamicAutoRepair) return;
+    final Stopwatch sw = Stopwatch()..start();
+    _beginEntryPerfLoad(
+      'segment.autoRepair',
+      detail: 'showLoading=$showLoading',
+    );
+    if (showLoading && mounted) {
+      _segmentStatusSetState(() => _loadingDynamicAutoRepair = true);
+      _publishDynamicRebuildUiSnapshot();
+    }
+    try {
+      final bool enabled = await _db.getDynamicAutoRepairEnabled();
+      if (!mounted) return;
+      _segmentStatusSetState(() {
+        _dynamicAutoRepairEnabled = enabled;
+        _loadingDynamicAutoRepair = false;
+      });
+      _publishDynamicRebuildUiSnapshot();
+      _endEntryPerfLoad(
+        'segment.autoRepair',
+        detail: 'ms=${sw.elapsedMilliseconds} enabled=$enabled',
+      );
+    } catch (e) {
+      _failEntryPerfLoad(
+        'segment.autoRepair',
+        e,
+        detail: 'ms=${sw.elapsedMilliseconds}',
+      );
+      if (!mounted || !_loadingDynamicAutoRepair) return;
+      _segmentStatusSetState(() => _loadingDynamicAutoRepair = false);
+      _publishDynamicRebuildUiSnapshot();
+    }
+  }
+
+  Future<void> _setDynamicAutoRepairEnabled(bool enabled) async {
+    if (_loadingDynamicAutoRepair || _togglingDynamicAutoRepair) return;
+    final bool previous = _dynamicAutoRepairEnabled;
+    _segmentStatusSetState(() {
+      _togglingDynamicAutoRepair = true;
+      _dynamicAutoRepairEnabled = enabled;
+    });
+    _publishDynamicRebuildUiSnapshot();
+    try {
+      final bool persisted = await _db.setDynamicAutoRepairEnabled(enabled);
+      if (!mounted) return;
+      _segmentStatusSetState(() => _dynamicAutoRepairEnabled = persisted);
+      _publishDynamicRebuildUiSnapshot();
+      UINotifier.info(
+        context,
+        persisted
+            ? AppLocalizations.of(context).dynamicAutoRepairEnabled
+            : AppLocalizations.of(context).dynamicAutoRepairPaused,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      _segmentStatusSetState(() => _dynamicAutoRepairEnabled = previous);
+      _publishDynamicRebuildUiSnapshot();
+      UINotifier.error(
+        context,
+        AppLocalizations.of(context).dynamicAutoRepairToggleFailed,
+      );
+    } finally {
+      if (!mounted) return;
+      _segmentStatusSetState(() => _togglingDynamicAutoRepair = false);
+      _publishDynamicRebuildUiSnapshot();
+    }
+  }
+
+  Future<void> _openDynamicRebuildTaskSheet() async {
+    try {
+      await Future.wait<void>([
+        _refreshDynamicRebuildTaskStatus(refreshSegmentsOnChange: false),
+        _refreshDynamicAutoRepairEnabled(showLoading: true),
+      ]);
+    } catch (_) {}
+    _dynamicRebuildTaskSheetOpen = true;
+    if (_SegmentStatusPageState._dynamicRebuildRequestLogsEnabled) {
+      await _refreshDynamicRebuildRequestLogs(force: true);
+    }
+    if (!mounted) return;
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) {
+          return ValueListenableBuilder<_DynamicRebuildUiSnapshot>(
+            valueListenable: _dynamicRebuildUiSnapshotNotifier,
+            builder: (sheetCtx, snapshot, _) {
+              final cs = Theme.of(sheetCtx).colorScheme;
+              return DraggableScrollableSheet(
+                initialChildSize: 0.62,
+                minChildSize: 0.32,
+                maxChildSize: 0.90,
+                expand: false,
+                builder: (_, scrollCtrl) {
+                  return ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(AppTheme.radiusLg),
+                      topRight: Radius.circular(AppTheme.radiusLg),
+                    ),
+                    child: ColoredBox(
+                      color: cs.surface,
+                      child: SafeArea(
+                        top: false,
+                        child: SingleChildScrollView(
+                          controller: scrollCtrl,
+                          padding: const EdgeInsets.fromLTRB(
+                            AppTheme.spacing4,
+                            AppTheme.spacing3,
+                            AppTheme.spacing4,
+                            AppTheme.spacing4,
+                          ),
+                          child: _buildDynamicRebuildTaskSheetBody(
+                            sheetCtx,
+                            snapshot,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      _dynamicRebuildTaskSheetOpen = false;
+    }
+  }
+
+  Future<void> _refreshDynamicRebuildRequestLogs({
+    DynamicRebuildTaskStatus? status,
+    bool force = false,
+  }) async {
+    final DynamicRebuildTaskStatus current =
+        status ?? _dynamicRebuildTaskStatus;
+    if (current.taskId.isEmpty || current.startedAt <= 0) {
+      if (_dynamicRebuildRequestLogsState.hasAny ||
+          _dynamicRebuildRequestLogsState.error != null ||
+          _dynamicRebuildRequestLogsState.loading) {
+        _dynamicRebuildRequestLogsState =
+            const _DynamicRebuildRequestLogsState();
+        _publishDynamicRebuildUiSnapshot();
+      }
+      return;
+    }
+    final int now = DateTime.now().millisecondsSinceEpoch;
+    if (!force && _dynamicRebuildRequestLogsState.loading) return;
+    if (!force && now - _lastDynamicRebuildRequestLogsRefreshAt < 1200) return;
+    _lastDynamicRebuildRequestLogsRefreshAt = now;
+    final int ticket = ++_dynamicRebuildRequestLogsLoadTicket;
+    final bool showForegroundLoading =
+        !_dynamicRebuildRequestLogsState.hasAny &&
+        (_dynamicRebuildRequestLogsState.error?.trim().isNotEmpty != true);
+    if (showForegroundLoading) {
+      final _DynamicRebuildRequestLogsState next =
+          _dynamicRebuildRequestLogsState.copyWith(loading: true, error: null);
+      if (!_sameDynamicRebuildRequestLogsState(
+        _dynamicRebuildRequestLogsState,
+        next,
+      )) {
+        _dynamicRebuildRequestLogsState = next;
+        _publishDynamicRebuildUiSnapshot();
+      }
+    }
+    try {
+      final _DynamicRebuildRequestLogsState loaded =
+          await _loadDynamicRebuildRequestLogs(current);
+      if (!mounted || ticket != _dynamicRebuildRequestLogsLoadTicket) return;
+      final _DynamicRebuildRequestLogsState next = loaded.copyWith(
+        loading: false,
+      );
+      if (!_sameDynamicRebuildRequestLogsState(
+        _dynamicRebuildRequestLogsState,
+        next,
+      )) {
+        _dynamicRebuildRequestLogsState = next;
+        _publishDynamicRebuildUiSnapshot();
+      }
+    } catch (e) {
+      if (!mounted || ticket != _dynamicRebuildRequestLogsLoadTicket) return;
+      final _DynamicRebuildRequestLogsState next = showForegroundLoading
+          ? _dynamicRebuildRequestLogsState.copyWith(
+              loading: false,
+              error: e.toString(),
+            )
+          : _dynamicRebuildRequestLogsState.copyWith(loading: false);
+      if (!_sameDynamicRebuildRequestLogsState(
+        _dynamicRebuildRequestLogsState,
+        next,
+      )) {
+        _dynamicRebuildRequestLogsState = next;
+        _publishDynamicRebuildUiSnapshot();
+      }
+    }
+  }
+
+  Future<_DynamicRebuildRequestLogsState> _loadDynamicRebuildRequestLogs(
+    DynamicRebuildTaskStatus status,
+  ) async {
+    String? todayDirPath;
+    try {
+      todayDirPath = await FlutterLogger.getTodayLogsDir();
+    } catch (_) {
+      todayDirPath = null;
+    }
+    final String trimmed = (todayDirPath ?? '').trim();
+    if (trimmed.isEmpty) {
+      return const _DynamicRebuildRequestLogsState();
+    }
+    final Directory? logsRoot = _resolveOutputLogsRoot(Directory(trimmed));
+    if (logsRoot == null || !await logsRoot.exists()) {
+      return const _DynamicRebuildRequestLogsState();
+    }
+
+    final DateTime startedAt = DateTime.fromMillisecondsSinceEpoch(
+      status.startedAt,
+    );
+    final DateTime endedAt = status.completedAt > 0
+        ? DateTime.fromMillisecondsSinceEpoch(status.completedAt)
+        : DateTime.now();
+    final List<File> files = await _listDynamicRebuildRequestLogFiles(
+      logsRoot,
+      startedAt: startedAt,
+      endedAt: endedAt,
+    );
+    if (files.isEmpty) {
+      return const _DynamicRebuildRequestLogsState();
+    }
+
+    final StringBuffer sb = StringBuffer();
+    for (final File file in files) {
+      try {
+        final String text = await file.readAsString();
+        final String content = text.trimRight();
+        if (content.isEmpty) continue;
+        if (sb.isNotEmpty) sb.writeln();
+        sb.writeln(content);
+      } catch (_) {}
+    }
+    final String rawText = sb.toString().trimRight();
+    if (rawText.trim().isEmpty) {
+      return const _DynamicRebuildRequestLogsState();
+    }
+    final List<AIRequestTrace> traces = parseNativeAiRequestLogText(
+      rawText,
+      since: startedAt.subtract(const Duration(seconds: 5)),
+      until: endedAt.add(const Duration(seconds: 5)),
+    );
+    if (traces.isEmpty) {
+      return const _DynamicRebuildRequestLogsState();
+    }
+    final List<AIRequestTrace> visibleTraces = traces
+        .take(_SegmentStatusPageState._dynamicRebuildRequestLogsDisplayLimit)
+        .toList(growable: false);
+    final String visibleRawText = visibleTraces
+        .expand((AIRequestTrace trace) => trace.rawBlocks)
+        .map((String line) => line.trimRight())
+        .where((String line) => line.trim().isNotEmpty)
+        .join('\n')
+        .trimRight();
+    return _DynamicRebuildRequestLogsState(
+      traces: visibleTraces,
+      rawText: visibleRawText,
+    );
+  }
+
+  Directory? _resolveOutputLogsRoot(Directory todayDir) {
+    Directory current = todayDir;
+    for (int i = 0; i < 3; i += 1) {
+      final Directory parent = current.parent;
+      if (parent.path == current.path) return null;
+      current = parent;
+    }
+    return current;
+  }
+
+  Future<List<File>> _listDynamicRebuildRequestLogFiles(
+    Directory logsRoot, {
+    required DateTime startedAt,
+    required DateTime endedAt,
+  }) async {
+    final List<File> files = <File>[];
+    DateTime day = DateTime(startedAt.year, startedAt.month, startedAt.day);
+    final DateTime lastDay = DateTime(endedAt.year, endedAt.month, endedAt.day);
+    while (!day.isAfter(lastDay)) {
+      final String yyyy = day.year.toString().padLeft(4, '0');
+      final String mm = day.month.toString().padLeft(2, '0');
+      final String dd = day.day.toString().padLeft(2, '0');
+      final Directory dir = Directory(
+        '${logsRoot.path}${Platform.pathSeparator}$yyyy${Platform.pathSeparator}$mm${Platform.pathSeparator}$dd',
+      );
+      final File infoFile = File(
+        '${dir.path}${Platform.pathSeparator}${dd}_info.log',
+      );
+      final File errorFile = File(
+        '${dir.path}${Platform.pathSeparator}${dd}_error.log',
+      );
+      if (await infoFile.exists()) files.add(infoFile);
+      if (await errorFile.exists()) files.add(errorFile);
+      day = day.add(const Duration(days: 1));
+    }
+    files.sort((a, b) => a.path.compareTo(b.path));
+    return files;
+  }
+
+  Future<void> _saveDynamicRebuildRequestLogsToFile(String text) async {
+    final String content = text.trimRight();
+    if (content.trim().isEmpty) return;
+    try {
+      final DateTime now = DateTime.now();
+      String? baseDirPath;
+      try {
+        baseDirPath = await FlutterLogger.getTodayLogsDir();
+      } catch (_) {
+        baseDirPath = null;
+      }
+      Directory baseDir = Directory.systemTemp;
+      if (baseDirPath != null && baseDirPath.trim().isNotEmpty) {
+        baseDir = Directory(baseDirPath.trim());
+      }
+      final String sep = Platform.pathSeparator;
+      final Directory outDir = Directory(
+        '${baseDir.path}${sep}dynamic_rebuild_ai_logs',
+      );
+      await outDir.create(recursive: true);
+      final File f = File(
+        '${outDir.path}${sep}dynamic_rebuild_ai_${now.millisecondsSinceEpoch}.log',
+      );
+      await f.writeAsString('$content\n', flush: true);
+      try {
+        await Clipboard.setData(ClipboardData(text: f.path));
+      } catch (_) {}
+      if (!mounted) return;
+      UINotifier.success(
+        context,
+        AppLocalizations.of(context).savedToPath(f.path),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      UINotifier.error(
+        context,
+        AppLocalizations.of(context).saveFailedError(e.toString()),
+      );
+    }
+  }
+
+  int _dynamicRebuildCurrentOrdinal(DynamicRebuildTaskStatus status) {
+    if (status.totalSegments <= 0) return 0;
+    if (status.isCompleted) return status.totalSegments;
+    final int next = status.processedSegments + 1;
+    return math.min(status.totalSegments, math.max(1, next));
+  }
+
+  String _dynamicRebuildCurrentLine(DynamicRebuildTaskStatus status) {
+    final List<String> activeDays =
+        status.workers
+            .where(
+              (DynamicRebuildWorkerState worker) =>
+                  worker.isRunning || worker.isRetrying,
+            )
+            .map((DynamicRebuildWorkerState worker) => worker.dayKey.trim())
+            .where((String dayKey) => dayKey.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort((String a, String b) => b.compareTo(a));
+    if (activeDays.isNotEmpty) {
+      return '当前活跃日期：${activeDays.join(' / ')}';
+    }
+    final String scope = [
+      if (status.currentDayKey.isNotEmpty) status.currentDayKey,
+      if (status.currentRangeLabel.isNotEmpty) status.currentRangeLabel,
+    ].join(' · ');
+    if (scope.isNotEmpty) {
+      final String prefix = status.isActive ? '当前正在重建' : '当前停留在';
+      return '$prefix：$scope';
+    }
+    if (status.timelineCutoffDayKey.trim().isNotEmpty) {
+      return '时间线当前可见到：${status.timelineCutoffDayKey.trim()}';
+    }
+    if (status.totalSegments <= 0) return '';
+    final int currentOrdinal = _dynamicRebuildCurrentOrdinal(status);
+    if (currentOrdinal <= 0) return '';
+    return '当前进度停留在第 $currentOrdinal/${status.totalSegments} 条动态';
+  }
+
+  String _dynamicRebuildStageHeadline(DynamicRebuildTaskStatus status) {
+    final String label = status.currentStageLabel.trim();
+    final String detail = status.currentStageDetail.trim();
+    if (label.isEmpty && detail.isEmpty) return '';
+    if (label.isEmpty) return '当前环节：$detail';
+    if (detail.isEmpty) return '当前环节：$label';
+    return '当前环节：$label\n$detail';
+  }
+
+  String _dynamicRebuildModelLine(DynamicRebuildTaskStatus status) {
+    final String model = status.aiModel.trim();
+    if (model.isEmpty) return '';
+    return '当前模型：$model';
+  }
+
+  String _dynamicRebuildWorkerStatusLine(DynamicRebuildWorkerState? worker) {
+    if (worker == null) return '等待分配';
+    if (worker.isRetrying) {
+      final int retryLimit = worker.retryLimit > 0 ? worker.retryLimit : 3;
+      final int retryCount = worker.retryCount > 0 ? worker.retryCount : 1;
+      return '重试 $retryCount/$retryLimit';
+    }
+    if (worker.dayKey.trim().isNotEmpty) return worker.dayKey.trim();
+    if (worker.isFailedWaiting) return '等待手动继续';
+    if (worker.isCompleted) return '当天完成';
+    return '等待分配';
+  }
+
+  String _dynamicRebuildWorkerChipLabel(DynamicRebuildWorkerState? worker) {
+    if (worker == null || worker.isIdle) return '空闲';
+    if (worker.isRetrying) return '重试中';
+    if (worker.isRunning) return '运行中';
+    if (worker.isCompleted) return '已完成';
+    if (worker.isFailedWaiting) return '待继续';
+    return worker.status;
+  }
+
+  Color _dynamicRebuildWorkerColor(
+    BuildContext context,
+    DynamicRebuildWorkerState? worker,
+  ) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    if (worker == null || worker.isIdle) return cs.outline;
+    if (worker.isRunning) return cs.tertiary;
+    if (worker.isRetrying) return cs.secondary;
+    if (worker.isCompleted) return cs.primary;
+    if (worker.isFailedWaiting) return cs.error;
+    return cs.onSurfaceVariant;
+  }
+
+  Widget _buildDynamicRebuildStageLogsSection(
+    BuildContext context,
+    DynamicRebuildTaskStatus status,
+  ) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme cs = theme.colorScheme;
+    final List<String> logs = status.recentLogs;
+    if (logs.isEmpty) return const SizedBox.shrink();
+    final int start = math.max(0, logs.length - 12);
+    final List<String> visible = logs.sublist(start);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppTheme.spacing3),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        border: Border.all(color: cs.outline.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '阶段日志',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: AppTheme.spacing2),
+          for (final String line in visible)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                line,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                  height: 1.35,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _dynamicRebuildSerialHint(DynamicRebuildTaskStatus status) {
+    if (status.isPreparing || status.isPending || status.isRunning) {
+      return '按天并发重建中：线程会先串行跑完当天全部动态，再领取下一个未完成日期。';
+    }
+    if (status.canContinue || status.isCompletedWithFailures) {
+      return '继续重建只会续跑未完成或失败待续的日期，不会重新清空已完成结果。';
+    }
+    return '';
+  }
+
+  String _dynamicRebuildTaskLabel(DynamicRebuildTaskStatus status) {
+    if (status.isIdle) return '未启动';
+    if (status.isPreparing) return '准备中';
+    if (status.isPending || status.isRunning) return '运行中';
+    if (status.isCompleted) return '已完成';
+    if (status.isCompletedWithFailures) return '部分完成';
+    if (status.isFailed) return '失败';
+    if (status.isCancelled) return '已停止';
+    return status.status;
+  }
+
+  Color _dynamicRebuildTaskColor(DynamicRebuildTaskStatus status) {
+    final cs = Theme.of(context).colorScheme;
+    if (status.isCompleted) return cs.primary;
+    if (status.isCompletedWithFailures) return cs.secondary;
+    if (status.isPreparing || status.isPending || status.isRunning) {
+      return cs.tertiary;
+    }
+    if (status.isFailed) return cs.error;
+    if (status.isCancelled) return cs.onSurfaceVariant;
+    return cs.onSurfaceVariant;
+  }
+
+  String _fmtTaskDateTime(int millis) {
+    if (millis <= 0) return '(null)';
+    return DateTime.fromMillisecondsSinceEpoch(millis).toString();
+  }
+
+  void _maybeStartAutoWatch() {
+    if (!_onlyNoSummary || _autoWatching) return;
+    _autoWatching = true;
+    // 先触发一次原生扫描，确保后续能尽快进入工作状态
+    () async {
+      try {
+        await _db.triggerSegmentTick();
+      } catch (_) {}
+    }();
+    _autoTimer?.cancel();
+    _autoTimer = Timer.periodic(const Duration(seconds: 1), (_) => _autoPoll());
+  }
+
+  void _stopAutoWatch() {
+    _autoTimer?.cancel();
+    _autoTimer = null;
+    _autoWatching = false;
+  }
+
+  Future<void> _autoPoll() async {
+    if (!_onlyNoSummary || !mounted) {
+      _stopAutoWatch();
+      return;
+    }
+    if (_loading) return;
+    try {
+      // 每次只做轻量查询；原生端 1s 心跳已持续推进/补救
+      final String? rebuildCutoffDayKey = _dynamicRebuildTimelineCutoffDayKey();
+      final List<Map<String, dynamic>> segments =
+          _shouldHideTimelineUntilRebuildAdvances()
+          ? const <Map<String, dynamic>>[]
+          : await _db.listSegmentsEx(
+              limit: 50,
+              onlyNoSummary: true,
+              endMillis:
+                  rebuildCutoffDayKey == null || rebuildCutoffDayKey.isEmpty
+                  ? null
+                  : _endMillisForDateKey(rebuildCutoffDayKey),
+            );
+      if (!mounted) return;
+      final List<String> loadedDayKeys = _orderedDayKeysFromSegments(segments);
+      _segmentStatusSetState(() {
+        _segments = segments;
+        _loadedDayKeys = loadedDayKeys;
+        _maxVisibleDayTabs = loadedDayKeys.isEmpty
+            ? _SegmentStatusPageState._initialDayTabs
+            : loadedDayKeys.length;
+        _noMoreOlderSegments = true;
+      });
+      // 若已无“暂无总结”，停止自动检测
+      final hasPending = segments.any(
+        (e) => (e['has_summary'] as int? ?? 0) == 0,
+      );
+      if (!hasPending) _stopAutoWatch();
+    } catch (_) {}
+  }
+
+  void _startDynamicRebuildTaskPolling() {
+    _dynamicRebuildTaskPollTimer?.cancel();
+    _dynamicRebuildTaskPollTimer = Timer.periodic(const Duration(seconds: 2), (
+      _,
+    ) {
+      // ignore: discarded_futures
+      _refreshDynamicRebuildTaskStatus();
+    });
+  }
+
+  Future<void> _refreshDynamicRebuildTaskStatus({
+    bool refreshSegmentsOnChange = true,
+  }) async {
+    if (_pollingDynamicRebuildTask) return;
+    final Stopwatch sw = Stopwatch()..start();
+    _beginEntryPerfLoad(
+      'segment.rebuildStatus',
+      detail: 'refreshSegmentsOnChange=$refreshSegmentsOnChange',
+    );
+    _pollingDynamicRebuildTask = true;
+    try {
+      final previous = _dynamicRebuildTaskStatus;
+      final status = await _db.getDynamicRebuildTaskStatus();
+      if (!mounted) return;
+      _segmentStatusSetState(() {
+        _dynamicRebuildTaskStatus = status;
+      });
+      _publishDynamicRebuildUiSnapshot();
+      if (_SegmentStatusPageState._dynamicRebuildRequestLogsEnabled &&
+          _dynamicRebuildTaskSheetOpen) {
+        unawaited(_refreshDynamicRebuildRequestLogs(status: status));
+      } else if (_dynamicRebuildRequestLogsState.hasAny ||
+          _dynamicRebuildRequestLogsState.error != null ||
+          _dynamicRebuildRequestLogsState.loading) {
+        _dynamicRebuildRequestLogsState =
+            const _DynamicRebuildRequestLogsState();
+        _publishDynamicRebuildUiSnapshot();
+      }
+      if (refreshSegmentsOnChange) {
+        await _handleDynamicRebuildTaskStatusChange(previous, status);
+      }
+      _endEntryPerfLoad(
+        'segment.rebuildStatus',
+        detail:
+            'ms=${sw.elapsedMilliseconds} status=${status.status} active=${status.isActive}',
+      );
+    } catch (e) {
+      _failEntryPerfLoad(
+        'segment.rebuildStatus',
+        e,
+        detail: 'ms=${sw.elapsedMilliseconds}',
+      );
+    } finally {
+      _pollingDynamicRebuildTask = false;
+    }
+  }
+
+  Future<void> _handleDynamicRebuildTaskStatusChange(
+    DynamicRebuildTaskStatus previous,
+    DynamicRebuildTaskStatus current,
+  ) async {
+    if (_loading) {
+      DynamicEntryPerfService.instance.mark(
+        'segment.rebuildStatus.refreshSkipped',
+        detail:
+            'loading=true prev=${previous.status} current=${current.status}',
+      );
+      return;
+    }
+    final bool justStarted = !previous.isActive && current.isActive;
+    final bool progressAdvanced =
+        current.isActive &&
+        current.processedSegments > previous.processedSegments;
+    final bool becameTerminal = previous.isActive && !current.isActive;
+    final bool terminalChanged =
+        previous.status != current.status &&
+        (current.isCompleted ||
+            current.isCompletedWithFailures ||
+            current.isFailed ||
+            current.isCancelled);
+    final bool timelineVisibilityChanged =
+        _dynamicRebuildTimelineVisibilityFingerprint(previous) !=
+        _dynamicRebuildTimelineVisibilityFingerprint(current);
+    if (justStarted) {
+      await _refresh(triggerSegmentTick: false);
+      return;
+    }
+    if (progressAdvanced) {
+      await _refreshSegmentsForDynamicRebuildProgress();
+      return;
+    }
+    if (timelineVisibilityChanged || becameTerminal || terminalChanged) {
+      await _refresh(triggerSegmentTick: false);
+    }
+  }
+
+  Future<void> _refreshSegmentsForDynamicRebuildProgress() async {
+    final int now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastDynamicRebuildListRefreshAt < 1500) return;
+    _lastDynamicRebuildListRefreshAt = now;
+    await _refresh(triggerSegmentTick: false);
+  }
+
+  Future<void> _confirmStartDynamicRebuild() async {
+    if (_dynamicRebuildTaskStatus.isActive || _startingDynamicRebuild) return;
+    final bool ok = await UIDialogs.showConfirm(
+      context,
+      title: '重建动态',
+      message: '会立即清空当前动态，并从最老截图开始全量重建。确定继续吗？',
+      confirmText: '立即重建',
+      cancelText: '取消',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
+    await _startDynamicRebuild();
+  }
+
+  Future<void> _startDynamicRebuild({bool resumeExisting = false}) async {
+    if (_startingDynamicRebuild) return;
+    _segmentStatusSetState(() => _startingDynamicRebuild = true);
+    _publishDynamicRebuildUiSnapshot();
+    try {
+      final previous = _dynamicRebuildTaskStatus;
+      final status = await _db.startDynamicRebuildTask(
+        resumeExisting: resumeExisting,
+        dayConcurrency: _selectedDynamicRebuildDayConcurrency,
+      );
+      if (!mounted) return;
+      _segmentStatusSetState(() {
+        _dynamicRebuildTaskStatus = status;
+        if (status.dayConcurrency > 0) {
+          _selectedDynamicRebuildDayConcurrency = math.max(
+            1,
+            math.min(10, status.dayConcurrency),
+          );
+        }
+      });
+      _publishDynamicRebuildUiSnapshot();
+      if (status.isCompleted && status.totalSegments == 0) {
+        UINotifier.info(
+          context,
+          AppLocalizations.of(context).dynamicRebuildNoSegments,
+        );
+        await _refresh(triggerSegmentTick: false);
+      } else if (status.isActive && resumeExisting) {
+        final String model = status.aiModel.trim();
+        UINotifier.info(
+          context,
+          model.isNotEmpty
+              ? AppLocalizations.of(
+                  context,
+                ).dynamicRebuildSwitchedModelContinue(model)
+              : AppLocalizations.of(context).dynamicRebuildTaskResumed,
+        );
+        await _refresh(triggerSegmentTick: false);
+      } else if (status.isActive && !previous.isActive) {
+        UINotifier.info(
+          context,
+          AppLocalizations.of(context).dynamicRebuildStartedInBackground,
+        );
+        await _refresh(triggerSegmentTick: false);
+      } else if (status.isActive) {
+        UINotifier.info(
+          context,
+          AppLocalizations.of(context).dynamicRebuildTaskResumed,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        await UIDialogs.showInfo(
+          context,
+          title: '动态重建失败',
+          message: e.toString(),
+        );
+      }
+    } finally {
+      if (mounted) {
+        _segmentStatusSetState(() => _startingDynamicRebuild = false);
+        _publishDynamicRebuildUiSnapshot();
+      }
+    }
+  }
+
+  Future<void> _continueDynamicRebuild() async {
+    await _startDynamicRebuild(resumeExisting: true);
+  }
+
+  Future<void> _cancelDynamicRebuild() async {
+    if (_stoppingDynamicRebuild) return;
+    _segmentStatusSetState(() => _stoppingDynamicRebuild = true);
+    _publishDynamicRebuildUiSnapshot();
+    try {
+      final status = await _db.cancelDynamicRebuildTask();
+      if (!mounted) return;
+      _segmentStatusSetState(() => _dynamicRebuildTaskStatus = status);
+      _publishDynamicRebuildUiSnapshot();
+      UINotifier.info(
+        context,
+        AppLocalizations.of(context).dynamicRebuildStopped,
+      );
+      await _refresh(triggerSegmentTick: false);
+    } catch (_) {
+      if (mounted) {
+        UINotifier.error(
+          context,
+          AppLocalizations.of(context).dynamicRebuildStopFailed,
+        );
+      }
+    } finally {
+      if (mounted) {
+        _segmentStatusSetState(() => _stoppingDynamicRebuild = false);
+        _publishDynamicRebuildUiSnapshot();
+      }
+    }
+  }
+}
