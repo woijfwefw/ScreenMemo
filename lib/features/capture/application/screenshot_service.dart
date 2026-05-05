@@ -14,6 +14,7 @@ import 'package:screen_memo/core/performance/startup_profiler.dart';
 import 'package:screen_memo/core/logging/flutter_logger.dart';
 import 'package:screen_memo/app/navigation/navigation_service.dart';
 import 'package:screen_memo/data/settings/user_settings_service.dart';
+import 'package:screen_memo/features/app_health/application/app_health_service.dart';
 
 /// 截屏服务异常类
 class ScreenshotServiceException implements Exception {
@@ -238,6 +239,11 @@ class ScreenshotService {
         _isRunning = true;
         _currentInterval = clampedInterval;
         await _saveServiceState();
+        unawaited(
+          AppHealthService.instance.recordCaptureServiceStarted(
+            intervalSec: clampedInterval,
+          ),
+        );
         print('=== 截屏服务启动成功，间隔: $clampedInterval秒 ===');
         return true;
       } else {
@@ -245,10 +251,22 @@ class ScreenshotService {
           '截屏服务启动失败，请检查：\n1. Android版本是否为11.0(API 30)或以上\n2. 无障碍服务是否正常运行\n3. 尝试重新启动应用',
         );
       }
-    } on ScreenshotServiceException {
+    } on ScreenshotServiceException catch (e) {
+      unawaited(
+        AppHealthService.instance.recordCaptureFailure(
+          errorType: 'capture_start_failed',
+          errorMessage: e.message,
+        ),
+      );
       rethrow;
     } catch (e) {
       print('启动截屏服务异常: $e');
+      unawaited(
+        AppHealthService.instance.recordCaptureFailure(
+          errorType: 'capture_start_failed',
+          errorMessage: 'Unexpected capture start error: $e',
+        ),
+      );
       throw ScreenshotServiceException('启动截屏服务时发生未知错误：$e');
     }
   }
@@ -259,8 +277,15 @@ class ScreenshotService {
       await _permissionService.stopTimedScreenshot();
       _isRunning = false;
       await _saveServiceState();
+      unawaited(AppHealthService.instance.recordCaptureServiceStopped());
     } catch (e) {
       print('停止截屏服务失败: $e');
+      unawaited(
+        AppHealthService.instance.recordCaptureFailure(
+          errorType: 'capture_stop_failed',
+          errorMessage: 'Failed to stop screenshot service: $e',
+        ),
+      );
     }
   }
 
@@ -320,6 +345,12 @@ class ScreenshotService {
       return await _permissionService.captureScreen();
     } catch (e) {
       print('手动截屏失败: $e');
+      unawaited(
+        AppHealthService.instance.recordCaptureFailure(
+          errorType: 'manual_capture_failed',
+          errorMessage: 'Manual capture failed: $e',
+        ),
+      );
       return null;
     }
   }
@@ -515,6 +546,12 @@ class ScreenshotService {
         final baseDir = await PathService.getInternalAppDir(null);
         if (baseDir == null) {
           print('无法获取基础目录，跳过数据库插入');
+          unawaited(
+            AppHealthService.instance.recordScreenshotSaveFailure(
+              errorType: 'storage_dir_missing',
+              errorMessage: 'Internal storage directory is unavailable',
+            ),
+          );
           return;
         }
 
@@ -548,6 +585,12 @@ class ScreenshotService {
           } else {
             print('截图记录已存在，未重复插入');
           }
+          unawaited(
+            AppHealthService.instance.recordScreenshotSaved(
+              packageName: packageName,
+              inserted: id != null,
+            ),
+          );
           // 刷新统计缓存后再通知监听者，避免先读到旧缓存
           await _refreshStatsCache(force: true);
           _screenshotStreamController.add(null);
@@ -558,9 +601,21 @@ class ScreenshotService {
         }
       } else {
         print('截图保存通知数据不完整，跳过数据库插入');
+        unawaited(
+          AppHealthService.instance.recordScreenshotSaveFailure(
+            errorType: 'invalid_screenshot_callback',
+            errorMessage: 'Screenshot callback payload is incomplete',
+          ),
+        );
       }
     } catch (e) {
       print('处理截图保存通知失败: $e');
+      unawaited(
+        AppHealthService.instance.recordScreenshotSaveFailure(
+          errorType: 'screenshot_save_failed',
+          errorMessage: 'Screenshot save callback failed: $e',
+        ),
+      );
     }
   }
 

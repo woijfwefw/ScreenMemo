@@ -7,6 +7,8 @@ import com.fqyw.screen_memo.diagnostics.RuntimeDiagnostics
 import com.fqyw.screen_memo.logging.FileLogger
 import com.fqyw.screen_memo.MainActivity
 import com.fqyw.screen_memo.segment.SegmentSummaryManager
+import com.fqyw.screen_memo.health.AppHealthNativeRecorder
+import com.fqyw.screen_memo.health.AppHealthScheduler
 import com.fqyw.screen_memo.service.ServiceStateManager
 import android.app.Notification
 import android.app.NotificationChannel
@@ -322,6 +324,11 @@ class ScreenCaptureService : Service() {
         // 更新状态
         ServiceStateManager.setForegroundServiceRunning(this, true)
         ServiceStateManager.printAllStates(this)
+        try {
+            AppHealthScheduler.restore(this)
+            AppHealthScheduler.startForegroundHeartbeat(this)
+            AppHealthNativeRecorder.recordSnapshot(this, "foreground_service_on_create")
+        } catch (_: Exception) {}
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -381,6 +388,10 @@ class ScreenCaptureService : Service() {
         // 更新状态
         ServiceStateManager.setForegroundServiceRunning(this, false)
         ServiceStateManager.printAllStates(this)
+        AppHealthScheduler.stopForegroundHeartbeat()
+        try {
+            AppHealthNativeRecorder.recordSnapshot(this, "foreground_service_on_destroy")
+        } catch (_: Exception) {}
     }
 
     /**

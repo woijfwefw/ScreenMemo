@@ -201,6 +201,11 @@
         <receiver
             android:name=".daily.DailySummaryAlarmReceiver"
             android:exported="false" />
+
+        <!-- App 运行状态 1 分钟健康检测闹钟接收器 -->
+        <receiver
+            android:name=".health.AppHealthAlarmReceiver"
+            android:exported="false" />
  
         <!-- 开机自启接收器 -->
         <receiver
@@ -210,6 +215,8 @@
             <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+            <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.PACKAGE_REPLACED" />
                 <data android:scheme="package" />
             </intent-filter>
@@ -224,6 +231,8 @@
                 <action android:name="com.fqyw.screen_memo.RESTART_SERVICE" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+            <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.PACKAGE_REPLACED" />
                 <data android:scheme="package" />
             </intent-filter>

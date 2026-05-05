@@ -24,6 +24,7 @@ part 'screenshot_database_memory_entities.dart';
 part 'screenshot_database_search.dart';
 part 'screenshot_database_merge.dart';
 part 'screenshot_database_query.dart';
+part 'screenshot_database_health.dart';
 
 /// 截屏数据库服务
 class ScreenshotDatabase {
@@ -116,7 +117,7 @@ class ScreenshotDatabase {
         final path = join(databasesDir.path, 'screenshot_memo.db');
         final db = await openDatabase(
           path,
-          version: 46,
+          version: 47,
           onConfigure: (db) async {
             try {
               await db.execute('PRAGMA journal_mode=WAL');
@@ -154,7 +155,7 @@ class ScreenshotDatabase {
 
         final db = await openDatabase(
           path,
-          version: 46,
+          version: 47,
           onConfigure: (db) async {
             // 启用 WAL 提升并发写入与长事务期间读取能力
             try {
@@ -187,7 +188,7 @@ class ScreenshotDatabase {
 
         final db = await openDatabase(
           path,
-          version: 46,
+          version: 47,
           onConfigure: (db) async {
             try {
               await db.execute('PRAGMA journal_mode=WAL');
@@ -214,7 +215,7 @@ class ScreenshotDatabase {
 
       final db = await openDatabase(
         path,
-        version: 46,
+        version: 47,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       );
@@ -727,6 +728,9 @@ class ScreenshotDatabase {
     // Nocturne Memory（URI 图谱记忆）表结构
     await _createNocturneMemoryTables(db);
     await _createMemoryEntityTables(db);
+
+    // App 运行状态（结构化健康数据）
+    await _createAppHealthTables(db);
   }
 
   /// 升级回调：按版本增量迁移
@@ -744,6 +748,9 @@ class ScreenshotDatabase {
     if (oldVersion < 46) {
       await _ensureAiProvidersBalanceColumns(db);
       await _ensureAiProviderKeyBalanceColumns(db);
+    }
+    if (oldVersion < 47) {
+      await _createAppHealthTables(db);
     }
     if (oldVersion < 2) {
       await _createAiTables(db);

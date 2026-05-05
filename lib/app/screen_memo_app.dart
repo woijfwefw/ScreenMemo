@@ -20,6 +20,7 @@ import 'package:screen_memo/features/nocturne_memory/application/nocturne_memory
 import 'package:screen_memo/features/nocturne_memory/application/nocturne_memory_rebuild_service.dart';
 import 'package:screen_memo/data/database/screenshot_database.dart';
 import 'package:screen_memo/features/capture/application/screenshot_service.dart';
+import 'package:screen_memo/features/app_health/application/app_health_service.dart';
 
 class ScreenMemoApp extends StatefulWidget {
   const ScreenMemoApp({
@@ -61,6 +62,7 @@ class _ScreenMemoAppState extends State<ScreenMemoApp>
       NocturneMemoryMaintenanceService.instance.ensureInitialized(
         autoResume: true,
       );
+      AppHealthService.instance.ensureAutoMonitorStarted();
     });
   }
 
@@ -96,6 +98,9 @@ class _ScreenMemoAppState extends State<ScreenMemoApp>
       NocturneMemoryMaintenanceService.instance.ensureInitialized(
         autoResume: true,
       );
+      // 回到前台时如果距离上次自动检查较久，补跑一次。
+      // ignore: discarded_futures
+      AppHealthService.instance.runAutoMonitorCheckIfStale(reason: 'resumed');
     }
   }
 

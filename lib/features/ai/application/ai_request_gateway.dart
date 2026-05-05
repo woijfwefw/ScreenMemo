@@ -7,6 +7,7 @@ import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
 import 'package:screen_memo/features/ai/application/ai_providers_service.dart';
 import 'package:screen_memo/core/logging/flutter_logger.dart';
 import 'package:screen_memo/features/ai/application/openai_responses_extract.dart';
+import 'package:screen_memo/features/app_health/application/app_health_service.dart';
 
 /// 统一的网关事件类型
 class AIGatewayEventKind {
@@ -116,6 +117,12 @@ class AIRequestGateway {
   bool _shouldCooldown(String errorType) => errorType == 'retryable';
 
   Future<void> _markEndpointSuccess(AIEndpoint endpoint) async {
+    unawaited(
+      AppHealthService.instance.recordApiSuccess(
+        model: endpoint.model,
+        providerType: endpoint.providerType,
+      ),
+    );
     final int? keyId = endpoint.providerKeyId;
     if (keyId == null) return;
     await AIProvidersService.instance.markProviderKeySuccess(keyId);
@@ -137,6 +144,14 @@ class AIRequestGateway {
     required Object error,
     required int attemptCountForKey,
   }) async {
+    unawaited(
+      AppHealthService.instance.recordApiFailure(
+        errorType: errorType,
+        errorMessage: error.toString(),
+        model: endpoint.model,
+        providerType: endpoint.providerType,
+      ),
+    );
     final int? keyId = endpoint.providerKeyId;
     if (keyId == null) return;
     final bool auth = errorType == 'auth_failed';

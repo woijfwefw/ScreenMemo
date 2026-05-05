@@ -4,6 +4,8 @@ import com.fqyw.screen_memo.app.AppContextProvider
 import com.fqyw.screen_memo.daily.DailySummaryScheduler
 import com.fqyw.screen_memo.diagnostics.RuntimeDiagnostics
 import com.fqyw.screen_memo.dynamic.DynamicRebuildService
+import com.fqyw.screen_memo.health.AppHealthNativeRecorder
+import com.fqyw.screen_memo.health.AppHealthScheduler
 import com.fqyw.screen_memo.importing.ImportOcrRepairService
 import com.fqyw.screen_memo.logging.FileLogger
 import com.fqyw.screen_memo.logging.OutputFileLogger
@@ -56,6 +58,13 @@ class ScreenMemoApplication : Application() {
             DynamicRebuildService.ensureResumedIfPending(this, "application_on_create")
         } catch (e: Exception) {
             FileLogger.w(TAG, "恢复动态重建任务失败：${e.message}")
+        }
+
+        try {
+            AppHealthScheduler.restore(this)
+            AppHealthNativeRecorder.recordSnapshot(this, "application_on_create")
+        } catch (e: Exception) {
+            FileLogger.w(TAG, "恢复 App 运行状态调度失败：${e.message}")
         }
 
     }

@@ -3,6 +3,8 @@ package com.fqyw.screen_memo.service
 import com.fqyw.screen_memo.capture.AccessibilityStateMonitor
 import com.fqyw.screen_memo.capture.ScreenCaptureService
 import com.fqyw.screen_memo.daily.DailySummaryScheduler
+import com.fqyw.screen_memo.health.AppHealthNativeRecorder
+import com.fqyw.screen_memo.health.AppHealthScheduler
 import com.fqyw.screen_memo.logging.FileLogger
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -62,6 +64,14 @@ class BootReceiver : BroadcastReceiver() {
                     FileLogger.d(TAG, "固定时段调度结果: $ok")
                 } catch (e: Exception) {
                     FileLogger.e(TAG, "恢复每日提醒调度失败", e)
+                }
+
+                try {
+                    AppHealthScheduler.restore(context)
+                    AppHealthNativeRecorder.recordSnapshot(context, "boot_or_package_replaced")
+                    FileLogger.d(TAG, "App 运行状态调度已恢复")
+                } catch (e: Exception) {
+                    FileLogger.e(TAG, "恢复 App 运行状态调度失败", e)
                 }
             }
         }
