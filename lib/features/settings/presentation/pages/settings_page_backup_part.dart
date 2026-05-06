@@ -18,104 +18,89 @@ extension _SettingsBackupPart on _SettingsPageState {
           ),
         );
     final NavigatorState navigator = Navigator.of(context, rootNavigator: true);
+    BuildContext? progressDialogContext;
     bool dialogClosed = false;
-    showGeneralDialog<void>(
+    bool cancelRequested = false;
+
+    void requestCancel() {
+      if (cancelRequested) return;
+      cancelRequested = true;
+      final ScreenshotRecomputeProgress current = progressNotifier.value;
+      progressNotifier.value = ScreenshotRecomputeProgress(
+        phase: 'cancel_requested',
+        current: current.current,
+        total: current.total,
+        inserted: current.inserted,
+        processedFiles: current.processedFiles,
+        packageName: current.packageName,
+      );
+    }
+
+    final Future<void> progressDialog = showUIDialog<void>(
       context: context,
       barrierDismissible: false,
-      barrierLabel: 'recalculate_progress',
-      pageBuilder: (BuildContext dialogContext, _, __) {
-        final ThemeData theme = Theme.of(dialogContext);
-        return PopScope(
-          canPop: false,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 260),
-              child: Material(
-                color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                elevation: 8,
-                child: Padding(
-                  padding: const EdgeInsets.all(AppTheme.spacing4),
-                  child: ValueListenableBuilder<ScreenshotRecomputeProgress>(
-                    valueListenable: progressNotifier,
-                    builder: (_, ScreenshotRecomputeProgress progress, __) {
-                      final double? value = progress.value;
-                      final String? percent = value == null
-                          ? null
-                          : '${(value * 100).clamp(0, 100).round()}%';
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            t.recalculateAllProgress,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: AppTheme.spacing3),
-                          UIProgress(value: value, height: 4),
-                          const SizedBox(height: AppTheme.spacing2),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  _formatRecalculateProgressDetail(progress),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ),
-                              if (percent != null) ...[
-                                const SizedBox(width: AppTheme.spacing2),
-                                Text(
-                                  percent,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
+      canPop: false,
+      title: t.recalculateAllTitle,
+      constraints: const BoxConstraints(maxWidth: 420, minWidth: 280),
+      content: Builder(
+        builder: (BuildContext dialogContext) {
+          progressDialogContext = dialogContext;
+          return _buildRecalculateProgressContent(t, progressNotifier);
+        },
+      ),
+      actions: [
+        UIDialogAction<void>(
+          text: t.dialogCancel,
+          closeOnPress: false,
+          onPressed: (_) async => requestCancel(),
+        ),
+      ],
     );
 
-    try {
-      await ScreenshotService.instance.recomputeAllAppStats(
-        onProgress: (ScreenshotRecomputeProgress progress) {
-          if (!dialogClosed) {
-            progressNotifier.value = progress;
-          }
-        },
-      );
-      if (mounted) {
-        if (!dialogClosed) {
-          try {
-            navigator.pop();
-            dialogClosed = true;
-          } catch (_) {}
+    Future<void> closeProgressDialog() async {
+      if (dialogClosed) return;
+      bool didPop = false;
+      try {
+        final BuildContext? dialogContext = progressDialogContext;
+        if (dialogContext != null && dialogContext.mounted) {
+          Navigator.of(dialogContext).pop();
+          didPop = true;
+        } else if (navigator.canPop()) {
+          navigator.pop();
+          didPop = true;
         }
-        UINotifier.success(context, t.recalculateAllSuccess);
+      } catch (_) {}
+      dialogClosed = true;
+      if (didPop) {
+        try {
+          await progressDialog;
+        } catch (_) {}
+      }
+    }
+
+    try {
+      final bool completed = await ScreenshotService.instance
+          .recomputeAllAppStats(
+            onProgress: (ScreenshotRecomputeProgress progress) {
+              if (!dialogClosed && !cancelRequested) {
+                progressNotifier.value = progress;
+              }
+            },
+            shouldCancel: () => cancelRequested,
+          );
+      if (mounted) {
+        await closeProgressDialog();
+        if (!mounted) return;
+        if (completed) {
+          UINotifier.success(context, t.recalculateAllSuccess);
+        } else {
+          UINotifier.info(context, _recalculateCanceledMessage(t));
+        }
       }
     } catch (e) {
       if (mounted) {
-        if (!dialogClosed) {
-          try {
-            navigator.pop();
-            dialogClosed = true;
-          } catch (_) {}
-        }
+        await closeProgressDialog();
+        if (!mounted) return;
         await showUIDialog<void>(
           context: context,
           barrierDismissible: false,
@@ -130,11 +115,7 @@ extension _SettingsBackupPart on _SettingsPageState {
         );
       }
     } finally {
-      if (!dialogClosed) {
-        try {
-          navigator.pop();
-        } catch (_) {}
-      }
+      await closeProgressDialog();
       if (mounted) {
         _settingsSetState(() {
           _recalculatingAll = false;
@@ -144,10 +125,95 @@ extension _SettingsBackupPart on _SettingsPageState {
     }
   }
 
+  Widget _buildRecalculateProgressContent(
+    AppLocalizations t,
+    ValueListenable<ScreenshotRecomputeProgress> progressNotifier,
+  ) {
+    final ThemeData theme = Theme.of(context);
+    final Color detailColor = theme.colorScheme.onSurfaceVariant;
+    return ValueListenableBuilder<ScreenshotRecomputeProgress>(
+      valueListenable: progressNotifier,
+      builder: (_, ScreenshotRecomputeProgress progress, __) {
+        final double? value = progress.value;
+        final String? percent = value == null
+            ? null
+            : '${(value * 100).clamp(0, 100).round()}%';
+        final bool canceling = progress.phase == 'cancel_requested';
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              canceling ? _recalculateCancelHint(t) : t.recalculateAllProgress,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: AppTheme.spacing3),
+            UIProgress(value: value, height: 6),
+            const SizedBox(height: AppTheme.spacing2),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _formatRecalculateProgressDetail(progress),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: detailColor,
+                    ),
+                  ),
+                ),
+                if (percent != null) ...[
+                  const SizedBox(width: AppTheme.spacing2),
+                  Text(
+                    percent,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: detailColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            if (!canceling) ...[
+              const SizedBox(height: AppTheme.spacing2),
+              Text(
+                _recalculateCancelTip(t),
+                style: theme.textTheme.bodySmall?.copyWith(color: detailColor),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  bool _isZhLocale(AppLocalizations t) =>
+      t.localeName.toLowerCase().startsWith('zh');
+
+  String _recalculateCancelHint(AppLocalizations t) {
+    return _isZhLocale(t)
+        ? '正在取消，当前步骤结束后会停止。'
+        : 'Cancelling after the current step...';
+  }
+
+  String _recalculateCancelTip(AppLocalizations t) {
+    return _isZhLocale(t)
+        ? '如需停止本次重新统计，可点击下方取消。'
+        : 'Tap Cancel to stop this recalculation.';
+  }
+
+  String _recalculateCanceledMessage(AppLocalizations t) {
+    return _isZhLocale(t) ? '已取消重新统计。' : 'Recalculation canceled.';
+  }
+
   String _formatRecalculateProgressDetail(
     ScreenshotRecomputeProgress progress,
   ) {
     final String phaseLabel = switch (progress.phase) {
+      'cancel_requested' => 'Cancelling',
       'scan_prepare' => 'Preparing scan',
       'scan_files' => 'Scanning screenshot files',
       'recompute_app' => 'Recomputing app statistics',

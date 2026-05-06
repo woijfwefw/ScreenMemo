@@ -80,6 +80,8 @@ Future<T?> showUIDialog<T>({
   Widget? content,
   List<UIDialogAction<T>> actions = const [],
   bool barrierDismissible = true,
+  BoxConstraints? constraints,
+  bool canPop = true,
 }) {
   final theme = Theme.of(context);
   final cs = theme.colorScheme;
@@ -95,61 +97,68 @@ Future<T?> showUIDialog<T>({
     barrierLabel: 'Dialog',
     barrierColor: cs.scrim.withValues(alpha: isDark ? 0.62 : 0.48),
     pageBuilder: (ctx, _, __) {
-      return SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacing6),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 360, minWidth: 280),
-              child: Material(
-                type: MaterialType.transparency,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: surface,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                    border: Border.all(color: borderColor, width: 1),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (title != null || titleWidget != null)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(
-                            AppTheme.spacing6,
-                            AppTheme.spacing6,
-                            AppTheme.spacing6,
-                            AppTheme.spacing2,
-                          ),
-                          child: DefaultTextStyle(
-                            style: theme.textTheme.titleLarge!.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: cs.onSurface,
+      return PopScope(
+        canPop: canPop,
+        child: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTheme.spacing6,
+              ),
+              child: ConstrainedBox(
+                constraints:
+                    constraints ??
+                    const BoxConstraints(maxWidth: 360, minWidth: 280),
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: surface,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                      border: Border.all(color: borderColor, width: 1),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (title != null || titleWidget != null)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              AppTheme.spacing6,
+                              AppTheme.spacing6,
+                              AppTheme.spacing6,
+                              AppTheme.spacing2,
                             ),
-                            child: Center(child: titleWidget ?? Text(title!)),
-                          ),
-                        ),
-                      if (message != null || content != null)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(
-                            AppTheme.spacing6,
-                            AppTheme.spacing2,
-                            AppTheme.spacing6,
-                            AppTheme.spacing5,
-                          ),
-                          child: DefaultTextStyle(
-                            style: theme.textTheme.bodyMedium!.copyWith(
-                              color: cs.onSurfaceVariant,
-                              height: 1.45,
+                            child: DefaultTextStyle(
+                              style: theme.textTheme.titleLarge!.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: cs.onSurface,
+                              ),
+                              child: Center(child: titleWidget ?? Text(title!)),
                             ),
-                            child: message != null
-                                ? Text(message, textAlign: TextAlign.center)
-                                : content!,
                           ),
-                        ),
-                      _buildActionsSection(context, actions),
-                    ],
+                        if (message != null || content != null)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              AppTheme.spacing6,
+                              AppTheme.spacing2,
+                              AppTheme.spacing6,
+                              AppTheme.spacing5,
+                            ),
+                            child: DefaultTextStyle(
+                              style: theme.textTheme.bodyMedium!.copyWith(
+                                color: cs.onSurfaceVariant,
+                                height: 1.45,
+                              ),
+                              child: message != null
+                                  ? Text(message, textAlign: TextAlign.center)
+                                  : content!,
+                            ),
+                          ),
+                        _buildActionsSection(context, actions),
+                      ],
+                    ),
                   ),
                 ),
               ),

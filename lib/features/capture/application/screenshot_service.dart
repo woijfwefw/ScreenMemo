@@ -705,9 +705,18 @@ class ScreenshotService {
     await _refreshStatsCache(force: true);
   }
 
+  bool _isRecomputeCanceled(bool Function()? shouldCancel) {
+    try {
+      return shouldCancel?.call() ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// 重新计算所有应用的统计信息，然后刷新全局统计与缓存
-  Future<void> recomputeAllAppStats({
+  Future<bool> recomputeAllAppStats({
     void Function(ScreenshotRecomputeProgress progress)? onProgress,
+    bool Function()? shouldCancel,
   }) async {
     onProgress?.call(
       const ScreenshotRecomputeProgress(
@@ -719,11 +728,14 @@ class ScreenshotService {
     final int repaired = await syncMissingScreenshotsFromFiles(
       refreshAfter: false,
       onProgress: onProgress,
+      shouldCancel: shouldCancel,
     );
+    if (_isRecomputeCanceled(shouldCancel)) return false;
     final List<String> packages = await _database.listRegisteredPackages();
     final int totalSteps = packages.length + 3;
     int step = 0;
     for (final String pkg in packages) {
+      if (_isRecomputeCanceled(shouldCancel)) return false;
       onProgress?.call(
         ScreenshotRecomputeProgress(
           phase: 'recompute_app',
@@ -735,6 +747,7 @@ class ScreenshotService {
       );
       await _database.recomputeAppStatsForPackage(pkg);
       step++;
+      if (_isRecomputeCanceled(shouldCancel)) return false;
       onProgress?.call(
         ScreenshotRecomputeProgress(
           phase: 'recompute_app',
@@ -745,6 +758,7 @@ class ScreenshotService {
         ),
       );
     }
+    if (_isRecomputeCanceled(shouldCancel)) return false;
     onProgress?.call(
       ScreenshotRecomputeProgress(
         phase: 'recalculate_totals',
@@ -787,6 +801,7 @@ class ScreenshotService {
     if (repaired > 0) {
       _screenshotStreamController.add(null);
     }
+    return true;
   }
 
   /// 获取最新统计（不使用统计缓存，可选择强制全量文件同步）
@@ -1760,6 +1775,7 @@ class ScreenshotService {
   Future<int> syncMissingScreenshotsFromFiles({
     bool refreshAfter = true,
     void Function(ScreenshotRecomputeProgress progress)? onProgress,
+    bool Function()? shouldCancel,
   }) async {
     int inserted = 0;
     final Set<String> affectedPackages = <String>{};
@@ -1783,6 +1799,7 @@ class ScreenshotService {
         ),
       );
       for (int i = 0; i < appDirs.length; i++) {
+        if (_isRecomputeCanceled(shouldCancel)) break;
         final Directory entity = appDirs[i];
         final String packageName = p.basename(entity.path).trim();
         if (packageName.isEmpty) continue;
@@ -1802,11 +1819,13 @@ class ScreenshotService {
           packageTotal: appDirs.length,
           insertedBefore: inserted,
           onProgress: onProgress,
+          shouldCancel: shouldCancel,
         );
         if (count > 0) {
           inserted += count;
           affectedPackages.add(packageName);
         }
+        if (_isRecomputeCanceled(shouldCancel)) break;
         onProgress?.call(
           ScreenshotRecomputeProgress(
             phase: 'scan_files',
@@ -1818,7 +1837,8 @@ class ScreenshotService {
         );
       }
 
-      if (refreshAfter && inserted > 0) {
+      if ((refreshAfter || _isRecomputeCanceled(shouldCancel)) &&
+          inserted > 0) {
         for (final String packageName in affectedPackages) {
           await _database.recomputeAppStatsForPackage(packageName);
         }
@@ -1848,6 +1868,7 @@ class ScreenshotService {
     int packageTotal = 0,
     int insertedBefore = 0,
     void Function(ScreenshotRecomputeProgress progress)? onProgress,
+    bool Function()? shouldCancel,
   }) async {
     int inserted = 0;
     int processedFiles = 0;
@@ -1857,6 +1878,7 @@ class ScreenshotService {
         recursive: true,
         followLinks: false,
       )) {
+        if (_isRecomputeCanceled(shouldCancel)) break;
         if (entity is! File || !_isSupportedScreenshotFile(entity.path)) {
           continue;
         }
