@@ -3722,4 +3722,93 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get modelStatusStable => '安定';
+
+  @override
+  String get updateCheckNowAction => 'アップデートを確認';
+
+  @override
+  String get updateChecking => 'アップデートを確認しています...';
+
+  @override
+  String get updateNoUpdate => '最新バージョンを使用しています';
+
+  @override
+  String updateCheckFailed(Object error) {
+    return 'アップデート確認に失敗しました：$error';
+  }
+
+  @override
+  String get updateUnknownError => '不明なエラー';
+
+  @override
+  String get updateNoCompatibleApk => 'この端末に対応する APK が見つかりません';
+
+  @override
+  String get updateNewVersionTitle => '新しいバージョンがあります';
+
+  @override
+  String get updateCurrentVersionLabel => '現在のバージョン';
+
+  @override
+  String get updateLatestVersionLabel => '最新バージョン';
+
+  @override
+  String get updatePublishedAtLabel => '公開日時';
+
+  @override
+  String get updateApkSizeLabel => 'APK サイズ';
+
+  @override
+  String get updateReleaseNotesLabel => 'リリースノート';
+
+  @override
+  String get updateDownloadAction => 'ダウンロード';
+
+  @override
+  String get updateIgnoreVersionAction => 'このバージョンを無視';
+
+  @override
+  String get updateCloseAction => '閉じる';
+
+  @override
+  String get updateIgnoredToast => 'このバージョンを無視しました';
+
+  @override
+  String get updateDownloadTitle => 'アップデートをダウンロード';
+
+  @override
+  String updateDownloadProgress(Object received, Object total) {
+    return '$received / $total';
+  }
+
+  @override
+  String updateDownloadProgressUnknown(Object received) {
+    return '$received ダウンロード済み';
+  }
+
+  @override
+  String updateDownloadFailed(Object error) {
+    return 'アップデートのダウンロードに失敗しました：$error';
+  }
+
+  @override
+  String get updateDownloadComplete => 'APK のダウンロードが完了しました';
+
+  @override
+  String get updateInstalling => 'インストーラーを開いています...';
+
+  @override
+  String updateInstallFailed(Object error) {
+    return 'インストーラーを開けません：$error';
+  }
+
+  @override
+  String get updateInstallPermissionTitle => 'インストール権限が必要です';
+
+  @override
+  String get updateInstallPermissionMessage =>
+      'ScreenMemo に不明なアプリのインストールを許可し、戻ってからもう一度ダウンロードをタップしてください。';
+
+  @override
+  String get updateOpenInstallSettingsAction => '設定を開く';
 }

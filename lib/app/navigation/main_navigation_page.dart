@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:screen_memo/core/theme/theme_service.dart';
@@ -11,6 +13,7 @@ import 'package:screen_memo/core/lifecycle/app_lifecycle_service.dart';
 import 'package:screen_memo/features/timeline/application/timeline_jump_service.dart';
 import 'package:screen_memo/l10n/app_localizations.dart';
 import 'package:screen_memo/core/logging/flutter_logger.dart';
+import 'package:screen_memo/features/updater/presentation/update_prompt_coordinator.dart';
 
 /// 主导航页面 - 包含底部导航栏的主界面
 class MainNavigationPage extends StatefulWidget {
@@ -22,7 +25,8 @@ class MainNavigationPage extends StatefulWidget {
   State<MainNavigationPage> createState() => _MainNavigationPageState();
 }
 
-class _MainNavigationPageState extends State<MainNavigationPage> {
+class _MainNavigationPageState extends State<MainNavigationPage>
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
   DateTime? _lastBackPressedAt;
 
@@ -35,6 +39,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _pages = [
       HomePage(themeService: widget.themeService),
       const FavoritesPage(),
@@ -59,6 +64,16 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
       }
     };
     TimelineJumpService.instance.requestNotifier.addListener(_jumpListener!);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(
+        UpdatePromptCoordinator.instance.checkAndPrompt(
+          context,
+          reason: 'startup',
+        ),
+      );
+    });
   }
 
   List<BottomNavigationBarItem> _buildNavigationItems(BuildContext context) {
@@ -221,6 +236,22 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (!mounted) return;
+        unawaited(
+          UpdatePromptCoordinator.instance.checkAndPrompt(
+            context,
+            reason: 'resumed',
+          ),
+        );
+      });
+    }
+  }
+
+  @override
   void dispose() {
     try {
       if (_jumpListener != null) {
@@ -229,6 +260,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
         );
       }
     } catch (_) {}
+    WidgetsBinding.instance.removeObserver(this);
     _settingsPageController.dispose();
     super.dispose();
   }

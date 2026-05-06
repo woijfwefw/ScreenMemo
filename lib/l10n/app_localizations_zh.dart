@@ -3688,4 +3688,92 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get modelStatusStable => '稳定';
+
+  @override
+  String get updateCheckNowAction => '检查更新';
+
+  @override
+  String get updateChecking => '正在检查更新...';
+
+  @override
+  String get updateNoUpdate => '已是最新版本';
+
+  @override
+  String updateCheckFailed(Object error) {
+    return '检查更新失败：$error';
+  }
+
+  @override
+  String get updateUnknownError => '未知错误';
+
+  @override
+  String get updateNoCompatibleApk => '未找到适合此设备的 APK';
+
+  @override
+  String get updateNewVersionTitle => '发现新版本';
+
+  @override
+  String get updateCurrentVersionLabel => '当前版本';
+
+  @override
+  String get updateLatestVersionLabel => '最新版本';
+
+  @override
+  String get updatePublishedAtLabel => '发布时间';
+
+  @override
+  String get updateApkSizeLabel => '安装包大小';
+
+  @override
+  String get updateReleaseNotesLabel => '更新说明';
+
+  @override
+  String get updateDownloadAction => '下载';
+
+  @override
+  String get updateIgnoreVersionAction => '忽略此版本';
+
+  @override
+  String get updateCloseAction => '关闭';
+
+  @override
+  String get updateIgnoredToast => '已忽略此版本';
+
+  @override
+  String get updateDownloadTitle => '下载更新';
+
+  @override
+  String updateDownloadProgress(Object received, Object total) {
+    return '$received / $total';
+  }
+
+  @override
+  String updateDownloadProgressUnknown(Object received) {
+    return '已下载 $received';
+  }
+
+  @override
+  String updateDownloadFailed(Object error) {
+    return '下载更新失败：$error';
+  }
+
+  @override
+  String get updateDownloadComplete => '安装包下载完成';
+
+  @override
+  String get updateInstalling => '正在打开安装器...';
+
+  @override
+  String updateInstallFailed(Object error) {
+    return '无法打开安装器：$error';
+  }
+
+  @override
+  String get updateInstallPermissionTitle => '需要安装权限';
+
+  @override
+  String get updateInstallPermissionMessage => '请允许屏忆安装未知来源应用，然后返回后重新点击下载。';
+
+  @override
+  String get updateOpenInstallSettingsAction => '打开设置';
 }

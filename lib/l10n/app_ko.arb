@@ -2000,5 +2000,58 @@
   "modelStatusBeta": "베타",
   "modelStatusDeprecated": "지원 중단",
   "modelStatusExperimental": "실험",
-  "modelStatusStable": "안정"
+  "modelStatusStable": "안정",
+  "updateCheckNowAction": "업데이트 확인",
+  "updateChecking": "업데이트를 확인하는 중...",
+  "updateNoUpdate": "최신 버전을 사용 중입니다",
+  "updateCheckFailed": "업데이트 확인 실패: {error}",
+  "@updateCheckFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "updateUnknownError": "알 수 없는 오류",
+  "updateNoCompatibleApk": "이 기기에 맞는 APK를 찾을 수 없습니다",
+  "updateNewVersionTitle": "새 버전이 있습니다",
+  "updateCurrentVersionLabel": "현재 버전",
+  "updateLatestVersionLabel": "최신 버전",
+  "updatePublishedAtLabel": "게시 시간",
+  "updateApkSizeLabel": "APK 크기",
+  "updateReleaseNotesLabel": "릴리스 노트",
+  "updateDownloadAction": "다운로드",
+  "updateIgnoreVersionAction": "이 버전 무시",
+  "updateCloseAction": "닫기",
+  "updateIgnoredToast": "이 버전을 무시했습니다",
+  "updateDownloadTitle": "업데이트 다운로드",
+  "updateDownloadProgress": "{received} / {total}",
+  "@updateDownloadProgress": {
+    "placeholders": {
+      "received": {},
+      "total": {}
+    }
+  },
+  "updateDownloadProgressUnknown": "{received} 다운로드됨",
+  "@updateDownloadProgressUnknown": {
+    "placeholders": {
+      "received": {}
+    }
+  },
+  "updateDownloadFailed": "업데이트 다운로드 실패: {error}",
+  "@updateDownloadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "updateDownloadComplete": "APK 다운로드가 완료되었습니다",
+  "updateInstalling": "설치 프로그램을 여는 중...",
+  "updateInstallFailed": "설치 프로그램을 열 수 없습니다: {error}",
+  "@updateInstallFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "updateInstallPermissionTitle": "설치 권한 필요",
+  "updateInstallPermissionMessage": "ScreenMemo가 알 수 없는 앱을 설치하도록 허용한 다음 돌아와서 다운로드를 다시 누르세요.",
+  "updateOpenInstallSettingsAction": "설정 열기"
+
 }

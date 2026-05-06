@@ -42,6 +42,11 @@ class UserSettingKeys {
   static const String dynamicEntryLogIconEnabled =
       'dynamic_entry_log_icon_enabled';
 
+  // 自动更新
+  static const String autoUpdateEnabled = 'auto_update_enabled';
+  static const String autoUpdateLastCheckMs = 'auto_update_last_check_ms';
+  static const String autoUpdateIgnoredVersion = 'auto_update_ignored_version';
+
   // Nocturne-style memory (URI graph)
   static const String nocturneMemoryLastUri = 'nocturne_memory_last_uri';
   static const String nocturneMemoryRebuildState =

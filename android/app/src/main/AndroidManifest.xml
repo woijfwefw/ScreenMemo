@@ -24,6 +24,9 @@
     <!-- 网络权限（如果需要上传截图） -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- App 内下载 APK 后交给系统安装器安装更新 -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- 唤醒锁权限，确保服务持续运行 -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 

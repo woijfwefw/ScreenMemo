@@ -2000,5 +2000,58 @@
   "modelStatusBeta": "Beta",
   "modelStatusDeprecated": "Deprecated",
   "modelStatusExperimental": "Experimental",
-  "modelStatusStable": "Stable"
+  "modelStatusStable": "Stable",
+  "updateCheckNowAction": "Check for updates",
+  "updateChecking": "Checking for updates...",
+  "updateNoUpdate": "You are using the latest version",
+  "updateCheckFailed": "Update check failed: {error}",
+  "@updateCheckFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "updateUnknownError": "Unknown error",
+  "updateNoCompatibleApk": "No compatible APK was found for this device",
+  "updateNewVersionTitle": "New version available",
+  "updateCurrentVersionLabel": "Current version",
+  "updateLatestVersionLabel": "Latest version",
+  "updatePublishedAtLabel": "Published at",
+  "updateApkSizeLabel": "APK size",
+  "updateReleaseNotesLabel": "Release notes",
+  "updateDownloadAction": "Download",
+  "updateIgnoreVersionAction": "Ignore this version",
+  "updateCloseAction": "Close",
+  "updateIgnoredToast": "This version has been ignored",
+  "updateDownloadTitle": "Downloading update",
+  "updateDownloadProgress": "{received} / {total}",
+  "@updateDownloadProgress": {
+    "placeholders": {
+      "received": {},
+      "total": {}
+    }
+  },
+  "updateDownloadProgressUnknown": "Downloaded {received}",
+  "@updateDownloadProgressUnknown": {
+    "placeholders": {
+      "received": {}
+    }
+  },
+  "updateDownloadFailed": "Update download failed: {error}",
+  "@updateDownloadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "updateDownloadComplete": "APK download completed",
+  "updateInstalling": "Opening installer...",
+  "updateInstallFailed": "Unable to open installer: {error}",
+  "@updateInstallFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "updateInstallPermissionTitle": "Install permission required",
+  "updateInstallPermissionMessage": "Allow ScreenMemo to install unknown apps, then return and tap Download again.",
+  "updateOpenInstallSettingsAction": "Open settings"
+
 }

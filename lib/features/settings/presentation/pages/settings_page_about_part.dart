@@ -92,7 +92,15 @@ extension _SettingsAboutPart on _SettingsPageState {
                   icon: Icons.apps_outlined,
                   label: l10n.aboutPackageName,
                   value: packageName,
+                  showBottomBorder: true,
+                ),
+                _buildAboutInfoRow(
+                  context: context,
+                  icon: Icons.system_update_alt_outlined,
+                  label: l10n.updateCheckNowAction,
+                  value: l10n.actionRefresh,
                   showBottomBorder: false,
+                  onTap: _checkForUpdates,
                 ),
               ],
             ),
@@ -358,6 +366,14 @@ extension _SettingsAboutPart on _SettingsPageState {
     } catch (_) {
       if (mounted) UINotifier.error(context, l10n.aboutOpenLinkFailed(url));
     }
+  }
+
+  Future<void> _checkForUpdates() async {
+    await UpdatePromptCoordinator.instance.checkAndPrompt(
+      context,
+      force: true,
+      reason: 'manual_about',
+    );
   }
 
   void _showAboutLicenses(PackageInfo? info) {

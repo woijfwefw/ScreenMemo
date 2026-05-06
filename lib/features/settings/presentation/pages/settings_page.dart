@@ -28,6 +28,7 @@ import 'package:screen_memo/features/daily_summary/application/daily_summary_ser
 import 'package:screen_memo/features/nsfw/application/nsfw_preference_service.dart';
 import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
 import 'package:screen_memo/features/app_health/application/app_health_service.dart';
+import 'package:screen_memo/features/updater/presentation/update_prompt_coordinator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 part 'settings_page_about_part.dart';

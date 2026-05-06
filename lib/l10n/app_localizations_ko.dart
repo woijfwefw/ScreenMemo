@@ -3723,4 +3723,93 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get modelStatusStable => '안정';
+
+  @override
+  String get updateCheckNowAction => '업데이트 확인';
+
+  @override
+  String get updateChecking => '업데이트를 확인하는 중...';
+
+  @override
+  String get updateNoUpdate => '최신 버전을 사용 중입니다';
+
+  @override
+  String updateCheckFailed(Object error) {
+    return '업데이트 확인 실패: $error';
+  }
+
+  @override
+  String get updateUnknownError => '알 수 없는 오류';
+
+  @override
+  String get updateNoCompatibleApk => '이 기기에 맞는 APK를 찾을 수 없습니다';
+
+  @override
+  String get updateNewVersionTitle => '새 버전이 있습니다';
+
+  @override
+  String get updateCurrentVersionLabel => '현재 버전';
+
+  @override
+  String get updateLatestVersionLabel => '최신 버전';
+
+  @override
+  String get updatePublishedAtLabel => '게시 시간';
+
+  @override
+  String get updateApkSizeLabel => 'APK 크기';
+
+  @override
+  String get updateReleaseNotesLabel => '릴리스 노트';
+
+  @override
+  String get updateDownloadAction => '다운로드';
+
+  @override
+  String get updateIgnoreVersionAction => '이 버전 무시';
+
+  @override
+  String get updateCloseAction => '닫기';
+
+  @override
+  String get updateIgnoredToast => '이 버전을 무시했습니다';
+
+  @override
+  String get updateDownloadTitle => '업데이트 다운로드';
+
+  @override
+  String updateDownloadProgress(Object received, Object total) {
+    return '$received / $total';
+  }
+
+  @override
+  String updateDownloadProgressUnknown(Object received) {
+    return '$received 다운로드됨';
+  }
+
+  @override
+  String updateDownloadFailed(Object error) {
+    return '업데이트 다운로드 실패: $error';
+  }
+
+  @override
+  String get updateDownloadComplete => 'APK 다운로드가 완료되었습니다';
+
+  @override
+  String get updateInstalling => '설치 프로그램을 여는 중...';
+
+  @override
+  String updateInstallFailed(Object error) {
+    return '설치 프로그램을 열 수 없습니다: $error';
+  }
+
+  @override
+  String get updateInstallPermissionTitle => '설치 권한 필요';
+
+  @override
+  String get updateInstallPermissionMessage =>
+      'ScreenMemo가 알 수 없는 앱을 설치하도록 허용한 다음 돌아와서 다운로드를 다시 누르세요.';
+
+  @override
+  String get updateOpenInstallSettingsAction => '설정 열기';
 }

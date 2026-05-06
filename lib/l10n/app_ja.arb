@@ -2000,5 +2000,58 @@
   "modelStatusBeta": "ベータ",
   "modelStatusDeprecated": "非推奨",
   "modelStatusExperimental": "実験",
-  "modelStatusStable": "安定"
+  "modelStatusStable": "安定",
+  "updateCheckNowAction": "アップデートを確認",
+  "updateChecking": "アップデートを確認しています...",
+  "updateNoUpdate": "最新バージョンを使用しています",
+  "updateCheckFailed": "アップデート確認に失敗しました：{error}",
+  "@updateCheckFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "updateUnknownError": "不明なエラー",
+  "updateNoCompatibleApk": "この端末に対応する APK が見つかりません",
+  "updateNewVersionTitle": "新しいバージョンがあります",
+  "updateCurrentVersionLabel": "現在のバージョン",
+  "updateLatestVersionLabel": "最新バージョン",
+  "updatePublishedAtLabel": "公開日時",
+  "updateApkSizeLabel": "APK サイズ",
+  "updateReleaseNotesLabel": "リリースノート",
+  "updateDownloadAction": "ダウンロード",
+  "updateIgnoreVersionAction": "このバージョンを無視",
+  "updateCloseAction": "閉じる",
+  "updateIgnoredToast": "このバージョンを無視しました",
+  "updateDownloadTitle": "アップデートをダウンロード",
+  "updateDownloadProgress": "{received} / {total}",
+  "@updateDownloadProgress": {
+    "placeholders": {
+      "received": {},
+      "total": {}
+    }
+  },
+  "updateDownloadProgressUnknown": "{received} ダウンロード済み",
+  "@updateDownloadProgressUnknown": {
+    "placeholders": {
+      "received": {}
+    }
+  },
+  "updateDownloadFailed": "アップデートのダウンロードに失敗しました：{error}",
+  "@updateDownloadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "updateDownloadComplete": "APK のダウンロードが完了しました",
+  "updateInstalling": "インストーラーを開いています...",
+  "updateInstallFailed": "インストーラーを開けません：{error}",
+  "@updateInstallFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "updateInstallPermissionTitle": "インストール権限が必要です",
+  "updateInstallPermissionMessage": "ScreenMemo に不明なアプリのインストールを許可し、戻ってからもう一度ダウンロードをタップしてください。",
+  "updateOpenInstallSettingsAction": "設定を開く"
+
 }

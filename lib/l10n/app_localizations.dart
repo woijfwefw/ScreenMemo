@@ -6696,6 +6696,162 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Stable'**
   String get modelStatusStable;
+
+  /// No description provided for @updateCheckNowAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates'**
+  String get updateCheckNowAction;
+
+  /// No description provided for @updateChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking for updates...'**
+  String get updateChecking;
+
+  /// No description provided for @updateNoUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'You are using the latest version'**
+  String get updateNoUpdate;
+
+  /// No description provided for @updateCheckFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Update check failed: {error}'**
+  String updateCheckFailed(Object error);
+
+  /// No description provided for @updateUnknownError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown error'**
+  String get updateUnknownError;
+
+  /// No description provided for @updateNoCompatibleApk.
+  ///
+  /// In en, this message translates to:
+  /// **'No compatible APK was found for this device'**
+  String get updateNoCompatibleApk;
+
+  /// No description provided for @updateNewVersionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New version available'**
+  String get updateNewVersionTitle;
+
+  /// No description provided for @updateCurrentVersionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Current version'**
+  String get updateCurrentVersionLabel;
+
+  /// No description provided for @updateLatestVersionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest version'**
+  String get updateLatestVersionLabel;
+
+  /// No description provided for @updatePublishedAtLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Published at'**
+  String get updatePublishedAtLabel;
+
+  /// No description provided for @updateApkSizeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'APK size'**
+  String get updateApkSizeLabel;
+
+  /// No description provided for @updateReleaseNotesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Release notes'**
+  String get updateReleaseNotesLabel;
+
+  /// No description provided for @updateDownloadAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get updateDownloadAction;
+
+  /// No description provided for @updateIgnoreVersionAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Ignore this version'**
+  String get updateIgnoreVersionAction;
+
+  /// No description provided for @updateCloseAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get updateCloseAction;
+
+  /// No description provided for @updateIgnoredToast.
+  ///
+  /// In en, this message translates to:
+  /// **'This version has been ignored'**
+  String get updateIgnoredToast;
+
+  /// No description provided for @updateDownloadTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading update'**
+  String get updateDownloadTitle;
+
+  /// No description provided for @updateDownloadProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{received} / {total}'**
+  String updateDownloadProgress(Object received, Object total);
+
+  /// No description provided for @updateDownloadProgressUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded {received}'**
+  String updateDownloadProgressUnknown(Object received);
+
+  /// No description provided for @updateDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Update download failed: {error}'**
+  String updateDownloadFailed(Object error);
+
+  /// No description provided for @updateDownloadComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'APK download completed'**
+  String get updateDownloadComplete;
+
+  /// No description provided for @updateInstalling.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening installer...'**
+  String get updateInstalling;
+
+  /// No description provided for @updateInstallFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to open installer: {error}'**
+  String updateInstallFailed(Object error);
+
+  /// No description provided for @updateInstallPermissionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Install permission required'**
+  String get updateInstallPermissionTitle;
+
+  /// No description provided for @updateInstallPermissionMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow ScreenMemo to install unknown apps, then return and tap Download again.'**
+  String get updateInstallPermissionMessage;
+
+  /// No description provided for @updateOpenInstallSettingsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Open settings'**
+  String get updateOpenInstallSettingsAction;
 }
 
 class _AppLocalizationsDelegate

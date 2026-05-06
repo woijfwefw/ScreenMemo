@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
+import androidx.core.content.FileProvider
 import com.fqyw.screen_memo.settings.AISettingsNative
 import com.fqyw.screen_memo.capture.AccessibilityServiceWatchdog
 import com.fqyw.screen_memo.daily.DailySummaryNotifier
@@ -28,6 +29,7 @@ import com.fqyw.screen_memo.settings.UserSettingsStorage
 import com.fqyw.screen_memo.storage.StorageAnalyzer
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
 
 class ExtractedMainMethodHandler(
     private val activity: MainActivity,
@@ -70,6 +72,10 @@ class ExtractedMainMethodHandler(
             "getDeviceInfo" -> result.success(OEMCompatibilityHelper.getDeviceInfo())
             "getEnabledImeList" -> getEnabledImeList(result)
             "getDefaultInputMethod" -> getDefaultInputMethod(result)
+            "getSupportedAbis" -> getSupportedAbis(result)
+            "canRequestPackageInstalls" -> canRequestPackageInstalls(result)
+            "openInstallPermissionSettings" -> openInstallPermissionSettings(result)
+            "installApk" -> installApk(call, result)
             "getDetailedStorageStats" -> getDetailedStorageStats(result)
             "getStorageMigrationStatus" -> getStorageMigrationStatus(result)
             "startStorageMigration" -> startStorageMigration(result)
@@ -390,6 +396,75 @@ class ExtractedMainMethodHandler(
         } catch (e: Exception) {
             FileLogger.e(tag, "读取默认输入法失败", e)
             result.success(null)
+        }
+    }
+
+    private fun getSupportedAbis(result: MethodChannel.Result) {
+        try {
+            result.success(Build.SUPPORTED_ABIS?.toList() ?: emptyList<String>())
+        } catch (e: Exception) {
+            result.error("read_abis_failed", e.message, null)
+        }
+    }
+
+    private fun canRequestPackageInstalls(result: MethodChannel.Result) {
+        try {
+            val allowed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                activity.packageManager.canRequestPackageInstalls()
+            } else {
+                true
+            }
+            result.success(allowed)
+        } catch (e: Exception) {
+            result.error("install_permission_check_failed", e.message, null)
+        }
+    }
+
+    private fun openInstallPermissionSettings(result: MethodChannel.Result) {
+        try {
+            val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Intent(
+                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:${activity.packageName}")
+                )
+            } else {
+                Intent(Settings.ACTION_SECURITY_SETTINGS)
+            }
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            activity.startActivity(intent)
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("open_install_settings_failed", e.message, null)
+        }
+    }
+
+    private fun installApk(call: MethodCall, result: MethodChannel.Result) {
+        try {
+            val path = call.argument<String>("path")?.trim()
+            if (path.isNullOrEmpty()) {
+                result.error("invalid_path", "path is required", null)
+                return
+            }
+            val apk = File(path)
+            if (!apk.exists() || !apk.isFile || apk.extension.lowercase() != "apk") {
+                result.error("file_not_found", "APK does not exist: $path", null)
+                return
+            }
+
+            val uri = FileProvider.getUriForFile(
+                activity,
+                "${activity.packageName}.fileprovider",
+                apk
+            )
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            activity.startActivity(intent)
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("install_apk_failed", e.message, null)
         }
     }
 

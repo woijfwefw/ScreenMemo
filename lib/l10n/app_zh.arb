@@ -2000,5 +2000,58 @@
   "modelStatusBeta": "测试",
   "modelStatusDeprecated": "已弃用",
   "modelStatusExperimental": "实验",
-  "modelStatusStable": "稳定"
+  "modelStatusStable": "稳定",
+  "updateCheckNowAction": "检查更新",
+  "updateChecking": "正在检查更新...",
+  "updateNoUpdate": "已是最新版本",
+  "updateCheckFailed": "检查更新失败：{error}",
+  "@updateCheckFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "updateUnknownError": "未知错误",
+  "updateNoCompatibleApk": "未找到适合此设备的 APK",
+  "updateNewVersionTitle": "发现新版本",
+  "updateCurrentVersionLabel": "当前版本",
+  "updateLatestVersionLabel": "最新版本",
+  "updatePublishedAtLabel": "发布时间",
+  "updateApkSizeLabel": "安装包大小",
+  "updateReleaseNotesLabel": "更新说明",
+  "updateDownloadAction": "下载",
+  "updateIgnoreVersionAction": "忽略此版本",
+  "updateCloseAction": "关闭",
+  "updateIgnoredToast": "已忽略此版本",
+  "updateDownloadTitle": "下载更新",
+  "updateDownloadProgress": "{received} / {total}",
+  "@updateDownloadProgress": {
+    "placeholders": {
+      "received": {},
+      "total": {}
+    }
+  },
+  "updateDownloadProgressUnknown": "已下载 {received}",
+  "@updateDownloadProgressUnknown": {
+    "placeholders": {
+      "received": {}
+    }
+  },
+  "updateDownloadFailed": "下载更新失败：{error}",
+  "@updateDownloadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "updateDownloadComplete": "安装包下载完成",
+  "updateInstalling": "正在打开安装器...",
+  "updateInstallFailed": "无法打开安装器：{error}",
+  "@updateInstallFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "updateInstallPermissionTitle": "需要安装权限",
+  "updateInstallPermissionMessage": "请允许屏忆安装未知来源应用，然后返回后重新点击下载。",
+  "updateOpenInstallSettingsAction": "打开设置"
+
 }

@@ -3812,4 +3812,94 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get modelStatusStable => 'Stable';
+
+  @override
+  String get updateCheckNowAction => 'Check for updates';
+
+  @override
+  String get updateChecking => 'Checking for updates...';
+
+  @override
+  String get updateNoUpdate => 'You are using the latest version';
+
+  @override
+  String updateCheckFailed(Object error) {
+    return 'Update check failed: $error';
+  }
+
+  @override
+  String get updateUnknownError => 'Unknown error';
+
+  @override
+  String get updateNoCompatibleApk =>
+      'No compatible APK was found for this device';
+
+  @override
+  String get updateNewVersionTitle => 'New version available';
+
+  @override
+  String get updateCurrentVersionLabel => 'Current version';
+
+  @override
+  String get updateLatestVersionLabel => 'Latest version';
+
+  @override
+  String get updatePublishedAtLabel => 'Published at';
+
+  @override
+  String get updateApkSizeLabel => 'APK size';
+
+  @override
+  String get updateReleaseNotesLabel => 'Release notes';
+
+  @override
+  String get updateDownloadAction => 'Download';
+
+  @override
+  String get updateIgnoreVersionAction => 'Ignore this version';
+
+  @override
+  String get updateCloseAction => 'Close';
+
+  @override
+  String get updateIgnoredToast => 'This version has been ignored';
+
+  @override
+  String get updateDownloadTitle => 'Downloading update';
+
+  @override
+  String updateDownloadProgress(Object received, Object total) {
+    return '$received / $total';
+  }
+
+  @override
+  String updateDownloadProgressUnknown(Object received) {
+    return 'Downloaded $received';
+  }
+
+  @override
+  String updateDownloadFailed(Object error) {
+    return 'Update download failed: $error';
+  }
+
+  @override
+  String get updateDownloadComplete => 'APK download completed';
+
+  @override
+  String get updateInstalling => 'Opening installer...';
+
+  @override
+  String updateInstallFailed(Object error) {
+    return 'Unable to open installer: $error';
+  }
+
+  @override
+  String get updateInstallPermissionTitle => 'Install permission required';
+
+  @override
+  String get updateInstallPermissionMessage =>
+      'Allow ScreenMemo to install unknown apps, then return and tap Download again.';
+
+  @override
+  String get updateOpenInstallSettingsAction => 'Open settings';
 }
