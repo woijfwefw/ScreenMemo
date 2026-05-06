@@ -799,51 +799,122 @@ class DynamicRebuildService : Service() {
         errorMessage: String,
         segmentId: Long,
     ): DayRunResult {
+        val dayKey = synchronized(stateLock) {
+            state.dayWorks.getOrNull(dayIndex)?.dayKey.orEmpty()
+        }
+        recordStage(
+            state = state,
+            stage = "day_failure_probe",
+            label = "失败后连续测试",
+            detail = "动态请求失败，正在用真实问答测试 Key：${clipForUi(errorMessage, 160)}",
+            segmentId = segmentId,
+            slotId = slotId,
+            dayKey = dayKey,
+            dayIndex = dayIndex,
+            forceLog = true,
+        )
+
+        val probe = try {
+            val config = synchronized(stateLock) { state.requireAiConfig() }
+            SegmentSummaryManager.probeDynamicRebuildAiAfterFailure(
+                ctx = this,
+                aiConfigOverride = config,
+                attemptsPerKey = DAY_RETRY_LIMIT,
+            )
+        } catch (e: SegmentSummaryManager.DynamicRebuildCancelledException) {
+            return DayRunResult(slotId, dayIndex, DayRunOutcome.CANCELLED)
+        } catch (e: Exception) {
+            SegmentSummaryManager.DynamicRebuildAiProbeResult(
+                success = false,
+                keyLabel = "",
+                model = state.aiModel,
+                attemptsUsed = 0,
+                totalCandidates = 0,
+                responsePreview = null,
+                failureMessages = listOf(e.message ?: e.toString()),
+            )
+        }
+
+        if (isCancellationRequested()) {
+            return DayRunResult(slotId, dayIndex, DayRunOutcome.CANCELLED)
+        }
+
         val outcome = synchronized(stateLock) {
             val day = state.dayWorks.getOrNull(dayIndex)
                 ?: return@synchronized DayRunOutcome.FATAL
             val slot = state.workerSlots.firstOrNull { it.slotId == slotId }
-            day.lastError = errorMessage
-            day.retryCount += 1
             if (segmentId > 0L && slot != null) {
                 slot.currentSegmentId = segmentId
             }
-            if (day.retryCount < DAY_RETRY_LIMIT) {
+            state.lastError = errorMessage
+
+            if (probe.success) {
+                day.lastError = errorMessage
+                day.retryCount = (day.retryCount + 1).coerceAtMost(DAY_RETRY_LIMIT - 1)
                 day.status = DynamicRebuildDayWorkItem.STATUS_RETRY_PENDING
                 if (slot != null) {
                     slot.status = DynamicRebuildWorkerSlotState.STATUS_FAILED_WAITING
-                    slot.currentStageLabel = "等待自动续跑"
-                    slot.currentStageDetail = "失败后等待空闲线程继续第 ${day.retryCount}/${DAY_RETRY_LIMIT} 次续跑"
+                    slot.currentStageLabel = "测试通过，继续自动续跑"
+                    slot.currentStageDetail =
+                        "连续测试通过：${clipForUi(probe.successSummary, 180)}"
+                    slot.retryCount = day.retryCount
+                    slot.retryLimit = DAY_RETRY_LIMIT
                 }
-                state.lastError = errorMessage
                 state.refreshDerivedFields()
                 persistStateLocked(state)
                 DayRunOutcome.RETRY_PENDING
             } else {
+                val probeFailure = probe.failureSummary.ifBlank { "连续测试全部失败" }
+                day.lastError =
+                    "动态请求失败：${clipForUi(errorMessage, 500)}；连续测试失败：${clipForUi(probeFailure, 500)}"
+                day.retryCount = DAY_RETRY_LIMIT
                 day.status = DynamicRebuildDayWorkItem.STATUS_FAILED_WAITING
                 if (slot != null) {
                     slot.status = DynamicRebuildWorkerSlotState.STATUS_FAILED_WAITING
                     slot.currentStageLabel = "等待手动继续"
-                    slot.currentStageDetail = "已达到自动续跑上限 ${DAY_RETRY_LIMIT} 次"
+                    slot.currentStageDetail =
+                        "连续测试全部失败：${clipForUi(probeFailure, 180)}"
+                    slot.retryCount = day.retryCount
+                    slot.retryLimit = DAY_RETRY_LIMIT
                 }
-                state.lastError = errorMessage
+                state.lastError = day.lastError
                 state.refreshDerivedFields()
                 persistStateLocked(state)
                 DayRunOutcome.FAILED_WAITING
             }
         }
+        if (outcome == DayRunOutcome.FATAL) {
+            return DayRunResult(slotId, dayIndex, outcome)
+        }
         recordStage(
             state = state,
             stage = "day_failed",
-            label = if (outcome == DayRunOutcome.RETRY_PENDING) "当天失败，等待自动续跑" else "当天失败，等待手动继续",
-            detail = errorMessage,
+            label =
+                if (outcome == DayRunOutcome.RETRY_PENDING) {
+                    "测试通过，继续自动续跑"
+                } else {
+                    "当天失败，等待手动继续"
+                },
+            detail =
+                if (outcome == DayRunOutcome.RETRY_PENDING) {
+                    "动态请求失败但连续测试通过：${clipForUi(probe.successSummary, 180)}；继续重试当前日期"
+                } else {
+                    val probeFailure = probe.failureSummary.ifBlank { "连续测试全部失败" }
+                    "动态请求失败：${clipForUi(errorMessage, 180)}；连续测试全部失败：${clipForUi(probeFailure, 180)}"
+                },
             segmentId = segmentId,
             slotId = slotId,
-            dayKey = synchronized(stateLock) { state.dayWorks.getOrNull(dayIndex)?.dayKey.orEmpty() },
+            dayKey = dayKey,
             dayIndex = dayIndex,
             forceLog = true,
         )
         return DayRunResult(slotId, dayIndex, outcome)
+    }
+
+    private fun clipForUi(text: String, maxLen: Int): String {
+        val normalized = text.replace("\r", " ").replace("\n", " ").trim()
+        if (normalized.length <= maxLen) return normalized
+        return normalized.substring(0, maxLen.coerceAtLeast(1)) + "..."
     }
 
     private fun finalizeTaskState(state: DynamicRebuildTaskState): DynamicRebuildTaskState {

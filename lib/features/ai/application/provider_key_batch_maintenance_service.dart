@@ -396,7 +396,6 @@ class ProviderKeyBatchMaintenanceService {
       final String model = candidateModels[attempt % candidateModels.length];
       modelsTried.add(model);
       final String token = _randomProbeToken();
-      final String expected = token.substring(token.length - 12);
       onAttemptStart?.call(attempt + 1, safeAttempts, model);
       try {
         final AIEndpoint endpoint = AIEndpoint(
@@ -435,10 +434,8 @@ class ProviderKeyBatchMaintenanceService {
           trackKeyStats: false,
         );
         final String response = result.content.trim();
-        if (!_probeResponseMatches(response, expected)) {
-          throw Exception(
-            '连续测试响应不匹配：期望包含 $expected，实际返回 ${_clip(response, 120)}',
-          );
+        if (!_probeResponseHasContent(response)) {
+          throw Exception('连续测试响应为空');
         }
         await _providers.markProviderKeySuccess(key.id!);
         if (provider.hasBalanceQuery && provider.id != null) {
@@ -564,14 +561,8 @@ class ProviderKeyBatchMaintenanceService {
     return path.isEmpty ? '/v1/chat/completions' : path;
   }
 
-  bool _probeResponseMatches(String response, String expected) {
-    final String normalized = response
-        .replaceAll('`', '')
-        .replaceAll('"', '')
-        .replaceAll("'", '')
-        .replaceAll(RegExp(r'\s+'), '')
-        .trim();
-    return normalized.contains(expected);
+  bool _probeResponseHasContent(String response) {
+    return response.trim().isNotEmpty;
   }
 
   String _randomProbeToken() {

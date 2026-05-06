@@ -1392,6 +1392,235 @@ object SegmentSummaryManager {
         val rawResponse: String?
     )
 
+    data class DynamicRebuildAiProbeResult(
+        val success: Boolean,
+        val keyLabel: String,
+        val model: String,
+        val attemptsUsed: Int,
+        val totalCandidates: Int,
+        val responsePreview: String?,
+        val failureMessages: List<String>,
+    ) {
+        val successSummary: String
+            get() {
+                val key = keyLabel.ifBlank { "legacy" }
+                val modelText = model.ifBlank { "-" }
+                val preview = responsePreview?.trim().orEmpty()
+                return if (preview.isEmpty()) {
+                    "$key · $modelText"
+                } else {
+                    "$key · $modelText · $preview"
+                }
+            }
+
+        val failureSummary: String
+            get() = failureMessages.lastOrNull()?.trim().orEmpty()
+    }
+
+    fun probeDynamicRebuildAiAfterFailure(
+        ctx: Context,
+        aiConfigOverride: AISettingsNative.AIConfig?,
+        attemptsPerKey: Int = 3,
+        timeoutMs: Long = 20_000L,
+    ): DynamicRebuildAiProbeResult {
+        val configs = resolveAiConfigCandidates(ctx, aiConfigOverride)
+        val safeAttempts = attemptsPerKey.coerceAtLeast(1)
+        val failures = ArrayList<String>()
+        if (configs.isEmpty()) {
+            return DynamicRebuildAiProbeResult(
+                success = false,
+                keyLabel = "",
+                model = aiConfigOverride?.model.orEmpty(),
+                attemptsUsed = 0,
+                totalCandidates = 0,
+                responsePreview = null,
+                failureMessages = listOf("没有可用于连续测试的 AI Key"),
+            )
+        }
+
+        var attemptsUsed = 0
+        for ((candidateIndex, cfg) in configs.withIndex()) {
+            val keyLabel = (cfg.providerKeyName ?: "").trim()
+                .ifEmpty { cfg.providerKeyId?.let { "key#$it" } ?: "legacy" }
+            for (attempt in 0 until safeAttempts) {
+                attemptsUsed += 1
+                val token = buildDynamicProbeToken()
+                try {
+                    FileLogger.i(
+                        TAG,
+                        "动态重建失败后连续测试：candidate=${candidateIndex + 1}/${configs.size} key=$keyLabel model=${cfg.model} attempt=${attempt + 1}/$safeAttempts",
+                    )
+                } catch (_: Exception) {}
+                try {
+                    val response = executeDynamicProbeRequest(
+                        ctx = ctx,
+                        cfg = cfg,
+                        token = token,
+                        timeoutMs = timeoutMs,
+                    )
+                    if (!probeResponseHasContent(response)) {
+                        throw IllegalStateException(
+                            "连续测试响应为空",
+                        )
+                    }
+                    AISettingsNative.markProviderKeySuccess(ctx, cfg)
+                    return DynamicRebuildAiProbeResult(
+                        success = true,
+                        keyLabel = keyLabel,
+                        model = cfg.model,
+                        attemptsUsed = attemptsUsed,
+                        totalCandidates = configs.size,
+                        responsePreview = truncateForLog(response.trim(), 120),
+                        failureMessages = failures.toList(),
+                    )
+                } catch (e: DynamicRebuildCancelledException) {
+                    throw e
+                } catch (e: Exception) {
+                    val msg = e.message ?: e.toString()
+                    val type = classifyAiFailure(msg)
+                    AISettingsNative.markProviderKeyFailure(
+                        ctx,
+                        cfg.providerKeyId,
+                        type,
+                        msg,
+                        attempt + 1,
+                    )
+                    val line =
+                        "$keyLabel attempt ${attempt + 1}/$safeAttempts [$type]: ${truncateForLog(msg, 300)}"
+                    failures.add(line)
+                    try { FileLogger.w(TAG, "动态重建失败后连续测试失败：$line") } catch (_: Exception) {}
+                }
+            }
+        }
+
+        return DynamicRebuildAiProbeResult(
+            success = false,
+            keyLabel = "",
+            model = aiConfigOverride?.model.orEmpty(),
+            attemptsUsed = attemptsUsed,
+            totalCandidates = configs.size,
+            responsePreview = null,
+            failureMessages = failures.toList(),
+        )
+    }
+
+    private fun buildDynamicProbeToken(): String {
+        val random = java.util.UUID.randomUUID().toString().replace("-", "")
+        val stamp = java.lang.Long.toString(System.nanoTime(), 36)
+        return "probe_${random}_${stamp}"
+    }
+
+    private fun probeResponseHasContent(response: String): Boolean {
+        return response.trim().isNotEmpty()
+    }
+
+    private fun executeDynamicProbeRequest(
+        ctx: Context,
+        cfg: AISettingsNative.AIConfig,
+        token: String,
+        timeoutMs: Long,
+    ): String {
+        maybeThrowDynamicAiCancelled(ctx, DYNAMIC_AI_STAGE_SUMMARY, 0L)
+        val client = OkHttpClientFactory.newBuilder(ctx)
+            .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+            .callTimeout(timeoutMs.coerceAtLeast(1_000L), java.util.concurrent.TimeUnit.MILLISECONDS)
+            .readTimeout(timeoutMs.coerceAtLeast(1_000L), java.util.concurrent.TimeUnit.MILLISECONDS)
+            .writeTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .build()
+
+        val base = cfg.baseUrl.trimEnd('/')
+        val model = cfg.model.trim()
+        val systemPrompt =
+            "Reply with exactly the requested substring. No markdown. No explanation. No punctuation."
+        val userPrompt =
+            "Return only the last 12 characters of this random string. Do not add punctuation or explanation.\n$token"
+        val isGoogle = isGoogleAiConfig(cfg)
+        val body: String
+        val requestBuilder = Request.Builder()
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Accept", "application/json")
+
+        if (isGoogle) {
+            val parts = JSONArray()
+                .put(JSONObject().put("text", "$systemPrompt\n\n$userPrompt"))
+            val contents = JSONArray().put(JSONObject().put("parts", parts))
+            body = JSONObject()
+                .put("contents", contents)
+                .toString()
+            requestBuilder
+                .url(buildGeminiUrl(base, model, stream = false))
+                .addHeader("x-goog-api-key", cfg.apiKey)
+        } else {
+            val normalizedChatPath = normalizeOpenAiCompatiblePath(cfg.chatPath)
+            val preferResponsesApi = shouldPreferResponsesApi(normalizedChatPath)
+            if (preferResponsesApi) {
+                val input = JSONArray()
+                    .put(
+                        JSONObject()
+                            .put("role", "system")
+                            .put(
+                                "content",
+                                JSONArray().put(
+                                    JSONObject()
+                                        .put("type", "input_text")
+                                        .put("text", systemPrompt),
+                                ),
+                            ),
+                    )
+                    .put(
+                        JSONObject()
+                            .put("role", "user")
+                            .put(
+                                "content",
+                                JSONArray().put(
+                                    JSONObject()
+                                        .put("type", "input_text")
+                                        .put("text", userPrompt),
+                                ),
+                            ),
+                    )
+                body = JSONObject()
+                    .put("model", model)
+                    .put("input", input)
+                    .put("stream", false)
+                    .toString()
+                requestBuilder.url(buildResponsesUrl(base, normalizedChatPath))
+            } else {
+                val messages = JSONArray()
+                    .put(JSONObject().put("role", "system").put("content", systemPrompt))
+                    .put(JSONObject().put("role", "user").put("content", userPrompt))
+                body = JSONObject()
+                    .put("model", model)
+                    .put("messages", messages)
+                    .put("stream", false)
+                    .toString()
+                requestBuilder.url(buildOpenAiCompatibleUrl(base, normalizedChatPath))
+            }
+            requestBuilder.addHeader("Authorization", "Bearer ${cfg.apiKey}")
+        }
+
+        val reqBody = body.toRequestBody("application/json; charset=utf-8".toMediaType())
+        val request = requestBuilder.post(reqBody).build()
+        return executeTrackedCall(
+            ctx = ctx,
+            stageScope = DYNAMIC_AI_STAGE_SUMMARY,
+            segmentId = 0L,
+            call = client.newCall(request),
+        ) { resp ->
+            val responseBody = resp.body?.string().orEmpty()
+            if (!resp.isSuccessful) {
+                throw IllegalStateException("Request failed: ${resp.code} $responseBody")
+            }
+            val text = if (isGoogle) {
+                extractTextFromGeminiBody(responseBody)
+            } else {
+                extractTextFromOpenAiCompatibleBody(responseBody)
+            }
+            text
+        }
+    }
+
     private fun extractAiFailureSnippet(rawResponse: String, maxLen: Int = 240): String {
         val normalized = rawResponse
             .replace("\r", " ")
