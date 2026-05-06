@@ -206,6 +206,16 @@ ScreenMemo 是一款在本地运行的智能截屏备忘与检索工具：自动
    flutter run
    ```
 
+### 开发调试：强制显示引导页
+
+如果本机已有数据且已经完成引导，但需要调试引导页样式，可以使用调试开关启动：
+
+```bash
+flutter run --dart-define=FORCE_ONBOARDING=true
+```
+
+该开关只在非 Release 构建生效，不会清空现有截图、数据库或设置数据。
+
 ### 在电脑上通过 Android 模拟器测试
 
 1. 在 Android Studio 的 **Device Manager** 中创建 Android 11+ 模拟器

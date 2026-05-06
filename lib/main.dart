@@ -21,7 +21,12 @@ Future<void> main() async {
   final bool onboardingCompleted = await permissionService
       .isOnboardingCompleted();
   final bool isFirstLaunch = await permissionService.isFirstLaunch();
-  final bool showOnboarding = !onboardingCompleted && isFirstLaunch;
+  // 开发调试用：通过 --dart-define=FORCE_ONBOARDING=true 强制进入引导页。
+  // 仅在非 Release 构建生效，避免正式包误显示引导页。
+  const bool forceOnboarding = bool.fromEnvironment('FORCE_ONBOARDING');
+  final bool showOnboarding =
+      (!kReleaseMode && forceOnboarding) ||
+      (!onboardingCompleted && isFirstLaunch);
 
   void appRunner() {
     // 统一使用 Zone 拦截所有 print，并通过 FlutterLogger 输出

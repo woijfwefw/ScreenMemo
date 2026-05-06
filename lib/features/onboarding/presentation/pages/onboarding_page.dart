@@ -16,8 +16,13 @@ import 'package:screen_memo/app/navigation/main_navigation_page.dart';
 /// 引导页面
 class OnboardingPage extends StatefulWidget {
   final ThemeService themeService;
+  final bool previewMode;
 
-  const OnboardingPage({super.key, required this.themeService});
+  const OnboardingPage({
+    super.key,
+    required this.themeService,
+    this.previewMode = false,
+  });
 
   @override
   State<OnboardingPage> createState() => _OnboardingPageState();
@@ -284,6 +289,11 @@ class _OnboardingPageState extends State<OnboardingPage>
   // 移除自动跳转逻辑，让用户通过按钮控制流程
 
   void _navigateToHome() async {
+    if (widget.previewMode) {
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
+
     // 标记引导已完成
     try {
       await PermissionService.instance.setOnboardingCompleted(true);
@@ -323,6 +333,9 @@ class _OnboardingPageState extends State<OnboardingPage>
 
   /// 异步保存选中的应用，不阻塞UI
   void _saveSelectedAppsAsync() {
+    // 预览模式只用于调试引导页样式，不修改用户现有应用选择。
+    if (widget.previewMode) return;
+
     // 使用 Future.microtask 确保在下一个事件循环中执行，不阻塞当前UI
     Future.microtask(() async {
       try {
