@@ -427,6 +427,75 @@ class AppLocalizationsKo extends AppLocalizations {
   String get advancedSectionDesc => '로그 및 성능 옵션';
 
   @override
+  String get aboutSectionTitle => '정보';
+
+  @override
+  String get aboutSectionDesc => '버전, 피드백 및 오픈소스 라이선스';
+
+  @override
+  String get aboutAppName => '스크린메모 / ScreenMemo';
+
+  @override
+  String get aboutSlogan => '화면은 남기지 않고, 기억은 남깁니다';
+
+  @override
+  String get aboutDescription =>
+      '로컬에서 실행되는 지능형 스크린샷 메모 및 검색 도구로 OCR, 의미 검색, AI 회고, 백업 이전을 지원합니다.';
+
+  @override
+  String get aboutVersionSectionTitle => '버전 정보';
+
+  @override
+  String get aboutCurrentVersion => '현재 버전';
+
+  @override
+  String get aboutBuildNumber => '빌드 번호';
+
+  @override
+  String get aboutPackageName => '패키지 이름';
+
+  @override
+  String get aboutPrivacyTitle => '개인정보';
+
+  @override
+  String get aboutPrivacyDesc =>
+      '스크린샷, OCR, 인덱스, 통계 및 대부분의 설정은 기본적으로 로컬에 저장됩니다. AI 기능을 명시적으로 활성화하고 제공자를 설정한 경우에만 요약 또는 채팅 요청이 설정한 모델 서비스로 전송됩니다.';
+
+  @override
+  String get aboutFeedbackTitle => '커뮤니티 및 피드백';
+
+  @override
+  String get aboutFeedbackDesc => '문제와 기능 요청 제출';
+
+  @override
+  String get aboutGithub => 'GitHub 프로젝트';
+
+  @override
+  String get aboutQqGroup => 'QQ 그룹';
+
+  @override
+  String get aboutIssueFeedback => '문제 피드백';
+
+  @override
+  String get aboutOpenSourceTitle => '오픈소스';
+
+  @override
+  String get aboutLicenseAgpl => '라이선스';
+
+  @override
+  String get aboutThirdPartyLicenses => '타사 오픈소스 라이선스';
+
+  @override
+  String aboutTapVersionRemaining(Object count) {
+    return '가이드를 열려면 $count번 더 탭하세요';
+  }
+
+  @override
+  String aboutOpenLinkFailed(Object url) {
+    return '링크를 열 수 없습니다: $url';
+  }
+
+  @override
   String get storageAnalysisEntryTitle => '저장소 분석';
 
   @override

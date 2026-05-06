@@ -418,6 +418,74 @@ class AppLocalizationsZh extends AppLocalizations {
   String get advancedSectionDesc => '日志/性能相关选项';
 
   @override
+  String get aboutSectionTitle => '关于';
+
+  @override
+  String get aboutSectionDesc => '版本、反馈与开源许可';
+
+  @override
+  String get aboutAppName => '屏忆 / ScreenMemo';
+
+  @override
+  String get aboutSlogan => '屏幕无痕，记忆有痕';
+
+  @override
+  String get aboutDescription => '本地运行的智能截屏备忘与检索工具，支持 OCR、语义搜索、AI 回顾和备份迁移。';
+
+  @override
+  String get aboutVersionSectionTitle => '版本信息';
+
+  @override
+  String get aboutCurrentVersion => '当前版本';
+
+  @override
+  String get aboutBuildNumber => '构建号';
+
+  @override
+  String get aboutPackageName => '包名';
+
+  @override
+  String get aboutPrivacyTitle => '隐私说明';
+
+  @override
+  String get aboutPrivacyDesc =>
+      '截图、OCR、索引、统计和大多数配置默认保存在本地。只有在你显式启用 AI 能力并配置提供商后，相关总结或对话请求才会发送到你配置的模型服务。';
+
+  @override
+  String get aboutFeedbackTitle => '社区与反馈';
+
+  @override
+  String get aboutFeedbackDesc => '提交问题和功能建议';
+
+  @override
+  String get aboutGithub => 'GitHub 项目';
+
+  @override
+  String get aboutQqGroup => 'QQ 群';
+
+  @override
+  String get aboutIssueFeedback => '问题反馈';
+
+  @override
+  String get aboutOpenSourceTitle => '开源许可';
+
+  @override
+  String get aboutLicenseAgpl => '开源协议';
+
+  @override
+  String get aboutThirdPartyLicenses => '第三方开源许可';
+
+  @override
+  String aboutTapVersionRemaining(Object count) {
+    return '再点击 $count 次打开引导页';
+  }
+
+  @override
+  String aboutOpenLinkFailed(Object url) {
+    return '无法打开链接：$url';
+  }
+
+  @override
   String get storageAnalysisEntryTitle => '存储分析';
 
   @override

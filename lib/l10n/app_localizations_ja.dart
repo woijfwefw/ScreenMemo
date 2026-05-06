@@ -428,6 +428,75 @@ class AppLocalizationsJa extends AppLocalizations {
   String get advancedSectionDesc => 'ログとパフォーマンス';
 
   @override
+  String get aboutSectionTitle => 'このアプリについて';
+
+  @override
+  String get aboutSectionDesc => 'バージョン、フィードバック、オープンソースライセンス';
+
+  @override
+  String get aboutAppName => 'スクリーンメモ / ScreenMemo';
+
+  @override
+  String get aboutSlogan => '画面は残さず、記憶は残す';
+
+  @override
+  String get aboutDescription =>
+      'ローカルで動作するインテリジェントなスクリーンショットメモ・検索ツールです。OCR、セマンティック検索、AI 回顧、バックアップ移行に対応します。';
+
+  @override
+  String get aboutVersionSectionTitle => 'バージョン情報';
+
+  @override
+  String get aboutCurrentVersion => '現在のバージョン';
+
+  @override
+  String get aboutBuildNumber => 'ビルド番号';
+
+  @override
+  String get aboutPackageName => 'パッケージ名';
+
+  @override
+  String get aboutPrivacyTitle => 'プライバシー';
+
+  @override
+  String get aboutPrivacyDesc =>
+      'スクリーンショット、OCR、インデックス、統計、多くの設定は既定でローカルに保存されます。AI 機能を明示的に有効にし、プロバイダーを設定した場合のみ、要約やチャットのリクエストが設定先のモデルサービスへ送信されます。';
+
+  @override
+  String get aboutFeedbackTitle => 'コミュニティとフィードバック';
+
+  @override
+  String get aboutFeedbackDesc => '不具合報告や機能要望を送信';
+
+  @override
+  String get aboutGithub => 'GitHub プロジェクト';
+
+  @override
+  String get aboutQqGroup => 'QQ グループ';
+
+  @override
+  String get aboutIssueFeedback => '問題を報告';
+
+  @override
+  String get aboutOpenSourceTitle => 'オープンソース';
+
+  @override
+  String get aboutLicenseAgpl => 'ライセンス';
+
+  @override
+  String get aboutThirdPartyLicenses => 'サードパーティライセンス';
+
+  @override
+  String aboutTapVersionRemaining(Object count) {
+    return 'あと $count 回タップするとガイドを開きます';
+  }
+
+  @override
+  String aboutOpenLinkFailed(Object url) {
+    return 'リンクを開けません：$url';
+  }
+
+  @override
   String get storageAnalysisEntryTitle => 'ストレージ分析';
 
   @override

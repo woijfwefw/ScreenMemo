@@ -178,6 +178,37 @@
   "dataBackupSectionDesc": "ストレージ/インポート/エクスポート/再集計",
   "advancedSectionTitle": "高度な設定",
   "advancedSectionDesc": "ログとパフォーマンス",
+  "aboutSectionTitle": "このアプリについて",
+  "aboutSectionDesc": "バージョン、フィードバック、オープンソースライセンス",
+  "aboutAppName": "スクリーンメモ / ScreenMemo",
+  "aboutSlogan": "画面は残さず、記憶は残す",
+  "aboutDescription": "ローカルで動作するインテリジェントなスクリーンショットメモ・検索ツールです。OCR、セマンティック検索、AI 回顧、バックアップ移行に対応します。",
+  "aboutVersionSectionTitle": "バージョン情報",
+  "aboutCurrentVersion": "現在のバージョン",
+  "aboutBuildNumber": "ビルド番号",
+  "aboutPackageName": "パッケージ名",
+  "aboutPrivacyTitle": "プライバシー",
+  "aboutPrivacyDesc": "スクリーンショット、OCR、インデックス、統計、多くの設定は既定でローカルに保存されます。AI 機能を明示的に有効にし、プロバイダーを設定した場合のみ、要約やチャットのリクエストが設定先のモデルサービスへ送信されます。",
+  "aboutFeedbackTitle": "コミュニティとフィードバック",
+  "aboutFeedbackDesc": "不具合報告や機能要望を送信",
+  "aboutGithub": "GitHub プロジェクト",
+  "aboutQqGroup": "QQ グループ",
+  "aboutIssueFeedback": "問題を報告",
+  "aboutOpenSourceTitle": "オープンソース",
+  "aboutLicenseAgpl": "ライセンス",
+  "aboutThirdPartyLicenses": "サードパーティライセンス",
+  "aboutTapVersionRemaining": "あと {count} 回タップするとガイドを開きます",
+  "@aboutTapVersionRemaining": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "aboutOpenLinkFailed": "リンクを開けません：{url}",
+  "@aboutOpenLinkFailed": {
+    "placeholders": {
+      "url": {}
+    }
+  },
   "storageAnalysisEntryTitle": "ストレージ分析",
   "storageAnalysisEntryDesc": "アプリのストレージ使用状況を詳しく確認します",
   "actionSet": "セット",

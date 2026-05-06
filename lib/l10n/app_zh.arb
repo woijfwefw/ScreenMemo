@@ -180,6 +180,37 @@
   "dataBackupSectionDesc": "存储分析/导入导出/重新统计",
   "advancedSectionTitle": "高级",
   "advancedSectionDesc": "日志/性能相关选项",
+  "aboutSectionTitle": "关于",
+  "aboutSectionDesc": "版本、反馈与开源许可",
+  "aboutAppName": "屏忆 / ScreenMemo",
+  "aboutSlogan": "屏幕无痕，记忆有痕",
+  "aboutDescription": "本地运行的智能截屏备忘与检索工具，支持 OCR、语义搜索、AI 回顾和备份迁移。",
+  "aboutVersionSectionTitle": "版本信息",
+  "aboutCurrentVersion": "当前版本",
+  "aboutBuildNumber": "构建号",
+  "aboutPackageName": "包名",
+  "aboutPrivacyTitle": "隐私说明",
+  "aboutPrivacyDesc": "截图、OCR、索引、统计和大多数配置默认保存在本地。只有在你显式启用 AI 能力并配置提供商后，相关总结或对话请求才会发送到你配置的模型服务。",
+  "aboutFeedbackTitle": "社区与反馈",
+  "aboutFeedbackDesc": "提交问题和功能建议",
+  "aboutGithub": "GitHub 项目",
+  "aboutQqGroup": "QQ 群",
+  "aboutIssueFeedback": "问题反馈",
+  "aboutOpenSourceTitle": "开源许可",
+  "aboutLicenseAgpl": "开源协议",
+  "aboutThirdPartyLicenses": "第三方开源许可",
+  "aboutTapVersionRemaining": "再点击 {count} 次打开引导页",
+  "@aboutTapVersionRemaining": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "aboutOpenLinkFailed": "无法打开链接：{url}",
+  "@aboutOpenLinkFailed": {
+    "placeholders": {
+      "url": {}
+    }
+  },
   "storageAnalysisEntryTitle": "存储分析",
   "storageAnalysisEntryDesc": "查看应用内部存储占用及分类详情",
   "actionSet": "设置",

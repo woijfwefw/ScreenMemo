@@ -178,6 +178,37 @@
   "dataBackupSectionDesc": "저장소/가져오기/내보내기/재계산",
   "advancedSectionTitle": "고급",
   "advancedSectionDesc": "로그 및 성능 옵션",
+  "aboutSectionTitle": "정보",
+  "aboutSectionDesc": "버전, 피드백 및 오픈소스 라이선스",
+  "aboutAppName": "스크린메모 / ScreenMemo",
+  "aboutSlogan": "화면은 남기지 않고, 기억은 남깁니다",
+  "aboutDescription": "로컬에서 실행되는 지능형 스크린샷 메모 및 검색 도구로 OCR, 의미 검색, AI 회고, 백업 이전을 지원합니다.",
+  "aboutVersionSectionTitle": "버전 정보",
+  "aboutCurrentVersion": "현재 버전",
+  "aboutBuildNumber": "빌드 번호",
+  "aboutPackageName": "패키지 이름",
+  "aboutPrivacyTitle": "개인정보",
+  "aboutPrivacyDesc": "스크린샷, OCR, 인덱스, 통계 및 대부분의 설정은 기본적으로 로컬에 저장됩니다. AI 기능을 명시적으로 활성화하고 제공자를 설정한 경우에만 요약 또는 채팅 요청이 설정한 모델 서비스로 전송됩니다.",
+  "aboutFeedbackTitle": "커뮤니티 및 피드백",
+  "aboutFeedbackDesc": "문제와 기능 요청 제출",
+  "aboutGithub": "GitHub 프로젝트",
+  "aboutQqGroup": "QQ 그룹",
+  "aboutIssueFeedback": "문제 피드백",
+  "aboutOpenSourceTitle": "오픈소스",
+  "aboutLicenseAgpl": "라이선스",
+  "aboutThirdPartyLicenses": "타사 오픈소스 라이선스",
+  "aboutTapVersionRemaining": "가이드를 열려면 {count}번 더 탭하세요",
+  "@aboutTapVersionRemaining": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "aboutOpenLinkFailed": "링크를 열 수 없습니다: {url}",
+  "@aboutOpenLinkFailed": {
+    "placeholders": {
+      "url": {}
+    }
+  },
   "storageAnalysisEntryTitle": "저장소 분석",
   "storageAnalysisEntryDesc": "앱의 저장소 사용량을 자세히 확인합니다",
   "actionSet": "세트",

@@ -882,6 +882,132 @@ abstract class AppLocalizations {
   /// **'Logs and performance options'**
   String get advancedSectionDesc;
 
+  /// No description provided for @aboutSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get aboutSectionTitle;
+
+  /// No description provided for @aboutSectionDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Version, feedback, and open-source licenses'**
+  String get aboutSectionDesc;
+
+  /// No description provided for @aboutAppName.
+  ///
+  /// In en, this message translates to:
+  /// **'ScreenMemo'**
+  String get aboutAppName;
+
+  /// No description provided for @aboutSlogan.
+  ///
+  /// In en, this message translates to:
+  /// **'Screen unseen, memory retained'**
+  String get aboutSlogan;
+
+  /// No description provided for @aboutDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'A local-first intelligent screenshot memo and retrieval tool with OCR, semantic search, AI review, and backup migration.'**
+  String get aboutDescription;
+
+  /// No description provided for @aboutVersionSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get aboutVersionSectionTitle;
+
+  /// No description provided for @aboutCurrentVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Current version'**
+  String get aboutCurrentVersion;
+
+  /// No description provided for @aboutBuildNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Build number'**
+  String get aboutBuildNumber;
+
+  /// No description provided for @aboutPackageName.
+  ///
+  /// In en, this message translates to:
+  /// **'Package name'**
+  String get aboutPackageName;
+
+  /// No description provided for @aboutPrivacyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy'**
+  String get aboutPrivacyTitle;
+
+  /// No description provided for @aboutPrivacyDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Screenshots, OCR, indexes, statistics, and most settings are stored locally by default. Summary or chat requests are sent only after you explicitly enable AI features and configure a provider.'**
+  String get aboutPrivacyDesc;
+
+  /// No description provided for @aboutFeedbackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Community & feedback'**
+  String get aboutFeedbackTitle;
+
+  /// No description provided for @aboutFeedbackDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Report issues and request features'**
+  String get aboutFeedbackDesc;
+
+  /// No description provided for @aboutGithub.
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub project'**
+  String get aboutGithub;
+
+  /// No description provided for @aboutQqGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'QQ group'**
+  String get aboutQqGroup;
+
+  /// No description provided for @aboutIssueFeedback.
+  ///
+  /// In en, this message translates to:
+  /// **'Issue feedback'**
+  String get aboutIssueFeedback;
+
+  /// No description provided for @aboutOpenSourceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Open source'**
+  String get aboutOpenSourceTitle;
+
+  /// No description provided for @aboutLicenseAgpl.
+  ///
+  /// In en, this message translates to:
+  /// **'License'**
+  String get aboutLicenseAgpl;
+
+  /// No description provided for @aboutThirdPartyLicenses.
+  ///
+  /// In en, this message translates to:
+  /// **'Third-party licenses'**
+  String get aboutThirdPartyLicenses;
+
+  /// No description provided for @aboutTapVersionRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap {count} more times to open onboarding'**
+  String aboutTapVersionRemaining(Object count);
+
+  /// No description provided for @aboutOpenLinkFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to open link: {url}'**
+  String aboutOpenLinkFailed(Object url);
+
   /// No description provided for @storageAnalysisEntryTitle.
   ///
   /// In en, this message translates to:

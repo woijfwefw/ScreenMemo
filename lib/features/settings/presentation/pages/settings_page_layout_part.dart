@@ -21,6 +21,8 @@ extension _SettingsLayoutPart on _SettingsPageState {
       title = l10n.dataBackupSectionTitle;
     } else if (_subPage == _SettingsSubPage.advanced) {
       title = l10n.advancedSectionTitle;
+    } else if (_subPage == _SettingsSubPage.about) {
+      title = l10n.aboutSectionTitle;
     }
 
     final bool canPop = Navigator.of(context).canPop();
@@ -158,6 +160,20 @@ extension _SettingsLayoutPart on _SettingsPageState {
                 ),
               ],
             ),
+            const SizedBox(height: AppTheme.spacing3),
+            _buildCard(
+              context: context,
+              children: [
+                _buildNavItem(
+                  context: context,
+                  icon: Icons.info_outline,
+                  title: AppLocalizations.of(context).aboutSectionTitle,
+                  showBottomBorder: false,
+                  isRootPageItem: true,
+                  onTap: () => _switchSubPage(_SettingsSubPage.about),
+                ),
+              ],
+            ),
           ],
         );
       case _SettingsSubPage.permissions:
@@ -267,6 +283,8 @@ extension _SettingsLayoutPart on _SettingsPageState {
             ),
           ],
         );
+      case _SettingsSubPage.about:
+        return _buildAboutPage(context);
     }
   }
 

@@ -444,6 +444,75 @@ class AppLocalizationsEn extends AppLocalizations {
   String get advancedSectionDesc => 'Logs and performance options';
 
   @override
+  String get aboutSectionTitle => 'About';
+
+  @override
+  String get aboutSectionDesc => 'Version, feedback, and open-source licenses';
+
+  @override
+  String get aboutAppName => 'ScreenMemo';
+
+  @override
+  String get aboutSlogan => 'Screen unseen, memory retained';
+
+  @override
+  String get aboutDescription =>
+      'A local-first intelligent screenshot memo and retrieval tool with OCR, semantic search, AI review, and backup migration.';
+
+  @override
+  String get aboutVersionSectionTitle => 'Version';
+
+  @override
+  String get aboutCurrentVersion => 'Current version';
+
+  @override
+  String get aboutBuildNumber => 'Build number';
+
+  @override
+  String get aboutPackageName => 'Package name';
+
+  @override
+  String get aboutPrivacyTitle => 'Privacy';
+
+  @override
+  String get aboutPrivacyDesc =>
+      'Screenshots, OCR, indexes, statistics, and most settings are stored locally by default. Summary or chat requests are sent only after you explicitly enable AI features and configure a provider.';
+
+  @override
+  String get aboutFeedbackTitle => 'Community & feedback';
+
+  @override
+  String get aboutFeedbackDesc => 'Report issues and request features';
+
+  @override
+  String get aboutGithub => 'GitHub project';
+
+  @override
+  String get aboutQqGroup => 'QQ group';
+
+  @override
+  String get aboutIssueFeedback => 'Issue feedback';
+
+  @override
+  String get aboutOpenSourceTitle => 'Open source';
+
+  @override
+  String get aboutLicenseAgpl => 'License';
+
+  @override
+  String get aboutThirdPartyLicenses => 'Third-party licenses';
+
+  @override
+  String aboutTapVersionRemaining(Object count) {
+    return 'Tap $count more times to open onboarding';
+  }
+
+  @override
+  String aboutOpenLinkFailed(Object url) {
+    return 'Unable to open link: $url';
+  }
+
+  @override
   String get storageAnalysisEntryTitle => 'Storage analysis';
 
   @override

@@ -64,6 +64,7 @@ dependencies:
 
   # 图片查看器，支持缩放和手势操作
   photo_view: ^0.15.0
+  package_info_plus: ^9.0.0
   url_launcher: ^6.3.1
 
   # Markdown 文本渲染

@@ -180,6 +180,37 @@
   "dataBackupSectionDesc": "Storage, import/export, recalc stats",
   "advancedSectionTitle": "Advanced",
   "advancedSectionDesc": "Logs and performance options",
+  "aboutSectionTitle": "About",
+  "aboutSectionDesc": "Version, feedback, and open-source licenses",
+  "aboutAppName": "ScreenMemo",
+  "aboutSlogan": "Screen unseen, memory retained",
+  "aboutDescription": "A local-first intelligent screenshot memo and retrieval tool with OCR, semantic search, AI review, and backup migration.",
+  "aboutVersionSectionTitle": "Version",
+  "aboutCurrentVersion": "Current version",
+  "aboutBuildNumber": "Build number",
+  "aboutPackageName": "Package name",
+  "aboutPrivacyTitle": "Privacy",
+  "aboutPrivacyDesc": "Screenshots, OCR, indexes, statistics, and most settings are stored locally by default. Summary or chat requests are sent only after you explicitly enable AI features and configure a provider.",
+  "aboutFeedbackTitle": "Community & feedback",
+  "aboutFeedbackDesc": "Report issues and request features",
+  "aboutGithub": "GitHub project",
+  "aboutQqGroup": "QQ group",
+  "aboutIssueFeedback": "Issue feedback",
+  "aboutOpenSourceTitle": "Open source",
+  "aboutLicenseAgpl": "License",
+  "aboutThirdPartyLicenses": "Third-party licenses",
+  "aboutTapVersionRemaining": "Tap {count} more times to open onboarding",
+  "@aboutTapVersionRemaining": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "aboutOpenLinkFailed": "Unable to open link: {url}",
+  "@aboutOpenLinkFailed": {
+    "placeholders": {
+      "url": {}
+    }
+  },
   "storageAnalysisEntryTitle": "Storage analysis",
   "storageAnalysisEntryDesc": "Inspect detailed storage usage for this app",
   "actionSet": "Set",

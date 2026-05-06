@@ -5,9 +5,11 @@ import 'package:screen_memo/l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
 import 'package:screen_memo/core/widgets/ui_components.dart';
 import 'package:screen_memo/core/widgets/ui_dialog.dart';
+import 'package:screen_memo/features/onboarding/presentation/pages/onboarding_page.dart';
 import 'package:screen_memo/features/permissions/application/permission_service.dart';
 import 'package:screen_memo/core/theme/theme_service.dart';
 import 'package:screen_memo/data/database/screenshot_database.dart';
@@ -26,7 +28,9 @@ import 'package:screen_memo/features/daily_summary/application/daily_summary_ser
 import 'package:screen_memo/features/nsfw/application/nsfw_preference_service.dart';
 import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
 import 'package:screen_memo/features/app_health/application/app_health_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+part 'settings_page_about_part.dart';
 part 'settings_page_backup_part.dart';
 part 'settings_page_permissions_part.dart';
 part 'settings_page_layout_part.dart';
@@ -49,6 +53,7 @@ enum _SettingsSubPage {
   appHealth,
   dataBackup,
   advanced,
+  about,
 }
 
 class SettingsPageController {
@@ -159,6 +164,9 @@ class _SettingsPageState extends State<SettingsPage>
   Duration _appHealthSlotSize = AppHealthService.defaultSlotSize;
   Timer? _appHealthWindowDebounce;
   bool _appHealthReloadQueued = false;
+  late final Future<PackageInfo> _packageInfoFuture =
+      PackageInfo.fromPlatform();
+  int _aboutVersionTapCount = 0;
 
   // NSFW 设置 - 域名清单管理
   final TextEditingController _nsfwDomainController = TextEditingController();
@@ -269,6 +277,8 @@ class _SettingsPageState extends State<SettingsPage>
         unawaited(_loadRenderImagesDuringStreaming());
         unawaited(_loadAiChatPerfOverlayEnabled());
         unawaited(_loadDynamicEntryLogIconEnabled());
+        break;
+      case _SettingsSubPage.about:
         break;
     }
   }
