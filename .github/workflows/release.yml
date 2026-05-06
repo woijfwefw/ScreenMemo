@@ -51,27 +51,64 @@ jobs:
         id: version
         shell: bash
         run: |
+          set -euo pipefail
+
           TAG="${GITHUB_REF_NAME}"
           VERSION="${TAG#v}"
+          if [[ ! "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+            echo "::error::Release tag must start with vMAJOR.MINOR.PATCH, got: $TAG"
+            exit 1
+          fi
+
+          MAJOR="${BASH_REMATCH[1]}"
+          MINOR="${BASH_REMATCH[2]}"
+          PATCH="${BASH_REMATCH[3]}"
+          # Android versionCode 必须是整数；这里从 tag 派生，versionName 仍使用完整 tag 版本。
+          BUILD_NUMBER=$((10#$MAJOR * 1000000 + 10#$MINOR * 1000 + 10#$PATCH))
+
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
 
-      - name: Configure Android release signing (optional)
+      - name: Configure Android release signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_SIGNING_CERT_SHA256: ${{ secrets.ANDROID_SIGNING_CERT_SHA256 }}
         shell: bash
         run: |
-          if [[ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]]; then
-            echo "ANDROID_KEYSTORE_BASE64 is not set; skipping release signing config."
-            exit 0
+          set -euo pipefail
+
+          missing=()
+          for name in \
+            ANDROID_KEYSTORE_BASE64 \
+            ANDROID_KEYSTORE_PASSWORD \
+            ANDROID_KEY_PASSWORD \
+            ANDROID_KEY_ALIAS \
+            ANDROID_SIGNING_CERT_SHA256
+          do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+
+          if (( ${#missing[@]} > 0 )); then
+            joined="$(IFS=,; echo "${missing[*]}")"
+            echo "::error::Missing required Android signing secrets: ${joined}"
+            exit 1
           fi
 
           mkdir -p android/app
-          printf '%s' "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
 
           {
-            printf 'storePassword=%s\n' "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
-            printf 'keyPassword=%s\n' "${{ secrets.ANDROID_KEY_PASSWORD }}"
-            printf 'keyAlias=%s\n' "${{ secrets.ANDROID_KEY_ALIAS }}"
+            printf 'storePassword=%s\n' "$ANDROID_KEYSTORE_PASSWORD"
+            printf 'keyPassword=%s\n' "$ANDROID_KEY_PASSWORD"
+            printf 'keyAlias=%s\n' "$ANDROID_KEY_ALIAS"
             printf 'storeFile=upload-keystore.jks\n'
+            printf 'certSha256=%s\n' "$ANDROID_SIGNING_CERT_SHA256"
           } > android/key.properties
 
           chmod 600 android/app/upload-keystore.jks android/key.properties
@@ -90,7 +127,44 @@ jobs:
         run: |
           flutter build apk --release --split-per-abi --tree-shake-icons --obfuscate --split-debug-info=build/symbols \
             --build-name="${{ steps.version.outputs.version }}" \
-            --build-number="${{ github.run_number }}"
+            --build-number="${{ steps.version.outputs.build_number }}"
+
+      - name: Verify APK signing certificates
+        env:
+          ANDROID_SIGNING_CERT_SHA256: ${{ secrets.ANDROID_SIGNING_CERT_SHA256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          expected="$(printf '%s' "$ANDROID_SIGNING_CERT_SHA256" | tr '[:upper:]' '[:lower:]' | sed 's/[^0-9a-f]//g')"
+          expected="${expected: -64}"
+          if [[ ${#expected} -ne 64 ]]; then
+            echo "::error::ANDROID_SIGNING_CERT_SHA256 must contain 64 hex characters."
+            exit 1
+          fi
+          apksigner="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+
+          shopt -s nullglob
+          apks=(build/app/outputs/flutter-apk/*-release.apk)
+          if (( ${#apks[@]} == 0 )); then
+            echo "::error::No release APKs were produced."
+            exit 1
+          fi
+
+          for apk in "${apks[@]}"; do
+            actual="$("$apksigner" verify --print-certs "$apk" | awk -F': ' '/Signer #1 certificate SHA-256 digest/ { print tolower($2); exit }')"
+            actual="$(printf '%s' "$actual" | tr '[:upper:]' '[:lower:]' | sed 's/[^0-9a-f]//g')"
+            actual="${actual: -64}"
+            if [[ -z "$actual" ]]; then
+              echo "::error file=$apk::Unable to read APK signing certificate."
+              exit 1
+            fi
+            if [[ "$actual" != "$expected" ]]; then
+              echo "::error file=$apk::APK signing certificate mismatch. Expected $expected but found $actual."
+              exit 1
+            fi
+            echo "$(basename "$apk"): $actual"
+          done
 
       - name: Collect artifacts
         shell: bash

@@ -1,4 +1,7 @@
 import org.gradle.api.GradleException
+import java.security.KeyStore
+import java.security.MessageDigest
+import java.util.Locale
 import java.util.Properties
 
 plugins {
@@ -17,7 +20,84 @@ fun requireKeystoreProperty(name: String): String =
         ?: throw GradleException("Missing `$name` in ${keystorePropertiesFile.path}.")
 
 if (hasReleaseKeystore) {
-    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+    keystorePropertiesFile.reader(Charsets.UTF_8).use { keystoreProperties.load(it) }
+    // 兼容 Windows PowerShell 5 生成的 UTF-8 BOM 文件，避免首个属性名带 BOM。
+    val normalizedProperties = Properties()
+    keystoreProperties.forEach { key, value ->
+        normalizedProperties.setProperty(
+            key.toString().removePrefix("\uFEFF"),
+            value.toString()
+        )
+    }
+    keystoreProperties.clear()
+    keystoreProperties.putAll(normalizedProperties)
+}
+
+val requiredReleaseSigningProperties = listOf(
+    "storePassword",
+    "keyPassword",
+    "keyAlias",
+    "storeFile",
+)
+
+fun normalizeSha256(value: String?): String? {
+    val hex = value
+        ?.lowercase(Locale.ROOT)
+        ?.filter { it in '0'..'9' || it in 'a'..'f' }
+        ?: return null
+    val normalized = if (hex.length > 64) hex.takeLast(64) else hex
+    return normalized.takeIf { it.isNotBlank() }
+}
+
+val expectedReleaseCertSha256 = normalizeSha256(
+    keystoreProperties.getProperty("certSha256") ?: System.getenv("ANDROID_SIGNING_CERT_SHA256")
+)
+
+fun releaseStoreFile(): java.io.File = file(requireKeystoreProperty("storeFile"))
+
+fun releaseCertificateSha256(): String {
+    val storeType = keystoreProperties.getProperty("storeType", KeyStore.getDefaultType())
+    val keyStore = KeyStore.getInstance(storeType)
+    releaseStoreFile().inputStream().use { input ->
+        keyStore.load(input, requireKeystoreProperty("storePassword").toCharArray())
+    }
+    val certificate = keyStore.getCertificate(requireKeystoreProperty("keyAlias"))
+        ?: throw GradleException("Missing signing certificate for keyAlias `${requireKeystoreProperty("keyAlias")}`.")
+    val digest = MessageDigest.getInstance("SHA-256").digest(certificate.encoded)
+    return digest.joinToString("") { "%02x".format(it.toInt() and 0xff) }
+}
+
+fun validateReleaseSigningConfig(): String {
+    if (!hasReleaseKeystore) {
+        throw GradleException(
+            "Release signing is required. Create android/key.properties and point it to the stable release keystore."
+        )
+    }
+
+    val missingProperties = requiredReleaseSigningProperties.filter {
+        keystoreProperties.getProperty(it).isNullOrBlank()
+    }
+    if (missingProperties.isNotEmpty()) {
+        throw GradleException(
+            "Missing Android signing properties in ${keystorePropertiesFile.path}: ${missingProperties.joinToString(", ")}."
+        )
+    }
+
+    val storeFile = releaseStoreFile()
+    if (!storeFile.isFile) {
+        throw GradleException("Android signing storeFile does not exist: ${storeFile.path}.")
+    }
+
+    val actualSha256 = releaseCertificateSha256()
+    if (expectedReleaseCertSha256 != null && expectedReleaseCertSha256.length != 64) {
+        throw GradleException("Android signing certificate SHA-256 must contain 64 hex characters.")
+    }
+    if (expectedReleaseCertSha256 != null && actualSha256 != expectedReleaseCertSha256) {
+        throw GradleException(
+            "Android signing certificate mismatch. Expected $expectedReleaseCertSha256 but found $actualSha256."
+        )
+    }
+    return actualSha256
 }
 
 android {
@@ -66,15 +146,23 @@ android {
                 keyPassword = requireKeystoreProperty("keyPassword")
                 storeFile = file(requireKeystoreProperty("storeFile"))
                 storePassword = requireKeystoreProperty("storePassword")
+                storeType = keystoreProperties.getProperty("storeType")
             }
         }
     }
 
     buildTypes {
+        configureEach {
+            // 本地配置了正式 keystore 时，debug/profile 等开发构建也使用同一签名，
+            // 方便直接覆盖 GitHub Release 版本做真机调试。
+            if (name != "release" && hasReleaseKeystore) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+
         release {
-            // Prefer a real release keystore on CI/local if configured; fall back to debug signing otherwise.
-            signingConfig =
-                if (hasReleaseKeystore) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
+            // Release 包必须使用稳定正式签名，禁止退回 debug keystore。
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -87,6 +175,29 @@ android {
 
 flutter {
     source = "../.."
+}
+
+val validateReleaseSigning by tasks.registering {
+    group = "verification"
+    description = "Validates the stable Android release signing certificate."
+    doLast {
+        val sha256 = validateReleaseSigningConfig()
+        logger.lifecycle("Android signing certificate SHA-256: $sha256")
+    }
+}
+
+tasks.configureEach {
+    val taskName = name.lowercase(Locale.ROOT)
+    val isPackagingTask =
+        taskName.startsWith("assemble") ||
+            taskName.startsWith("bundle") ||
+            taskName.startsWith("package")
+    val isReleasePackagingTask = isPackagingTask && taskName.contains("release")
+
+    // release 打包必须校验；本地存在 key.properties 时，debug/profile 打包也校验，防止误用其他签名。
+    if (isReleasePackagingTask || (hasReleaseKeystore && isPackagingTask)) {
+        dependsOn(validateReleaseSigning)
+    }
 }
 
 dependencies {

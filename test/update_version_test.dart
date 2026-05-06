@@ -13,6 +13,17 @@ void main() {
       expect(UpdateVersionComparator.compare('v1.1.0', '1.1.1'), lessThan(0));
     });
 
+    test('treats local default version as newer than cloud releases', () {
+      expect(
+        UpdateVersionComparator.compare('v99.99.99', '999.999.999'),
+        lessThan(0),
+      );
+      expect(
+        UpdateVersionComparator.compare('999.999.999', 'v99.99.99'),
+        greaterThan(0),
+      );
+    });
+
     test('normalizes leading v prefix', () {
       expect(UpdateVersionComparator.normalize('v1.2.3'), '1.2.3');
       expect(UpdateVersionComparator.normalize('V2.0.0'), '2.0.0');
