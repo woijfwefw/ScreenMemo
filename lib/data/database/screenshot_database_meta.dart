@@ -145,6 +145,10 @@ Future<void> _importZipIsolateEntry(Map<String, dynamic> args) async {
     (args['targetRoots'] as Map?) ?? const <String, String>{},
   );
   final bool overwrite = (args['overwrite'] as bool?) ?? true;
+  final bool skipMissingTargets =
+      (args['skipMissingTargets'] as bool?) ?? false;
+  final bool treatDatabasesAsOutputWhenNoManifest =
+      (args['treatDatabasesAsOutputWhenNoManifest'] as bool?) ?? false;
 
   try {
     final InputFileStream input = InputFileStream(localZipPath);
@@ -227,15 +231,29 @@ Future<void> _importZipIsolateEntry(Map<String, dynamic> args) async {
         continue;
       }
 
-      final String? destRootPath = targetRoots[rootEntry];
+      String effectiveRootEntry = rootEntry;
+      String effectiveRel = rel;
+      String? destRootPath = targetRoots[effectiveRootEntry];
+      if ((destRootPath == null || destRootPath.isEmpty) &&
+          !inspection.hasManifest &&
+          treatDatabasesAsOutputWhenNoManifest &&
+          rootEntry == 'databases') {
+        final String? outputRootPath = targetRoots['output'];
+        if (outputRootPath != null && outputRootPath.isNotEmpty) {
+          effectiveRootEntry = 'output';
+          effectiveRel = _normalizeBackupImportRelativePath('databases/$rel');
+          destRootPath = outputRootPath;
+        }
+      }
       if (destRootPath == null || destRootPath.isEmpty) {
-        if (inspection.hasManifest) {
+        if (inspection.hasManifest &&
+            (!skipMissingTargets || rootEntry == 'output')) {
           throw StateError('missing_import_target:$rootEntry');
         }
         continue;
       }
 
-      final String destPath = join(destRootPath, rel);
+      final String destPath = join(destRootPath, effectiveRel);
       if (f.isFile) {
         final File destFile = File(destPath);
         final Directory parent = destFile.parent;
@@ -249,7 +267,7 @@ Future<void> _importZipIsolateEntry(Map<String, dynamic> args) async {
           f.writeContent(out);
           await out.close();
           extracted++;
-          restoredRoots.add(rootEntry);
+          restoredRoots.add(effectiveRootEntry);
         }
       }
 
@@ -264,7 +282,7 @@ Future<void> _importZipIsolateEntry(Map<String, dynamic> args) async {
           'type': 'progress',
           'progress': progress.clamp(0.0, 1.0),
           'stage': 'extracting',
-          'entry': rel,
+          'entry': effectiveRel,
         });
         lastProgressIndex = i;
         progressThrottle.reset();
@@ -629,6 +647,8 @@ Future<Map<String, dynamic>?> _runImportZipWithProgress({
   required Map<String, String> targetRoots,
   required bool overwrite,
   void Function(ImportExportProgress progress)? onProgress,
+  bool skipMissingTargets = false,
+  bool treatDatabasesAsOutputWhenNoManifest = false,
 }) async {
   final ReceivePort receivePort = ReceivePort();
   Isolate? iso;
@@ -640,6 +660,9 @@ Future<Map<String, dynamic>?> _runImportZipWithProgress({
         'zipPath': localZipPath,
         'targetRoots': targetRoots,
         'overwrite': overwrite,
+        'skipMissingTargets': skipMissingTargets,
+        'treatDatabasesAsOutputWhenNoManifest':
+            treatDatabasesAsOutputWhenNoManifest,
       },
     );
 
@@ -4404,8 +4427,35 @@ extension ScreenshotDatabaseMeta on ScreenshotDatabase {
       if (path == null || path.isEmpty) {
         continue;
       }
+      if (_isUnsafeImportDeleteTarget(roots, path)) {
+        await FlutterLogger.nativeWarn(
+          'IMPORT',
+          '跳过危险导入删除目标：root=$root path=$path',
+        );
+        continue;
+      }
       await _deleteDirectoryIfExists(path);
     }
+  }
+
+  bool _isUnsafeImportDeleteTarget(BackupRootPaths roots, String path) {
+    final String target = _normalizeImportDeleteGuardPath(path);
+    if (target.isEmpty) {
+      return true;
+    }
+    final Set<String> protectedRoots = <String>{
+      _normalizeImportDeleteGuardPath(roots.dataRootPath),
+      _normalizeImportDeleteGuardPath(roots.filesDirPath),
+    };
+    return protectedRoots.contains(target);
+  }
+
+  String _normalizeImportDeleteGuardPath(String path) {
+    String value = normalize(path).replaceAll('\\', '/').trim();
+    while (value.length > 1 && value.endsWith('/')) {
+      value = value.substring(0, value.length - 1);
+    }
+    return value;
   }
 
   Future<void> _deleteDirectoryIfExists(String path) async {

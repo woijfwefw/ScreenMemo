@@ -280,6 +280,12 @@ extension ScreenshotDatabaseMerge on ScreenshotDatabase {
         localZipPath: localZipPath!,
         targetRoots: <String, String>{'output': stagingOutput.path},
         overwrite: true,
+        // 合并模式只需要 output 数据；全量备份中的 shared_prefs/app_flutter/no_backup
+        // 等根目录应跳过，不能因为没有导入目标导致合并失败。
+        skipMissingTargets: true,
+        // 桌面合并工具生成的 zip 以 output 内容为根目录（screen/databases/...）。
+        // 无 manifest 时把顶层 databases 当作 output/databases 处理以兼容旧包。
+        treatDatabasesAsOutputWhenNoManifest: true,
         onProgress: (progress) {
           reportProgress(
             ImportExportProgress(

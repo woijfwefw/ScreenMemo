@@ -284,8 +284,10 @@ class BackupInventoryService {
     }
 
     final Directory dataRoot = filesDir.parent;
-    final String dbPath = await getDatabasesPath();
-    final String appDatabasesDirPath = p.dirname(dbPath);
+    // sqflite 的 getDatabasesPath() 返回的是数据库目录本身，不是某个数据库文件。
+    // 这里不能再取 dirname，否则 Android 上会退到应用 data 根目录，覆盖导入
+    // databases 根时可能误删 cache/shared_prefs 等同级目录。
+    final String appDatabasesDirPath = await getDatabasesPath();
 
     final String sharedPrefsDirPath = p.join(dataRoot.path, 'shared_prefs');
     final String appFlutterDirPath = p.join(dataRoot.path, 'app_flutter');

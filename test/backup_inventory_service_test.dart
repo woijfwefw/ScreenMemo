@@ -76,7 +76,7 @@ void main() {
         ),
       );
 
-      expect(inventory.totalFiles, 9);
+      expect(inventory.totalFiles, 10);
       expect(
         inventory.categoryById(BackupCategoryIds.screenshots)?.fileCount,
         1,

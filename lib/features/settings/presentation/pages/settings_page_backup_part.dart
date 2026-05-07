@@ -782,6 +782,7 @@ extension _SettingsBackupPart on _SettingsPageState {
       await FlutterLogger.nativeWarn('UI_IMPORT', '用户取消选择导入模式');
       return;
     }
+    await FlutterLogger.nativeInfo('UI_IMPORT', '导入模式=${mode.name}');
 
     _settingsSetState(() {
       _importingData = true;
