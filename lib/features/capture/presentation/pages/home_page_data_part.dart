@@ -77,7 +77,6 @@ extension _HomePageDataPart on _HomePageState {
   /// 计算当前统计数据的签名，用于快速判断是否需要刷新UI
   String _computeStatsSignature(Map<String, dynamic> stats) {
     final int total = (stats['totalScreenshots'] as int?) ?? 0;
-    final int today = (stats['todayScreenshots'] as int?) ?? 0;
     final int lastTs = (stats['lastScreenshotTime'] as int?) ?? 0;
     final appStats =
         stats['appStatistics'] as Map<String, Map<String, dynamic>>? ?? {};
@@ -98,7 +97,7 @@ extension _HomePageDataPart on _HomePageState {
       if (ts > maxLast) maxLast = ts;
     }
 
-    return '$total|$today|$lastTs|$appsCount|$sumCount|$sumSize|$maxLast';
+    return '$total|$lastTs|$appsCount|$sumCount|$sumSize|$maxLast';
   }
 
   /// 校验当前展示与数据库最新统计是否一致，不一致则用最新统计刷新
@@ -126,6 +125,10 @@ extension _HomePageDataPart on _HomePageState {
     // 始终走软刷新：不触发全屏加载动画
 
     try {
+      // 统计信息与应用安装列表互不依赖，先并发启动，避免首页顶部长时间显示 0。
+      final Future<void> earlyTotalsFuture = _loadTotals();
+      final Future<void> earlyStatsFuture = _loadStats();
+
       // 加载用户设置
       final selectedApps = await _appService.getSelectedApps();
       final installedApps = await _appService.getAllInstalledApps();
@@ -160,14 +163,10 @@ extension _HomePageDataPart on _HomePageState {
       // ignore: unawaited_futures
       _loadPerAppCustomFlags(selectedApps);
 
-      // 再加载统计数据（缓存优先），不阻塞应用列表
-      await _loadStats();
-
-      // 首次加载时重新计算汇总统计（确保数据完整性）
-      await ScreenshotService.instance.recalculateTotals();
-      // 重算可能修正旧缓存中的 0 计数，立即用数据库新值刷新首页。
+      // 等首批缓存/快速统计完成，再用 app_stats 快速刷新一次，修正旧缓存。
+      await Future.wait([earlyTotalsFuture, earlyStatsFuture]);
       await _loadStatsFresh();
-      await _loadTotals(); // 同时加载汇总统计
+      await _loadTotals();
 
       // 根据排序模式排序应用
       _sortApps();

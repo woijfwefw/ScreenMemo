@@ -141,6 +141,15 @@ class ScreenshotService {
           _statsCacheTtlSecondsDefault;
       final now = DateTime.now().millisecondsSinceEpoch;
       if (cached != null && ts > 0 && (now - ts) <= ttl * 1000) {
+        final map = _deserializeStats(cached);
+        if (!await _isStatsCacheAlignedWithDatabase(map)) {
+          final fresh = await getScreenshotStatsFresh();
+          await _saveStatsCache(fresh);
+          StartupProfiler.end(
+            'ScreenshotService.getScreenshotStatsCachedFirst',
+          );
+          return fresh;
+        }
         // 访问即续期：读缓存的同时刷新时间戳，避免频繁过期导致首页闪烁
         try {
           await prefs.setInt(_statsCacheTsKey, now);
@@ -148,7 +157,6 @@ class ScreenshotService {
         // 日志：观察续期是否生效
         // ignore: unawaited_futures
         FlutterLogger.log('统计缓存命中，已续期：时间戳=$now，有效期=${ttl}秒');
-        final map = _deserializeStats(cached);
         // 后台异步刷新缓存
         // ignore: unawaited_futures
         _refreshStatsCacheIfStale();
@@ -158,6 +166,14 @@ class ScreenshotService {
       // 若存在缓存但已过期：先返回陈旧缓存以避免首屏空白，再后台强制刷新
       if (cached != null && ts > 0 && (now - ts) > ttl * 1000) {
         final stale = _deserializeStats(cached);
+        if (!await _isStatsCacheAlignedWithDatabase(stale)) {
+          final fresh = await getScreenshotStatsFresh();
+          await _saveStatsCache(fresh);
+          StartupProfiler.end(
+            'ScreenshotService.getScreenshotStatsCachedFirst',
+          );
+          return fresh;
+        }
         // ignore: unawaited_futures
         FlutterLogger.log(
           '统计缓存已过期 -> 先返回旧缓存并刷新，缓存年龄=${now - ts}毫秒，有效期=${ttl}秒',
@@ -182,6 +198,55 @@ class ScreenshotService {
     } catch (_) {}
     final stats = await getScreenshotStats();
     StartupProfiler.end('ScreenshotService.getScreenshotStatsCachedFirst');
+    return stats;
+  }
+
+  Future<bool> _isStatsCacheAlignedWithDatabase(
+    Map<String, dynamic> cached,
+  ) async {
+    try {
+      final int cachedTotal = (cached['totalScreenshots'] as int?) ?? 0;
+      final int cachedLast = (cached['lastScreenshotTime'] as int?) ?? 0;
+      final int dbTotal = await _database.getTotalScreenshotCount();
+      final int dbLast =
+          await _database.getGlobalLatestCaptureTimeMillis() ?? 0;
+      return cachedTotal == dbTotal && cachedLast == dbLast;
+    } catch (_) {
+      // 校验失败时宁愿使用缓存，避免启动阶段因为异常回退到 0。
+      return true;
+    }
+  }
+
+  Future<Map<String, dynamic>> _buildStatsFromAppStats({
+    bool includeTodayCount = false,
+    bool saveCache = false,
+  }) async {
+    final statistics = await _database.getScreenshotStatistics();
+
+    int totalCount = 0;
+    DateTime? lastScreenshotTime;
+    for (final stat in statistics.values) {
+      totalCount += (stat['totalCount'] as int?) ?? 0;
+      final time = stat['lastCaptureTime'] as DateTime?;
+      if (time != null &&
+          (lastScreenshotTime == null || time.isAfter(lastScreenshotTime))) {
+        lastScreenshotTime = time;
+      }
+    }
+
+    final int todayCount = includeTodayCount
+        ? await _database.getTodayScreenshotCount()
+        : 0;
+    final stats = {
+      'totalScreenshots': totalCount,
+      'todayScreenshots': todayCount,
+      'lastScreenshotTime': lastScreenshotTime?.millisecondsSinceEpoch,
+      'appStatistics': statistics,
+    };
+    if (saveCache) {
+      // ignore: unawaited_futures
+      _saveStatsCache(stats);
+    }
     return stats;
   }
 
@@ -646,35 +711,8 @@ class ScreenshotService {
   Future<Map<String, dynamic>> getScreenshotStats() async {
     StartupProfiler.begin('ScreenshotService.getScreenshotStats');
     try {
-      // 改为仅DB统计，不触发文件系统扫描
-
-      final totalCount = await _database.getTotalScreenshotCount();
-      final todayCount = await _database.getTodayScreenshotCount();
-      final statistics = await _database.getScreenshotStatistics();
-
-      // 获取最近的截图时间
-      DateTime? lastScreenshotTime;
-      if (statistics.isNotEmpty) {
-        for (final stat in statistics.values) {
-          final time = stat['lastCaptureTime'] as DateTime?;
-          if (time != null &&
-              (lastScreenshotTime == null ||
-                  time.isAfter(lastScreenshotTime))) {
-            lastScreenshotTime = time;
-          }
-        }
-      }
-
-      final stats = {
-        'totalScreenshots': totalCount,
-        'todayScreenshots': todayCount,
-        'lastScreenshotTime': lastScreenshotTime?.millisecondsSinceEpoch,
-        'appStatistics': statistics,
-      };
-      // 保存到缓存
-      // ignore: unawaited_futures
-      _saveStatsCache(stats);
-      return stats;
+      // 首页和应用列表只依赖 app_stats；不扫描分库统计 today，避免大库启动慢。
+      return await _buildStatsFromAppStats(saveCache: true);
     } catch (e) {
       print('获取截屏统计信息失败: $e');
       return {
@@ -779,7 +817,7 @@ class ScreenshotService {
     );
     await _refreshStatsCache(force: true);
     step++;
-    invalidateAvailableDayCountCache();
+    await _invalidateAvailableDayCountCacheAsync();
     onProgress?.call(
       ScreenshotRecomputeProgress(
         phase: 'refresh_days',
@@ -807,33 +845,13 @@ class ScreenshotService {
   /// 获取最新统计（不使用统计缓存，可选择强制全量文件同步）
   Future<Map<String, dynamic>> getScreenshotStatsFresh({
     bool forceFullSync = true,
+    bool includeTodayCount = false,
   }) async {
     StartupProfiler.begin('ScreenshotService.getScreenshotStatsFresh');
     try {
-      // 仅DB统计，不进行文件系统同步
-
-      final totalCount = await _database.getTotalScreenshotCount();
-      final todayCount = await _database.getTodayScreenshotCount();
-      final statistics = await _database.getScreenshotStatistics();
-
-      DateTime? lastScreenshotTime;
-      if (statistics.isNotEmpty) {
-        for (final stat in statistics.values) {
-          final time = stat['lastCaptureTime'] as DateTime?;
-          if (time != null &&
-              (lastScreenshotTime == null ||
-                  time.isAfter(lastScreenshotTime))) {
-            lastScreenshotTime = time;
-          }
-        }
-      }
-
-      return {
-        'totalScreenshots': totalCount,
-        'todayScreenshots': todayCount,
-        'lastScreenshotTime': lastScreenshotTime?.millisecondsSinceEpoch,
-        'appStatistics': statistics,
-      };
+      return await _buildStatsFromAppStats(
+        includeTodayCount: includeTodayCount,
+      );
     } catch (e) {
       print('获取最新截屏统计失败: $e');
       return {
@@ -850,28 +868,7 @@ class ScreenshotService {
   // 仅从数据库读取统计（不触发文件系统全量扫描），用于快速更新缓存
   Future<Map<String, dynamic>> _getStatsDbOnly() async {
     try {
-      final totalCount = await _database.getTotalScreenshotCount();
-      final todayCount = await _database.getTodayScreenshotCount();
-      final statistics = await _database.getScreenshotStatistics();
-
-      DateTime? lastScreenshotTime;
-      if (statistics.isNotEmpty) {
-        for (final stat in statistics.values) {
-          final time = stat['lastCaptureTime'] as DateTime?;
-          if (time != null &&
-              (lastScreenshotTime == null ||
-                  time.isAfter(lastScreenshotTime))) {
-            lastScreenshotTime = time;
-          }
-        }
-      }
-
-      return {
-        'totalScreenshots': totalCount,
-        'todayScreenshots': todayCount,
-        'lastScreenshotTime': lastScreenshotTime?.millisecondsSinceEpoch,
-        'appStatistics': statistics,
-      };
+      return await _buildStatsFromAppStats();
     } catch (_) {
       return {
         'totalScreenshots': 0,
@@ -1596,6 +1593,7 @@ class ScreenshotService {
       final ok = await _database.deleteScreenshot(id, packageName);
       if (ok) {
         // 先快速刷新统计缓存（DB-only），再通知监听者
+        invalidateAvailableDayCountCache();
         await _refreshStatsCacheQuick();
         _screenshotStreamController.add(null);
         // 后台触发可能的全量同步（不等待）
@@ -1635,6 +1633,7 @@ class ScreenshotService {
       );
       if (deleted > 0) {
         // 批量删除后优先进行快速统计缓存刷新并通知，再后台全量刷新
+        invalidateAvailableDayCountCache();
         await _refreshStatsCacheQuick();
         _screenshotStreamController.add(null);
         // ignore: unawaited_futures
@@ -1676,6 +1675,7 @@ class ScreenshotService {
       if (!await appDir.exists()) {
         // 若文件夹不存在，仅做DB侧删除非保留记录即可
         await _database.deleteAllExcept(packageName, keepIds);
+        invalidateAvailableDayCountCache();
         await _refreshStatsCache(force: true);
         _screenshotStreamController.add(null);
         return true;
@@ -1759,6 +1759,7 @@ class ScreenshotService {
       } catch (_) {}
 
       // 6) 刷新统计缓存并通知
+      invalidateAvailableDayCountCache();
       await _refreshStatsCache(force: true);
       _screenshotStreamController.add(null);
       return true;
@@ -2195,6 +2196,19 @@ class ScreenshotService {
     }
 
     final int now = DateTime.now().millisecondsSinceEpoch;
+    final int? initializedDbCount = await _database
+        .getInitializedDayStatsCount();
+    if (initializedDbCount != null) {
+      _dayCountMemCache = initializedDbCount;
+      _dayCountMemCacheTs = now;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt(_dayCountCacheKey, initializedDbCount);
+        await prefs.setInt(_dayCountCacheTsKey, now);
+      } catch (_) {}
+      return initializedDbCount;
+    }
+
     final int ageInMemory = now - _dayCountMemCacheTs;
     if (_dayCountMemCache != null) {
       if (ageInMemory <= _dayCountCacheTtlMillis) {
@@ -2213,6 +2227,8 @@ class ScreenshotService {
         _dayCountMemCacheTs = ts;
         if (now - ts > _dayCountCacheTtlMillis) {
           _refreshDayCountInBackground();
+        } else {
+          _rebuildDayStatsInBackgroundIfNeeded();
         }
         return cached;
       }
@@ -2225,6 +2241,13 @@ class ScreenshotService {
   void invalidateAvailableDayCountCache() {
     _dayCountMemCache = null;
     _dayCountMemCacheTs = 0;
+    unawaited(_database.invalidateDayStatsCompleteness());
+  }
+
+  Future<void> _invalidateAvailableDayCountCacheAsync() async {
+    _dayCountMemCache = null;
+    _dayCountMemCacheTs = 0;
+    await _database.invalidateDayStatsCompleteness();
   }
 
   Future<int> _refreshDayCount() {
@@ -2234,9 +2257,8 @@ class ScreenshotService {
 
   Future<int> _doRefreshDayCount() async {
     try {
-      final List<Map<String, dynamic>> days = await _database
-          .listAvailableDaysGlobal();
-      final int count = days.length;
+      int? count = await _database.getInitializedDayStatsCount();
+      count ??= await _database.recalculateDayStats();
       final int now = DateTime.now().millisecondsSinceEpoch;
       _dayCountMemCache = count;
       _dayCountMemCacheTs = now;
@@ -2259,6 +2281,15 @@ class ScreenshotService {
     }
     // ignore: discarded_futures
     _refreshDayCount();
+  }
+
+  void _rebuildDayStatsInBackgroundIfNeeded() {
+    // ignore: discarded_futures
+    (() async {
+      final int? count = await _database.getInitializedDayStatsCount();
+      if (count != null) return;
+      await _refreshDayCount();
+    })();
   }
 
   /// 指定应用列出所有有数据的日期（本地时区），按日期倒序

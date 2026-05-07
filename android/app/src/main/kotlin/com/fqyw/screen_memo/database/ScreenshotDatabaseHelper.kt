@@ -52,6 +52,8 @@ object ScreenshotDatabaseHelper {
             if (isFilePathExists(shardDb!!, tableName, absoluteFilePath)) return
 
             val fileSize = getFileSizeSafe(absoluteFilePath)
+            val totalBeforeInsert = getTotalScreenshotCount(db)
+            val isNewPositiveApp = !hasPositiveAppStat(db, appPackageName)
             val values = ContentValues().apply {
                 put("file_path", absoluteFilePath)
                 put("capture_time", captureTimeMillis)
@@ -64,6 +66,11 @@ object ScreenshotDatabaseHelper {
 
             // 维护聚合统计（写主库）
             upsertAppStatsOnInsert(db, appPackageName, appName, fileSize, captureTimeMillis)
+            updateTotalsOnInsert(db, if (isNewPositiveApp) 1 else 0, 1, fileSize)
+            updateDayStatsOnInsert(db, captureTimeMillis, fileSize)
+            if (totalBeforeInsert <= 0L) {
+                markDayStatsInitialized(db)
+            }
             FileLogger.i(TAG, "更新 app_stats 成功：包名=${appPackageName} last=${captureTimeMillis}")
         } catch (e: Exception) {
             FileLogger.w(TAG, "原生 insertIfNotExists 失败：${e.message}")
@@ -175,6 +182,38 @@ object ScreenshotDatabaseHelper {
                 """.trimIndent()
             )
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_app_stats_last ON app_stats(last_capture_time)")
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS totals (
+                  id INTEGER PRIMARY KEY CHECK (id = 1),
+                  app_count INTEGER NOT NULL DEFAULT 0,
+                  screenshot_count INTEGER NOT NULL DEFAULT 0,
+                  total_size_bytes INTEGER NOT NULL DEFAULT 0,
+                  updated_at INTEGER DEFAULT (strftime('%s','now') * 1000)
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS day_stats (
+                  day TEXT PRIMARY KEY,
+                  screenshot_count INTEGER NOT NULL DEFAULT 0,
+                  total_size_bytes INTEGER NOT NULL DEFAULT 0,
+                  first_capture_time INTEGER,
+                  last_capture_time INTEGER,
+                  updated_at INTEGER DEFAULT (strftime('%s','now') * 1000)
+                )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_day_stats_last ON day_stats(last_capture_time DESC)")
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS day_stats_meta (
+                  id INTEGER PRIMARY KEY CHECK (id = 1),
+                  rebuilt_at INTEGER NOT NULL
+                )
+                """.trimIndent()
+            )
             // 分库注册表
             db.execSQL(
                 """
@@ -331,6 +370,104 @@ object ScreenshotDatabaseHelper {
         } finally {
             try { cursor?.close() } catch (_: Exception) {}
         }
+    }
+
+    private fun hasPositiveAppStat(db: SQLiteDatabase, packageName: String): Boolean {
+        var cursor: Cursor? = null
+        return try {
+            cursor = db.rawQuery(
+                "SELECT total_count FROM app_stats WHERE app_package_name = ? LIMIT 1",
+                arrayOf(packageName)
+            )
+            val c = cursor ?: return false
+            if (!c.moveToFirst()) return false
+            c.getLong(0) > 0L
+        } catch (_: Exception) {
+            false
+        } finally {
+            try { cursor?.close() } catch (_: Exception) {}
+        }
+    }
+
+    private fun getTotalScreenshotCount(db: SQLiteDatabase): Long {
+        var cursor: Cursor? = null
+        return try {
+            cursor = db.rawQuery("SELECT COALESCE(SUM(total_count), 0) FROM app_stats", emptyArray())
+            val c = cursor ?: return 0L
+            if (c.moveToFirst()) c.getLong(0) else 0L
+        } catch (_: Exception) {
+            0L
+        } finally {
+            try { cursor?.close() } catch (_: Exception) {}
+        }
+    }
+
+    private fun updateTotalsOnInsert(
+        db: SQLiteDatabase,
+        newAppCount: Int,
+        screenshotCount: Int,
+        totalSizeBytes: Long
+    ) {
+        try {
+            db.execSQL(
+                """
+                INSERT OR REPLACE INTO totals (id, app_count, screenshot_count, total_size_bytes, updated_at)
+                VALUES (1,
+                  COALESCE((SELECT app_count FROM totals WHERE id = 1), 0) + ?,
+                  COALESCE((SELECT screenshot_count FROM totals WHERE id = 1), 0) + ?,
+                  COALESCE((SELECT total_size_bytes FROM totals WHERE id = 1), 0) + ?,
+                  ?
+                )
+                """.trimIndent(),
+                arrayOf(newAppCount, screenshotCount, totalSizeBytes, System.currentTimeMillis())
+            )
+        } catch (_: Exception) {}
+    }
+
+    private fun dayKeyFromMillis(captureTimeMillis: Long): String {
+        return try {
+            java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                .format(java.util.Date(captureTimeMillis))
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    private fun updateDayStatsOnInsert(
+        db: SQLiteDatabase,
+        captureTimeMillis: Long,
+        totalSizeBytes: Long
+    ) {
+        val day = dayKeyFromMillis(captureTimeMillis)
+        if (day.isBlank()) return
+        try {
+            db.execSQL(
+                """
+                INSERT INTO day_stats(day, screenshot_count, total_size_bytes, first_capture_time, last_capture_time, updated_at)
+                VALUES (?, 1, ?, ?, ?, ?)
+                ON CONFLICT(day) DO UPDATE SET
+                  screenshot_count = day_stats.screenshot_count + 1,
+                  total_size_bytes = day_stats.total_size_bytes + excluded.total_size_bytes,
+                  first_capture_time = CASE
+                    WHEN day_stats.first_capture_time IS NULL OR excluded.first_capture_time < day_stats.first_capture_time
+                    THEN excluded.first_capture_time ELSE day_stats.first_capture_time END,
+                  last_capture_time = CASE
+                    WHEN day_stats.last_capture_time IS NULL OR excluded.last_capture_time > day_stats.last_capture_time
+                    THEN excluded.last_capture_time ELSE day_stats.last_capture_time END,
+                  updated_at = excluded.updated_at
+                """.trimIndent(),
+                arrayOf(day, totalSizeBytes, captureTimeMillis, captureTimeMillis, System.currentTimeMillis())
+            )
+        } catch (_: Exception) {}
+    }
+
+    private fun markDayStatsInitialized(db: SQLiteDatabase) {
+        try {
+            db.execSQL(
+                "INSERT OR REPLACE INTO day_stats_meta(id, rebuilt_at) VALUES(1, ?)",
+                arrayOf(System.currentTimeMillis())
+            )
+        } catch (_: Exception) {}
     }
 
     private fun upsertAppStatsOnInsert(

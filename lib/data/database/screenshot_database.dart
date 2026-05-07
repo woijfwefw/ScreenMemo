@@ -117,7 +117,7 @@ class ScreenshotDatabase {
         final path = join(databasesDir.path, 'screenshot_memo.db');
         final db = await openDatabase(
           path,
-          version: 47,
+          version: 48,
           onConfigure: (db) async {
             try {
               await db.execute('PRAGMA journal_mode=WAL');
@@ -155,7 +155,7 @@ class ScreenshotDatabase {
 
         final db = await openDatabase(
           path,
-          version: 47,
+          version: 48,
           onConfigure: (db) async {
             // 启用 WAL 提升并发写入与长事务期间读取能力
             try {
@@ -188,7 +188,7 @@ class ScreenshotDatabase {
 
         final db = await openDatabase(
           path,
-          version: 47,
+          version: 48,
           onConfigure: (db) async {
             try {
               await db.execute('PRAGMA journal_mode=WAL');
@@ -215,7 +215,7 @@ class ScreenshotDatabase {
 
       final db = await openDatabase(
         path,
-        version: 47,
+        version: 48,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       );
@@ -737,6 +737,7 @@ class ScreenshotDatabase {
         updated_at INTEGER DEFAULT (strftime('%s','now') * 1000)
       )
     ''');
+    await _createDayStatsTables(db);
 
     // v2: AI 配置与会话表
     await _createAiTables(db);
@@ -781,6 +782,9 @@ class ScreenshotDatabase {
     }
     if (oldVersion < 47) {
       await _createAppHealthTables(db);
+    }
+    if (oldVersion < 48) {
+      await _createDayStatsTables(db);
     }
     if (oldVersion < 2) {
       await _createAiTables(db);
@@ -1360,6 +1364,33 @@ class ScreenshotDatabase {
     ''');
   }
 
+  /// 创建全局日期聚合表。
+  ///
+  /// 首页只需要“有截图的天数”，不应该每次启动都扫描所有分库月表。
+  /// `day_stats_meta` 用来标记该表已由历史数据完整重建；没有标记时只把它
+  /// 当作增量缓存，避免老用户升级后只统计到升级后的日期。
+  Future<void> _createDayStatsTables(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS day_stats (
+        day TEXT PRIMARY KEY,
+        screenshot_count INTEGER NOT NULL DEFAULT 0,
+        total_size_bytes INTEGER NOT NULL DEFAULT 0,
+        first_capture_time INTEGER,
+        last_capture_time INTEGER,
+        updated_at INTEGER DEFAULT (strftime('%s','now') * 1000)
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_day_stats_last ON day_stats(last_capture_time DESC)',
+    );
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS day_stats_meta (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        rebuilt_at INTEGER NOT NULL
+      )
+    ''');
+  }
+
   // 无升级逻辑：新安装直接按 _onCreate 创建所有表
   // 注：从 v2 起使用 _onUpgrade 进行增量迁移
 
@@ -1462,6 +1493,14 @@ class ScreenshotDatabase {
           screenshotCount: 1,
           totalSizeBytes: actualFileSize,
         );
+        await _updateDayStatsOnInsertWithExecutor(
+          txn,
+          dayKey: _dayKeyFromMillis(ts),
+          screenshotCount: 1,
+          totalSizeBytes: actualFileSize,
+          firstCaptureTime: ts,
+          lastCaptureTime: ts,
+        );
 
         final gid = _encodeGid(year, month, localId);
         print('分库插入成功 gid=$gid table=$tableName');
@@ -1493,6 +1532,10 @@ class ScreenshotDatabase {
     final Map<String, int> packageCounts = {};
     final Map<String, int> packageSizes = {};
     final Set<String> newPackages = <String>{};
+    final Map<String, int> dayCounts = <String, int>{};
+    final Map<String, int> daySizes = <String, int>{};
+    final Map<String, int> dayFirstCapture = <String, int>{};
+    final Map<String, int> dayLastCapture = <String, int>{};
 
     try {
       await db.transaction((txn) async {
@@ -1547,6 +1590,13 @@ class ScreenshotDatabase {
           packageSizes[recordWithSize.appPackageName] =
               (packageSizes[recordWithSize.appPackageName] ?? 0) +
               actualFileSize;
+          final String dayKey = _dayKeyFromMillis(ts);
+          dayCounts[dayKey] = (dayCounts[dayKey] ?? 0) + 1;
+          daySizes[dayKey] = (daySizes[dayKey] ?? 0) + actualFileSize;
+          final int prevFirst = dayFirstCapture[dayKey] ?? ts;
+          final int prevLast = dayLastCapture[dayKey] ?? ts;
+          if (ts <= prevFirst) dayFirstCapture[dayKey] = ts;
+          if (ts >= prevLast) dayLastCapture[dayKey] = ts;
         }
 
         // 批量更新汇总统计
@@ -1565,6 +1615,16 @@ class ScreenshotDatabase {
             screenshotCount: totalScreenshots,
             totalSizeBytes: totalSize,
           );
+          for (final String dayKey in dayCounts.keys) {
+            await _updateDayStatsOnInsertWithExecutor(
+              txn,
+              dayKey: dayKey,
+              screenshotCount: dayCounts[dayKey] ?? 0,
+              totalSizeBytes: daySizes[dayKey] ?? 0,
+              firstCaptureTime: dayFirstCapture[dayKey] ?? 0,
+              lastCaptureTime: dayLastCapture[dayKey] ?? 0,
+            );
+          }
         }
       });
     } catch (e) {
@@ -1948,24 +2008,41 @@ class ScreenshotDatabase {
   Future<Map<String, dynamic>> getTotals() async {
     final db = await database;
     try {
-      final rows = await db.query('totals', where: 'id = 1', limit: 1);
-      if (rows.isEmpty) {
-        // 初始化汇总表
-        await db.insert('totals', {
-          'id': 1,
-          'app_count': 0,
-          'screenshot_count': 0,
-          'total_size_bytes': 0,
-          'updated_at': DateTime.now().millisecondsSinceEpoch,
-        });
-        return {
-          'app_count': 0,
-          'screenshot_count': 0,
-          'total_size_bytes': 0,
-          'updated_at': DateTime.now().millisecondsSinceEpoch,
-        };
-      }
-      return rows.first;
+      await _createTotalsTable(db);
+      // 直接从 app_stats 读 1 次聚合。app_stats 每应用一行，107 个应用时
+      // 成本极低，并且能绕过原生后台截屏未及时维护 totals 导致的旧数据。
+      final List<Map<String, Object?>> rows = await db.rawQuery('''
+        SELECT
+          COUNT(*) AS app_count,
+          COALESCE(SUM(total_count), 0) AS screenshot_count,
+          COALESCE(SUM(total_size), 0) AS total_size_bytes
+        FROM app_stats
+        WHERE COALESCE(total_count, 0) > 0
+      ''');
+      final Map<String, Object?> row = rows.isNotEmpty
+          ? rows.first
+          : const <String, Object?>{};
+      final int now = DateTime.now().millisecondsSinceEpoch;
+      final Map<String, dynamic> totals = <String, dynamic>{
+        'id': 1,
+        'app_count': (row['app_count'] as int?) ?? 0,
+        'screenshot_count': (row['screenshot_count'] as int?) ?? 0,
+        'total_size_bytes': (row['total_size_bytes'] as int?) ?? 0,
+        'updated_at': now,
+      };
+      await db.execute(
+        '''
+        INSERT OR REPLACE INTO totals (id, app_count, screenshot_count, total_size_bytes, updated_at)
+        VALUES (1, ?, ?, ?, ?)
+      ''',
+        [
+          totals['app_count'],
+          totals['screenshot_count'],
+          totals['total_size_bytes'],
+          now,
+        ],
+      );
+      return totals;
     } catch (e) {
       print('获取汇总统计失败: $e');
       return {
@@ -2006,12 +2083,13 @@ class ScreenshotDatabase {
   ) async {
     final existing = await db.query(
       'app_stats',
-      columns: ['app_package_name'],
+      columns: ['total_count'],
       where: 'app_package_name = ?',
       whereArgs: [packageName],
       limit: 1,
     );
-    return existing.isEmpty;
+    if (existing.isEmpty) return true;
+    return ((existing.first['total_count'] as int?) ?? 0) <= 0;
   }
 
   Future<int> _countMissingAppStats(
@@ -2054,20 +2132,131 @@ class ScreenshotDatabase {
     );
   }
 
+  String _dayKeyFromMillis(int millis) {
+    final DateTime local = DateTime.fromMillisecondsSinceEpoch(millis);
+    final String month = local.month.toString().padLeft(2, '0');
+    final String day = local.day.toString().padLeft(2, '0');
+    return '${local.year}-$month-$day';
+  }
+
+  Future<void> _updateDayStatsOnInsertWithExecutor(
+    DatabaseExecutor db, {
+    required String dayKey,
+    required int screenshotCount,
+    required int totalSizeBytes,
+    required int firstCaptureTime,
+    required int lastCaptureTime,
+  }) async {
+    if (dayKey.isEmpty || screenshotCount <= 0) return;
+    await _createDayStatsTables(db);
+    final int now = DateTime.now().millisecondsSinceEpoch;
+    await db.execute(
+      '''
+      INSERT INTO day_stats(
+        day, screenshot_count, total_size_bytes, first_capture_time, last_capture_time, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(day) DO UPDATE SET
+        screenshot_count = day_stats.screenshot_count + excluded.screenshot_count,
+        total_size_bytes = day_stats.total_size_bytes + excluded.total_size_bytes,
+        first_capture_time = CASE
+          WHEN day_stats.first_capture_time IS NULL OR excluded.first_capture_time < day_stats.first_capture_time
+          THEN excluded.first_capture_time ELSE day_stats.first_capture_time END,
+        last_capture_time = CASE
+          WHEN day_stats.last_capture_time IS NULL OR excluded.last_capture_time > day_stats.last_capture_time
+          THEN excluded.last_capture_time ELSE day_stats.last_capture_time END,
+        updated_at = excluded.updated_at
+    ''',
+      [
+        dayKey,
+        screenshotCount,
+        totalSizeBytes,
+        firstCaptureTime,
+        lastCaptureTime,
+        now,
+      ],
+    );
+  }
+
+  Future<int?> getInitializedDayStatsCount() async {
+    final db = await database;
+    try {
+      await _createDayStatsTables(db);
+      final List<Map<String, Object?>> meta = await db.query(
+        'day_stats_meta',
+        columns: ['rebuilt_at'],
+        where: 'id = 1',
+        limit: 1,
+      );
+      if (meta.isEmpty) return null;
+      final List<Map<String, Object?>> rows = await db.rawQuery(
+        'SELECT COUNT(*) AS c FROM day_stats WHERE screenshot_count > 0',
+      );
+      return (rows.first['c'] as int?) ?? 0;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<int> recalculateDayStats() async {
+    final db = await database;
+    try {
+      await _createDayStatsTables(db);
+      // 这里复用已有全局日期扫描；该方法较重，只在首次迁移或用户强制刷新时执行。
+      final List<Map<String, dynamic>> days = await ScreenshotDatabaseMeta(
+        this,
+      ).listAvailableDaysGlobal();
+      final int now = DateTime.now().millisecondsSinceEpoch;
+      await db.transaction((txn) async {
+        await _createDayStatsTables(txn);
+        await txn.delete('day_stats');
+        final Batch batch = txn.batch();
+        for (final Map<String, dynamic> item in days) {
+          final String day = (item['date'] as String?) ?? '';
+          final int count = (item['count'] as int?) ?? 0;
+          if (day.isEmpty || count <= 0) continue;
+          batch.insert('day_stats', <String, Object?>{
+            'day': day,
+            'screenshot_count': count,
+            'total_size_bytes': 0,
+            'updated_at': now,
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+        await batch.commit(noResult: true);
+        await txn.insert('day_stats_meta', <String, Object?>{
+          'id': 1,
+          'rebuilt_at': now,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      });
+      return days.length;
+    } catch (e) {
+      print('重建日期统计失败: $e');
+      return 0;
+    }
+  }
+
+  Future<void> invalidateDayStatsCompleteness() async {
+    final db = await database;
+    try {
+      await _createDayStatsTables(db);
+      await db.delete('day_stats_meta', where: 'id = 1');
+    } catch (_) {}
+  }
+
   /// 从现有数据重新计算汇总统计（用于数据迁移或修复）
   Future<void> recalculateTotals() async {
     final db = await database;
     try {
       await db.transaction((txn) async {
-        // 计算应用数量
         final appStats = await txn.query('app_stats');
-        final appCount = appStats.length;
-
-        // 计算总截图数量和总大小
+        int appCount = 0;
         int totalScreenshots = 0;
         int totalSizeBytes = 0;
         for (final stat in appStats) {
-          totalScreenshots += (stat['total_count'] as int?) ?? 0;
+          final int count = (stat['total_count'] as int?) ?? 0;
+          if (count <= 0) continue;
+          appCount++;
+          totalScreenshots += count;
           totalSizeBytes += (stat['total_size'] as int?) ?? 0;
         }
 

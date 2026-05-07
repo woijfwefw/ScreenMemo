@@ -172,6 +172,7 @@ class _HomePageState extends State<HomePage>
       // 应用从后台返回前台：强制同步文件到数据库并刷新统计，避免节流导致读到旧数据
       Future.delayed(const Duration(milliseconds: 300), () async {
         await _loadStatsFresh();
+        await _loadTotals();
         // 回到前台后同步刷新自定义标记
         // ignore: unawaited_futures
         _loadPerAppCustomFlags();
