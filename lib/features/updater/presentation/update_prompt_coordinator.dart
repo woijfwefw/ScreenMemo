@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
 import 'package:screen_memo/core/widgets/ui_components.dart';
 import 'package:screen_memo/core/widgets/ui_dialog.dart';
+import 'package:screen_memo/features/updater/application/update_changelog.dart';
 import 'package:screen_memo/features/updater/application/update_models.dart';
 import 'package:screen_memo/features/updater/application/update_platform_service.dart';
 import 'package:screen_memo/features/updater/application/update_service.dart';
@@ -263,7 +264,7 @@ class _UpdateInfoContent extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final release = candidate.release;
-    final notes = (release.body ?? '').trim();
+    final noteItems = _buildNoteItems(release);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -294,26 +295,139 @@ class _UpdateInfoContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppTheme.spacing1),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 120),
-          child: SingleChildScrollView(
-            child: Text(
-              notes.isEmpty ? release.name : notes,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                height: 1.45,
-              ),
-            ),
-          ),
-        ),
+        _UpdateNotesList(items: noteItems),
       ],
     );
+  }
+
+  List<_DisplayUpdateNote> _buildNoteItems(UpdateReleaseInfo release) {
+    final bodyItems = UpdateChangelogText.releaseBodyItems(release.body);
+    if (bodyItems.isNotEmpty) {
+      return bodyItems
+          .map((text) => _DisplayUpdateNote(text: text))
+          .toList(growable: false);
+    }
+
+    final fallback = release.name.trim().isEmpty
+        ? release.version
+        : release.name.trim();
+    return <_DisplayUpdateNote>[_DisplayUpdateNote(text: fallback)];
   }
 
   String _formatDateTime(DateTime value) {
     String two(int n) => n.toString().padLeft(2, '0');
     return '${value.year}-${two(value.month)}-${two(value.day)} '
         '${two(value.hour)}:${two(value.minute)}';
+  }
+}
+
+class _DisplayUpdateNote {
+  const _DisplayUpdateNote({required this.text});
+
+  final String text;
+}
+
+class _UpdateNotesList extends StatelessWidget {
+  const _UpdateNotesList({required this.items});
+
+  static const double _itemExtent = 56;
+  static const double _maxHeight = 224;
+
+  final List<_DisplayUpdateNote> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final height = (items.length * _itemExtent)
+        .clamp(_itemExtent, _maxHeight)
+        .toDouble();
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.36,
+          ),
+          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.8),
+          ),
+        ),
+        child: SizedBox(
+          height: height,
+          child: ListView.builder(
+            primary: false,
+            padding: EdgeInsets.zero,
+            itemExtent: _itemExtent,
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              return _UpdateNoteTile(
+                item: items[index],
+                showDivider: index < items.length - 1,
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _UpdateNoteTile extends StatelessWidget {
+  const _UpdateNoteTile({required this.item, required this.showDivider});
+
+  final _DisplayUpdateNote item;
+  final bool showDivider;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: showDivider
+            ? Border(
+                bottom: BorderSide(
+                  color: theme.colorScheme.outlineVariant.withValues(
+                    alpha: 0.72,
+                  ),
+                  width: 1,
+                ),
+              )
+            : null,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTheme.spacing3,
+          vertical: AppTheme.spacing2,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '•',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(width: AppTheme.spacing2),
+            Expanded(
+              child: Text(
+                item.text,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

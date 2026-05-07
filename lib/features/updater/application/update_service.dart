@@ -185,6 +185,8 @@ class UpdateService {
       }
     }
 
+    final String? body = (decoded['body'] as String?)?.trim();
+
     return UpdateReleaseInfo(
       tagName: tag,
       version: UpdateVersionComparator.normalize(tag),
@@ -193,7 +195,7 @@ class UpdateService {
           (decoded['html_url'] as String? ??
                   '$_webReleaseBaseUrl/tag/${Uri.encodeComponent(tag)}')
               .trim(),
-      body: (decoded['body'] as String?)?.trim(),
+      body: body,
       publishedAt: DateTime.tryParse(
         (decoded['published_at'] as String? ?? '').trim(),
       ),
