@@ -76,6 +76,8 @@ import java.util.zip.ZipEntry
 import java.util.zip.Deflater
 import java.util.zip.ZipInputStream
 import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
@@ -111,6 +113,10 @@ class MainActivity : FlutterActivity() {
     private var splashDialog: Dialog? = null
     private val outputCacheDirTokens = setOf("cache", "tmp", "temp", ".thumbnails")
     private val replayExecutor = Executors.newSingleThreadExecutor()
+    private val activeCompressionJobs: MutableSet<String> =
+        Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
+    private val cancelledCompressionJobs: MutableSet<String> =
+        Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     
     private val accessibilityServiceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -497,6 +503,7 @@ class MainActivity : FlutterActivity() {
                     val quality = call.argument<Int>("quality") ?: 90
                     val useTargetSize = call.argument<Boolean>("useTargetSize") ?: true
                     val parallelism = call.argument<Int>("parallelism")
+                    val jobId = call.argument<String>("jobId")?.trim()?.takeIf { it.isNotEmpty() }
                     compressScreenshotsBatch(
                         tasksArg,
                         format,
@@ -504,8 +511,23 @@ class MainActivity : FlutterActivity() {
                         quality,
                         useTargetSize,
                         parallelism,
+                        jobId,
                         result,
                     )
+                }
+                "cancelCompressionBatch" -> {
+                    val jobId = call.argument<String>("jobId")?.trim()?.takeIf { it.isNotEmpty() }
+                    if (jobId != null) {
+                        cancelledCompressionJobs.add(jobId)
+                        if (!activeCompressionJobs.contains(jobId)) {
+                            mainHandler.postDelayed({
+                                if (!activeCompressionJobs.contains(jobId)) {
+                                    cancelledCompressionJobs.remove(jobId)
+                                }
+                            }, 30_000L)
+                        }
+                    }
+                    result.success(true)
                 }
                 else -> {
                     result.notImplemented()
@@ -1344,6 +1366,16 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private fun isCompressionJobCancelled(jobId: String?): Boolean {
+        return !jobId.isNullOrBlank() && cancelledCompressionJobs.contains(jobId)
+    }
+
+    private fun clearCompressionJob(jobId: String?) {
+        if (jobId.isNullOrBlank()) return
+        activeCompressionJobs.remove(jobId)
+        cancelledCompressionJobs.remove(jobId)
+    }
+
     private fun compressScreenshotsBatch(
         tasksArg: List<Map<String, Any?>>,
         format: String,
@@ -1351,8 +1383,12 @@ class MainActivity : FlutterActivity() {
         quality: Int,
         useTargetSize: Boolean,
         parallelism: Int?,
+        jobId: String?,
         result: MethodChannel.Result,
     ) {
+        if (!jobId.isNullOrBlank()) {
+            activeCompressionJobs.add(jobId)
+        }
         Thread {
             try {
                 val parsedTasks = tasksArg.mapNotNull { map ->
@@ -1385,6 +1421,7 @@ class MainActivity : FlutterActivity() {
                                 "totalBeforeBytes" to 0L,
                                 "totalAfterBytes" to 0L,
                                 "durationMillis" to 0,
+                                "cancelled" to isCompressionJobCancelled(jobId),
                                 "successes" to emptyList<Map<String, Any?>>(),
                                 "failures" to emptyList<Map<String, Any?>>(),
                                 "skippedEntries" to emptyList<Map<String, Any?>>(),
@@ -1401,7 +1438,9 @@ class MainActivity : FlutterActivity() {
                 val desiredParallelism = parallelism ?: cpuCount
                 val poolSize = max(1, min(8, max(2, desiredParallelism)))
                 val executor = Executors.newFixedThreadPool(poolSize)
-                val latch = CountDownLatch(total)
+                val workerCount = min(poolSize, total)
+                val latch = CountDownLatch(workerCount)
+                val queue = ConcurrentLinkedQueue(parsedTasks)
 
                 val handledCount = AtomicInteger(0)
                 val successCount = AtomicInteger(0)
@@ -1417,92 +1456,100 @@ class MainActivity : FlutterActivity() {
                 val startTime = SystemClock.elapsedRealtime()
                 val effectiveTargetBytes = if (targetBytes <= 0) 1024 else targetBytes
 
-                parsedTasks.forEach { task ->
+                repeat(workerCount) {
                     executor.execute {
                         try {
-                            val file = File(task.filePath)
-                            if (!file.exists()) {
-                                failedCount.incrementAndGet()
-                                failures.add(
-                                    mapOf(
-                                        "filePath" to task.filePath,
-                                        "gid" to task.gid,
-                                        "reason" to "not_found",
-                                    ),
-                                )
-                            } else {
-                                val currentSize = if (task.originalSize > 0) task.originalSize else file.length()
-                                if (effectiveTargetBytes > 0 && currentSize <= effectiveTargetBytes.toLong()) {
-                                    skippedCount.incrementAndGet()
-                                    skipped.add(
-                                        mapOf(
-                                            "filePath" to task.filePath,
-                                            "gid" to task.gid,
-                                            "originalSize" to currentSize,
-                                            "reason" to "already_small",
-                                        ),
-                                    )
-                                } else {
-                                    val outcome = compressScreenshotFileInternal(
-                                        task.filePath,
-                                        format,
-                                        effectiveTargetBytes,
-                                        quality,
-                                        useTargetSize,
-                                    )
-                                    val success = outcome["success"] as? Boolean ?: false
-                                    if (success) {
-                                        val newSize = (
-                                            (outcome["newSize"] as? Number)?.toLong()
-                                                ?: File(task.filePath).length()
-                                            ).coerceAtLeast(0L)
-                                        val origin = if (currentSize > 0) currentSize else newSize
-                                        successCount.incrementAndGet()
-                                        totalBefore.addAndGet(origin)
-                                    totalAfter.addAndGet(newSize)
-                                    val effectiveSaved = (origin - newSize).coerceAtLeast(0L)
-                                    val savedBytes = totalBefore.get() - totalAfter.get()
-                                        successes.add(
-                                            mapOf(
-                                                "filePath" to task.filePath,
-                                                "gid" to task.gid,
-                                                "originalSize" to origin,
-                                                "newSize" to newSize,
-                                            "savedBytes" to effectiveSaved,
-                                            ),
-                                        )
-                                    } else {
+                            while (true) {
+                                if (isCompressionJobCancelled(jobId)) break
+                                val task = queue.poll() ?: break
+                                if (isCompressionJobCancelled(jobId)) break
+
+                                try {
+                                    val file = File(task.filePath)
+                                    if (!file.exists()) {
                                         failedCount.incrementAndGet()
                                         failures.add(
                                             mapOf(
                                                 "filePath" to task.filePath,
                                                 "gid" to task.gid,
-                                                "reason" to (outcome["error"] ?: "compress_failed"),
+                                                "reason" to "not_found",
                                             ),
                                         )
+                                    } else {
+                                        val currentSize = if (task.originalSize > 0) task.originalSize else file.length()
+                                        if (effectiveTargetBytes > 0 && currentSize <= effectiveTargetBytes.toLong()) {
+                                            skippedCount.incrementAndGet()
+                                            skipped.add(
+                                                mapOf(
+                                                    "filePath" to task.filePath,
+                                                    "gid" to task.gid,
+                                                    "originalSize" to currentSize,
+                                                    "reason" to "already_small",
+                                                ),
+                                            )
+                                        } else {
+                                            val outcome = compressScreenshotFileInternal(
+                                                task.filePath,
+                                                format,
+                                                effectiveTargetBytes,
+                                                quality,
+                                                useTargetSize,
+                                            )
+                                            val success = outcome["success"] as? Boolean ?: false
+                                            if (success) {
+                                                val newSize = (
+                                                    (outcome["newSize"] as? Number)?.toLong()
+                                                        ?: File(task.filePath).length()
+                                                    ).coerceAtLeast(0L)
+                                                val origin = if (currentSize > 0) currentSize else newSize
+                                                val effectiveSaved = (origin - newSize).coerceAtLeast(0L)
+                                                successCount.incrementAndGet()
+                                                totalBefore.addAndGet(origin)
+                                                totalAfter.addAndGet(newSize)
+                                                successes.add(
+                                                    mapOf(
+                                                        "filePath" to task.filePath,
+                                                        "gid" to task.gid,
+                                                        "originalSize" to origin,
+                                                        "newSize" to newSize,
+                                                        "savedBytes" to effectiveSaved,
+                                                    ),
+                                                )
+                                            } else {
+                                                failedCount.incrementAndGet()
+                                                failures.add(
+                                                    mapOf(
+                                                        "filePath" to task.filePath,
+                                                        "gid" to task.gid,
+                                                        "reason" to (outcome["error"] ?: "compress_failed"),
+                                                    ),
+                                                )
+                                            }
+                                        }
                                     }
+                                } catch (e: Exception) {
+                                    failedCount.incrementAndGet()
+                                    failures.add(
+                                        mapOf(
+                                            "filePath" to task.filePath,
+                                            "gid" to task.gid,
+                                            "reason" to (e.message ?: "unknown"),
+                                        ),
+                                    )
+                                } finally {
+                                    val handledNow = handledCount.incrementAndGet()
+                                    val savedBytes = totalBefore.get() - totalAfter.get()
+                                    emitCompressionProgress(
+                                        total,
+                                        handledNow,
+                                        successCount.get(),
+                                        skippedCount.get(),
+                                        failedCount.get(),
+                                        savedBytes,
+                                    )
                                 }
                             }
-                        } catch (e: Exception) {
-                            failedCount.incrementAndGet()
-                            failures.add(
-                                mapOf(
-                                    "filePath" to task.filePath,
-                                    "gid" to task.gid,
-                                    "reason" to (e.message ?: "unknown"),
-                                ),
-                            )
                         } finally {
-                            val handledNow = handledCount.incrementAndGet()
-                            val savedBytes = totalBefore.get() - totalAfter.get()
-                            emitCompressionProgress(
-                                total,
-                                handledNow,
-                                successCount.get(),
-                                skippedCount.get(),
-                                failedCount.get(),
-                                savedBytes,
-                            )
                             latch.countDown()
                         }
                     }
@@ -1513,6 +1560,7 @@ class MainActivity : FlutterActivity() {
 
                 val duration = (SystemClock.elapsedRealtime() - startTime).toInt()
                 val savedTotal = (totalBefore.get() - totalAfter.get()).coerceAtLeast(0L)
+                val wasCancelled = isCompressionJobCancelled(jobId)
                 val summary = mapOf(
                     "total" to total,
                     "handled" to handledCount.get(),
@@ -1523,6 +1571,7 @@ class MainActivity : FlutterActivity() {
                     "totalBeforeBytes" to totalBefore.get(),
                     "totalAfterBytes" to totalAfter.get(),
                     "durationMillis" to duration,
+                    "cancelled" to wasCancelled,
                     "successes" to ArrayList(successes),
                     "failures" to ArrayList(failures),
                     "skippedEntries" to ArrayList(skipped),
@@ -1530,6 +1579,8 @@ class MainActivity : FlutterActivity() {
                 runOnUiThread { result.success(summary) }
             } catch (e: Exception) {
                 runOnUiThread { result.error("compress_batch_failed", e.message, null) }
+            } finally {
+                clearCompressionJob(jobId)
             }
         }.start()
     }

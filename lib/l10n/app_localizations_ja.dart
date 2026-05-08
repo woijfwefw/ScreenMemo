@@ -746,10 +746,32 @@ class AppLocalizationsJa extends AppLocalizations {
   String get compressDaysInputHint => '日数を入力してください';
 
   @override
+  String get compressDaysInputHintAll => 'すべての履歴は 0、または日数を入力してください';
+
+  @override
   String get compressDaysInvalidError => '1 以上の日数を入力してください。';
 
   @override
+  String get compressDaysInvalidOrAllError => '0 または 1 以上の日数を入力してください。';
+
+  @override
   String get compressHistoryTitle => '履歴の圧縮';
+
+  @override
+  String get compressHistoryAllDays => 'すべて';
+
+  @override
+  String get globalCompressHistoryTitle => '全アプリ履歴の圧縮';
+
+  @override
+  String globalCompressHistoryDescription(Object days, Object size) {
+    return '直近 $days 日間のすべてのアプリのスクリーンショットを $size KB に圧縮し、超過分のみ処理します。';
+  }
+
+  @override
+  String globalCompressHistoryDescriptionAll(Object size) {
+    return 'すべてのアプリのスクリーンショットを $size KB に圧縮し、超過分のみ処理します。';
+  }
 
   @override
   String compressHistoryDescription(Object days, Object size) {
@@ -773,6 +795,12 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get compressHistoryAction => '今すぐ圧縮';
+
+  @override
+  String get compressHistoryCancelling => '停止中です。開始済みの画像は完了する場合があります…';
+
+  @override
+  String get compressHistoryCancelled => '圧縮をキャンセルしました。完了済みの変更は保持されます。';
 
   @override
   String get compressHistoryRequireTarget => '圧縮する前に目標サイズを有効にしてください。';
@@ -988,6 +1016,42 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String targetSizeSavedSuccess(Object kb) {
     return '目標サイズを $kb KB に設定しました';
+  }
+
+  @override
+  String get aiImageSendFormatTitle => 'AI 送信用画像形式';
+
+  @override
+  String aiImageSendFormatCurrent(Object format) {
+    return '現在：$format（送信前のみ一時変換）';
+  }
+
+  @override
+  String get aiImageSendFormatDialogTitle => 'AI 送信用画像形式を選択';
+
+  @override
+  String get aiImageSendFormatOriginal => '元の形式';
+
+  @override
+  String get aiImageSendFormatOriginalDesc => 'ローカルファイルを追加変換せずそのまま送信します';
+
+  @override
+  String get aiImageSendFormatJpeg => 'JPEG（互換性優先）';
+
+  @override
+  String get aiImageSendFormatJpegDesc =>
+      '送信前に一時的に JPEG へ変換します。互換性は高いですが、文字の輪郭が少しぼやける場合があります';
+
+  @override
+  String get aiImageSendFormatPng => 'PNG（ロスレス）';
+
+  @override
+  String get aiImageSendFormatPngDesc =>
+      '送信前に一時的に PNG へ変換します。画質はロスレスですが、サイズが大きくなる場合があります';
+
+  @override
+  String aiImageSendFormatSaved(Object format) {
+    return 'AI 送信用画像形式を $format に設定しました';
   }
 
   @override

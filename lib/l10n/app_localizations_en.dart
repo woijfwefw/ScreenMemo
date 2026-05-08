@@ -766,11 +766,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressDaysInputHint => 'Enter number of days';
 
   @override
+  String get compressDaysInputHintAll =>
+      'Enter 0 for all history, or a number of days';
+
+  @override
   String get compressDaysInvalidError =>
       'Please enter a positive number of days.';
 
   @override
+  String get compressDaysInvalidOrAllError =>
+      'Please enter 0 or a positive number of days.';
+
+  @override
   String get compressHistoryTitle => 'Compress history';
+
+  @override
+  String get compressHistoryAllDays => 'All';
+
+  @override
+  String get globalCompressHistoryTitle => 'Compress all app history';
+
+  @override
+  String globalCompressHistoryDescription(Object days, Object size) {
+    return 'Compress screenshots from all apps in the last $days days to $size KB if they exceed the target.';
+  }
+
+  @override
+  String globalCompressHistoryDescriptionAll(Object size) {
+    return 'Compress screenshots from all apps to $size KB if they exceed the target.';
+  }
 
   @override
   String compressHistoryDescription(Object days, Object size) {
@@ -794,6 +818,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compressHistoryAction => 'Compress now';
+
+  @override
+  String get compressHistoryCancelling =>
+      'Stopping… images already in progress may finish.';
+
+  @override
+  String get compressHistoryCancelled =>
+      'Compression cancelled. Completed changes were kept.';
 
   @override
   String get compressHistoryRequireTarget =>
@@ -1020,6 +1052,43 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String targetSizeSavedSuccess(Object kb) {
     return 'Target size set to $kb KB';
+  }
+
+  @override
+  String get aiImageSendFormatTitle => 'AI image send format';
+
+  @override
+  String aiImageSendFormatCurrent(Object format) {
+    return 'Current: $format (temporary conversion before sending only)';
+  }
+
+  @override
+  String get aiImageSendFormatDialogTitle => 'Choose AI image send format';
+
+  @override
+  String get aiImageSendFormatOriginal => 'Original format';
+
+  @override
+  String get aiImageSendFormatOriginalDesc =>
+      'Send the local file as-is without extra transcoding';
+
+  @override
+  String get aiImageSendFormatJpeg => 'JPEG (compatibility)';
+
+  @override
+  String get aiImageSendFormatJpegDesc =>
+      'Temporarily convert to JPEG before sending; best compatibility, text edges may soften';
+
+  @override
+  String get aiImageSendFormatPng => 'PNG (lossless)';
+
+  @override
+  String get aiImageSendFormatPngDesc =>
+      'Temporarily convert to PNG before sending; lossless but may be much larger';
+
+  @override
+  String aiImageSendFormatSaved(Object format) {
+    return 'AI image send format set to $format';
   }
 
   @override

@@ -73,12 +73,23 @@ extension AIChatServiceToolExecExt on AIChatService {
             'The following images are provided from the user device. Each image is preceded by its filename.',
       },
     ];
+    final String sendFormat = await _loadAiImageSendFormatForSending();
+    final bool useTargetSize = await UserSettingsService.instance.getBool(
+      UserSettingKeys.useTargetSize,
+      defaultValue: false,
+      legacyPrefKeys: const <String>['use_target_size'],
+    );
+    final int targetSizeKb = (await UserSettingsService.instance.getInt(
+      UserSettingKeys.targetSizeKb,
+      defaultValue: 50,
+      legacyPrefKeys: const <String>['target_size_kb'],
+    )).clamp(50, 1024 * 20).toInt();
 
     int totalRawBytes = 0;
     int totalPayloadBytes = 0;
     const int maxTotalPayloadBytes = 10 * 1024 * 1024;
 
-    int _estimateDataUrlBytes(int rawBytes, String mime) {
+    int estimateDataUrlBytes(int rawBytes, String mime) {
       final int b64Len = ((rawBytes + 2) ~/ 3) * 4;
       final int prefixLen = ('data:$mime;base64,').length;
       return prefixLen + b64Len;
@@ -96,9 +107,22 @@ extension AIChatServiceToolExecExt on AIChatService {
           missing.add(name);
           continue;
         }
-        final String mime = _detectImageMimeByExt(path);
         final int rawLen = await f.length();
-        final int estimatedPayloadBytes = _estimateDataUrlBytes(rawLen, mime);
+        final _AIImageSendPayload? payload =
+            await _prepareImagePayloadForAiSend(
+              path: path,
+              sendFormat: sendFormat,
+              useTargetSize: useTargetSize,
+              targetSizeKb: targetSizeKb,
+            );
+        if (payload == null || payload.bytes.isEmpty) {
+          missing.add(name);
+          continue;
+        }
+        final int estimatedPayloadBytes = estimateDataUrlBytes(
+          payload.bytes.length,
+          payload.mime,
+        );
         if (totalPayloadBytes + estimatedPayloadBytes > maxTotalPayloadBytes) {
           skipped.add(<String, dynamic>{
             'filename': name,
@@ -109,9 +133,9 @@ extension AIChatServiceToolExecExt on AIChatService {
           continue;
         }
 
-        final List<int> bytes = await f.readAsBytes();
+        final List<int> bytes = payload.bytes;
         final String b64 = base64Encode(bytes);
-        final String dataUrl = 'data:$mime;base64,$b64';
+        final String dataUrl = 'data:${payload.mime};base64,$b64';
         final int actualPayloadBytes = dataUrl.length;
         if (totalPayloadBytes + actualPayloadBytes > maxTotalPayloadBytes) {
           skipped.add(<String, dynamic>{
@@ -128,7 +152,9 @@ extension AIChatServiceToolExecExt on AIChatService {
         found.add(<String, dynamic>{
           'filename': name,
           'bytes': bytes.length,
-          'mime': mime,
+          'mime': payload.mime,
+          'send_format': payload.format,
+          'converted': payload.converted,
         });
         parts.add(<String, Object?>{'type': 'text', 'text': 'Filename: $name'});
         parts.add(<String, Object?>{
@@ -170,6 +196,132 @@ extension AIChatServiceToolExecExt on AIChatService {
     );
 
     return <AIMessage>[toolResult, userImages];
+  }
+
+  Future<String> _loadAiImageSendFormatForSending() async {
+    final String? raw = await UserSettingsService.instance.getString(
+      UserSettingKeys.aiImageSendFormat,
+      defaultValue: 'original',
+    );
+    return _normalizeAiImageSendFormatForSending(raw);
+  }
+
+  String _normalizeAiImageSendFormatForSending(String? value) {
+    switch ((value ?? '').trim().toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'jpeg';
+      case 'png':
+        return 'png';
+      default:
+        return 'original';
+    }
+  }
+
+  /// AI 发送前按设置临时转码，不修改本地截图文件。
+  Future<_AIImageSendPayload?> _prepareImagePayloadForAiSend({
+    required String path,
+    required String sendFormat,
+    required bool useTargetSize,
+    required int targetSizeKb,
+  }) async {
+    final File file = File(path);
+    final Uint8List originalBytes = await file.readAsBytes();
+    if (originalBytes.isEmpty) return null;
+
+    final String originalMime = _detectImageMimeByExt(path);
+    final String normalized = _normalizeAiImageSendFormatForSending(sendFormat);
+    if (normalized == 'original') {
+      return _AIImageSendPayload(
+        bytes: originalBytes,
+        mime: originalMime,
+        format: 'original',
+        converted: false,
+      );
+    }
+    if (normalized == 'jpeg' && originalMime == 'image/jpeg') {
+      return _AIImageSendPayload(
+        bytes: originalBytes,
+        mime: originalMime,
+        format: 'jpeg',
+        converted: false,
+      );
+    }
+    if (normalized == 'png' && originalMime == 'image/png') {
+      return _AIImageSendPayload(
+        bytes: originalBytes,
+        mime: originalMime,
+        format: 'png',
+        converted: false,
+      );
+    }
+
+    final img.Image? decoded = img.decodeImage(originalBytes);
+    if (decoded == null) {
+      return _AIImageSendPayload(
+        bytes: originalBytes,
+        mime: originalMime,
+        format: 'original',
+        converted: false,
+      );
+    }
+
+    if (normalized == 'jpeg') {
+      final int targetBytes = (targetSizeKb * 1024)
+          .clamp(1024, 20 * 1024 * 1024)
+          .toInt();
+      final List<int> encoded = useTargetSize
+          ? (_encodeJpegToTargetForAi(decoded, targetBytes) ??
+                img.encodeJpg(decoded, quality: 85))
+          : img.encodeJpg(decoded, quality: 90);
+      return _AIImageSendPayload(
+        bytes: encoded,
+        mime: 'image/jpeg',
+        format: 'jpeg',
+        converted: true,
+      );
+    }
+
+    if (normalized == 'png') {
+      return _AIImageSendPayload(
+        bytes: img.encodePng(decoded),
+        mime: 'image/png',
+        format: 'png',
+        converted: true,
+      );
+    }
+
+    return _AIImageSendPayload(
+      bytes: originalBytes,
+      mime: originalMime,
+      format: 'original',
+      converted: false,
+    );
+  }
+
+  List<int>? _encodeJpegToTargetForAi(img.Image image, int targetBytes) {
+    int lo = 1;
+    int hi = 100;
+    List<int>? bestUnder;
+    List<int>? bestOver;
+    int iterations = 0;
+    while (lo <= hi && iterations < 12) {
+      iterations++;
+      final int mid = (lo + hi) ~/ 2;
+      final List<int> data = img.encodeJpg(image, quality: mid);
+      if (data.length <= targetBytes) {
+        if (bestUnder == null || data.length > bestUnder.length) {
+          bestUnder = data;
+        }
+        lo = mid + 1;
+      } else {
+        if (bestOver == null || data.length < bestOver.length) {
+          bestOver = data;
+        }
+        hi = mid - 1;
+      }
+    }
+    return bestUnder ?? bestOver;
   }
 
   Future<List<AIMessage>> _executeMemorySearchTool(AIToolCall call) async {
@@ -2043,4 +2195,18 @@ extension AIChatServiceToolExecExt on AIChatService {
         ];
     }
   }
+}
+
+class _AIImageSendPayload {
+  const _AIImageSendPayload({
+    required this.bytes,
+    required this.mime,
+    required this.format,
+    required this.converted,
+  });
+
+  final List<int> bytes;
+  final String mime;
+  final String format;
+  final bool converted;
 }

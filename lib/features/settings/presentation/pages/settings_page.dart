@@ -136,6 +136,10 @@ class _SettingsPageState extends State<SettingsPage>
   int _imageQuality = 90; // 备用项，已被"目标大小"策略覆盖
   bool _useTargetSize = false; // 默认关闭
   int _targetSizeKb = 50; // 默认 50KB（最低仅支持 50KB）
+  int _globalCompressDays = 0; // 全局历史压缩的时间范围；0 表示全部历史
+  bool _compressingGlobalHistory = false;
+  CompressionProgress? _globalCompressionProgress;
+  String _aiImageSendFormat = 'original'; // original | jpeg | png
   bool _grayscale = false; // 已移除，保持为 false
   // 电池权限检查定时器
   Timer? _batteryPermissionTimer;
@@ -268,6 +272,7 @@ class _SettingsPageState extends State<SettingsPage>
         unawaited(_loadScreenshotInterval());
         unawaited(_loadScreenshotQualitySettings());
         unawaited(_loadScreenshotExpireSettings());
+        _restoreGlobalCompressionState();
         break;
       case _SettingsSubPage.segmentSummary:
         unawaited(_loadSegmentSettings());

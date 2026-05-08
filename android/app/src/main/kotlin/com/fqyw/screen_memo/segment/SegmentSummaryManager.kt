@@ -10,6 +10,7 @@ import com.fqyw.screen_memo.settings.AISettingsNative
 import com.fqyw.screen_memo.settings.UserSettingsKeysNative
 import com.fqyw.screen_memo.settings.UserSettingsStorage
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
  
@@ -22,6 +23,7 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.URI
 import java.util.Timer
@@ -2194,11 +2196,11 @@ object SegmentSummaryManager {
             val parts = JSONArray()
             parts.put(JSONObject().put("text", promptWithRule))
             for (s in effSamples) {
-                val imgBytes = try { File(s.filePath).readBytes() } catch (_: Exception) { null }
-                if (imgBytes == null || imgBytes.isEmpty()) continue
-                val b64 = Base64.encodeToString(imgBytes, Base64.NO_WRAP)
+                val payload = prepareImagePayloadForAi(ctx, s.filePath) ?: continue
+                if (payload.bytes.isEmpty()) continue
+                val b64 = Base64.encodeToString(payload.bytes, Base64.NO_WRAP)
                 val inline = JSONObject()
-                    .put("mimeType", guessMime(s.filePath))
+                    .put("mimeType", payload.mime)
                     .put("data", b64)
                 parts.put(JSONObject().put("inlineData", inline))
             }
@@ -2536,10 +2538,10 @@ object SegmentSummaryManager {
             val contentArr = JSONArray()
             contentArr.put(JSONObject().put("type", "text").put("text", promptWithRule))
             for (s in effSamples) {
-                val imgBytes = try { File(s.filePath).readBytes() } catch (_: Exception) { null }
-                if (imgBytes == null || imgBytes.isEmpty()) continue
-                val b64 = Base64.encodeToString(imgBytes, Base64.NO_WRAP)
-                val dataUrl = "data:" + guessMime(s.filePath) + ";base64," + b64
+                val payload = prepareImagePayloadForAi(ctx, s.filePath) ?: continue
+                if (payload.bytes.isEmpty()) continue
+                val b64 = Base64.encodeToString(payload.bytes, Base64.NO_WRAP)
+                val dataUrl = "data:" + payload.mime + ";base64," + b64
                 val imageUrl = JSONObject().put("url", dataUrl)
                 contentArr.put(JSONObject().put("type", "image_url").put("image_url", imageUrl))
             }
@@ -5609,6 +5611,147 @@ object SegmentSummaryManager {
             "ko" -> ctx.getString(koId)
             else -> ctx.getString(enId)
         }
+    }
+
+    private data class AiImagePayload(
+        val bytes: ByteArray,
+        val mime: String,
+    )
+
+    private fun resolveAiImageSendFormat(ctx: Context): String {
+        val raw = try {
+            UserSettingsStorage.getString(
+                ctx,
+                UserSettingsKeysNative.AI_IMAGE_SEND_FORMAT,
+                "original"
+            )
+        } catch (_: Exception) {
+            "original"
+        }
+        return when (raw?.trim()?.lowercase()) {
+            "jpg", "jpeg" -> "jpeg"
+            "png" -> "png"
+            else -> "original"
+        }
+    }
+
+    /**
+     * AI 发送前按全局设置临时转码，不修改本地截图文件。
+     * JPEG 在启用“目标大小”时沿用目标 KB，避免兼容转换后请求体过大。
+     */
+    private fun prepareImagePayloadForAi(ctx: Context, filePath: String): AiImagePayload? {
+        val originalBytes = try { File(filePath).readBytes() } catch (_: Exception) { null }
+            ?: return null
+        if (originalBytes.isEmpty()) return null
+
+        val sendFormat = resolveAiImageSendFormat(ctx)
+        val originalMime = guessMime(filePath)
+        if (sendFormat == "original") {
+            return AiImagePayload(originalBytes, originalMime)
+        }
+        if (sendFormat == "jpeg" && originalMime == "image/jpeg") {
+            return AiImagePayload(originalBytes, originalMime)
+        }
+        if (sendFormat == "png" && originalMime == "image/png") {
+            return AiImagePayload(originalBytes, originalMime)
+        }
+
+        val bitmap = try { BitmapFactory.decodeFile(filePath) } catch (_: Exception) { null }
+            ?: return AiImagePayload(originalBytes, originalMime)
+        return try {
+            when (sendFormat) {
+                "jpeg" -> {
+                    val bytes = encodeJpegForAi(ctx, bitmap)
+                        ?: return AiImagePayload(originalBytes, originalMime)
+                    AiImagePayload(bytes, "image/jpeg")
+                }
+                "png" -> {
+                    val bytes = compressBitmapForAi(bitmap, Bitmap.CompressFormat.PNG, 100)
+                        ?: return AiImagePayload(originalBytes, originalMime)
+                    AiImagePayload(bytes, "image/png")
+                }
+                else -> AiImagePayload(originalBytes, originalMime)
+            }
+        } finally {
+            try { bitmap.recycle() } catch (_: Exception) {}
+        }
+    }
+
+    private fun encodeJpegForAi(ctx: Context, bitmap: Bitmap): ByteArray? {
+        val useTargetSize = try {
+            UserSettingsStorage.getBoolean(
+                ctx,
+                UserSettingsKeysNative.USE_TARGET_SIZE,
+                false
+            )
+        } catch (_: Exception) {
+            false
+        }
+        if (useTargetSize) {
+            val targetKb = try {
+                UserSettingsStorage.getInt(
+                    ctx,
+                    UserSettingsKeysNative.TARGET_SIZE_KB,
+                    50
+                ).coerceIn(50, 20 * 1024)
+            } catch (_: Exception) {
+                50
+            }
+            val targetBytes = (targetKb * 1024).coerceAtLeast(1024)
+            return compressBitmapToTargetForAi(
+                bitmap,
+                Bitmap.CompressFormat.JPEG,
+                targetBytes,
+                minQuality = 1,
+                maxQuality = 100,
+            ) ?: compressBitmapForAi(bitmap, Bitmap.CompressFormat.JPEG, 85)
+        }
+        return compressBitmapForAi(bitmap, Bitmap.CompressFormat.JPEG, 90)
+    }
+
+    private fun compressBitmapForAi(
+        bitmap: Bitmap,
+        format: Bitmap.CompressFormat,
+        quality: Int,
+    ): ByteArray? {
+        return try {
+            val out = ByteArrayOutputStream()
+            bitmap.compress(format, quality.coerceIn(1, 100), out)
+            out.toByteArray()
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun compressBitmapToTargetForAi(
+        bitmap: Bitmap,
+        format: Bitmap.CompressFormat,
+        targetBytes: Int,
+        minQuality: Int,
+        maxQuality: Int,
+    ): ByteArray? {
+        var lo = minQuality.coerceIn(1, 100)
+        var hi = maxQuality.coerceIn(lo, 100)
+        var bestUnder: ByteArray? = null
+        var bestOver: ByteArray? = null
+        var iterations = 0
+        while (lo <= hi && iterations < 12) {
+            iterations++
+            val mid = (lo + hi) / 2
+            val data = compressBitmapForAi(bitmap, format, mid) ?: return null
+            if (data.size <= targetBytes) {
+                if (bestUnder == null || data.size > bestUnder!!.size) {
+                    bestUnder = data
+                }
+                lo = mid + 1
+            } else {
+                if (bestOver == null || data.size < bestOver!!.size) {
+                    bestOver = data
+                }
+                hi = mid - 1
+            }
+        }
+        return bestUnder ?: bestOver
     }
 
     private fun guessMime(path: String): String {

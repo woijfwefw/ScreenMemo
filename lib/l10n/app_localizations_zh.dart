@@ -733,10 +733,32 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressDaysInputHint => '请输入天数';
 
   @override
+  String get compressDaysInputHintAll => '输入 0 表示全部历史，或输入天数';
+
+  @override
   String get compressDaysInvalidError => '请输入大于 0 的天数。';
 
   @override
+  String get compressDaysInvalidOrAllError => '请输入 0 或大于 0 的天数。';
+
+  @override
   String get compressHistoryTitle => '历史压缩';
+
+  @override
+  String get compressHistoryAllDays => '全部';
+
+  @override
+  String get globalCompressHistoryTitle => '全局历史压缩';
+
+  @override
+  String globalCompressHistoryDescription(Object days, Object size) {
+    return '将最近 $days 天所有 App 的截图按 $size KB 目标压缩，超过目标的才会处理。';
+  }
+
+  @override
+  String globalCompressHistoryDescriptionAll(Object size) {
+    return '将所有 App 的全部截图按 $size KB 目标压缩，超过目标的才会处理。';
+  }
 
   @override
   String compressHistoryDescription(Object days, Object size) {
@@ -760,6 +782,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get compressHistoryAction => '开始压缩';
+
+  @override
+  String get compressHistoryCancelling => '正在停止，已开始的图片会完成…';
+
+  @override
+  String get compressHistoryCancelled => '压缩已取消，已完成的更改会保留。';
 
   @override
   String get compressHistoryRequireTarget => '请先启用目标大小后再进行压缩。';
@@ -973,6 +1001,40 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String targetSizeSavedSuccess(Object kb) {
     return '目标大小已设置为 $kb KB';
+  }
+
+  @override
+  String get aiImageSendFormatTitle => 'AI 发送图片格式';
+
+  @override
+  String aiImageSendFormatCurrent(Object format) {
+    return '当前：$format（仅发送前临时转换）';
+  }
+
+  @override
+  String get aiImageSendFormatDialogTitle => '选择 AI 发送图片格式';
+
+  @override
+  String get aiImageSendFormatOriginal => '原格式';
+
+  @override
+  String get aiImageSendFormatOriginalDesc => '直接发送本地文件，不额外转码';
+
+  @override
+  String get aiImageSendFormatJpeg => 'JPEG（兼容优先）';
+
+  @override
+  String get aiImageSendFormatJpegDesc => '发送前临时转为 JPEG；兼容性最好，文字边缘可能略糊';
+
+  @override
+  String get aiImageSendFormatPng => 'PNG（无损）';
+
+  @override
+  String get aiImageSendFormatPngDesc => '发送前临时转为 PNG；画质无损，但体积可能明显变大';
+
+  @override
+  String aiImageSendFormatSaved(Object format) {
+    return 'AI 发送图片格式已设置为 $format';
   }
 
   @override

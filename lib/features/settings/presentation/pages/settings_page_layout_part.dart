@@ -244,6 +244,8 @@ extension _SettingsLayoutPart on _SettingsPageState {
               children: [
                 _buildScreenshotIntervalItem(context),
                 _buildScreenshotQualityItem(context),
+                _buildGlobalHistoryCompressionItem(context),
+                _buildAiImageSendFormatItem(context),
                 _buildScreenshotExpireItem(context),
               ],
             ),

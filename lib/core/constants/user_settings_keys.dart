@@ -14,6 +14,7 @@ class UserSettingKeys {
   static const String imageQuality = 'image_quality';
   static const String useTargetSize = 'use_target_size';
   static const String targetSizeKb = 'target_size_kb';
+  static const String aiImageSendFormat = 'ai_image_send_format';
   static const String screenshotExpireEnabled = 'screenshot_expire_enabled';
   static const String screenshotExpireDays = 'screenshot_expire_days';
   static const String aiRawResponseCleanupEnabled =

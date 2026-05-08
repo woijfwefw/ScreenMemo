@@ -9,6 +9,7 @@ object UserSettingsKeysNative {
     const val IMAGE_QUALITY = "image_quality"
     const val USE_TARGET_SIZE = "use_target_size"
     const val TARGET_SIZE_KB = "target_size_kb"
+    const val AI_IMAGE_SEND_FORMAT = "ai_image_send_format"
     const val SCREENSHOT_EXPIRE_ENABLED = "screenshot_expire_enabled"
     const val SCREENSHOT_EXPIRE_DAYS = "screenshot_expire_days"
     const val SEGMENT_SAMPLE_INTERVAL_SEC = "segment_sample_interval_sec"

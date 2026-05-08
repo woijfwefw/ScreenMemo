@@ -744,10 +744,32 @@ class AppLocalizationsKo extends AppLocalizations {
   String get compressDaysInputHint => '일수를 입력하세요';
 
   @override
+  String get compressDaysInputHintAll => '전체 기록은 0, 또는 일수를 입력하세요';
+
+  @override
   String get compressDaysInvalidError => '1 이상의 일수를 입력하세요.';
 
   @override
+  String get compressDaysInvalidOrAllError => '0 또는 1 이상의 일수를 입력하세요.';
+
+  @override
   String get compressHistoryTitle => '과거 압축';
+
+  @override
+  String get compressHistoryAllDays => '전체';
+
+  @override
+  String get globalCompressHistoryTitle => '모든 앱 기록 압축';
+
+  @override
+  String globalCompressHistoryDescription(Object days, Object size) {
+    return '최근 $days일 동안 모든 앱의 스크린샷을 ${size}KB 목표로 압축하며, 초과한 파일만 처리합니다.';
+  }
+
+  @override
+  String globalCompressHistoryDescriptionAll(Object size) {
+    return '모든 앱의 전체 스크린샷을 ${size}KB 목표로 압축하며, 초과한 파일만 처리합니다.';
+  }
 
   @override
   String compressHistoryDescription(Object days, Object size) {
@@ -771,6 +793,12 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get compressHistoryAction => '지금 압축';
+
+  @override
+  String get compressHistoryCancelling => '중지 중입니다. 이미 시작된 이미지는 완료될 수 있습니다…';
+
+  @override
+  String get compressHistoryCancelled => '압축이 취소되었습니다. 완료된 변경 사항은 유지됩니다.';
 
   @override
   String get compressHistoryRequireTarget => '압축 전에 목표 크기를 먼저 활성화하세요.';
@@ -985,6 +1013,42 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String targetSizeSavedSuccess(Object kb) {
     return '목표 크기를 ${kb}KB로 설정했습니다';
+  }
+
+  @override
+  String get aiImageSendFormatTitle => 'AI 전송 이미지 형식';
+
+  @override
+  String aiImageSendFormatCurrent(Object format) {
+    return '현재: $format(전송 직전에만 임시 변환)';
+  }
+
+  @override
+  String get aiImageSendFormatDialogTitle => 'AI 전송 이미지 형식 선택';
+
+  @override
+  String get aiImageSendFormatOriginal => '원본 형식';
+
+  @override
+  String get aiImageSendFormatOriginalDesc => '로컬 파일을 추가 변환 없이 그대로 전송합니다';
+
+  @override
+  String get aiImageSendFormatJpeg => 'JPEG(호환성 우선)';
+
+  @override
+  String get aiImageSendFormatJpegDesc =>
+      '전송 전에 JPEG로 임시 변환합니다. 호환성이 가장 좋지만 글자 가장자리가 약간 흐려질 수 있습니다';
+
+  @override
+  String get aiImageSendFormatPng => 'PNG(무손실)';
+
+  @override
+  String get aiImageSendFormatPngDesc =>
+      '전송 전에 PNG로 임시 변환합니다. 화질은 무손실이지만 용량이 크게 늘 수 있습니다';
+
+  @override
+  String aiImageSendFormatSaved(Object format) {
+    return 'AI 전송 이미지 형식을 $format(으)로 설정했습니다';
   }
 
   @override

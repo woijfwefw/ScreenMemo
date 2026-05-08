@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
+import 'package:image/image.dart' as img;
 import 'package:screen_memo/l10n/app_localizations.dart';
 import 'package:screen_memo/models/screenshot_record.dart';
 
+import 'package:screen_memo/core/constants/user_settings_keys.dart';
 import 'package:screen_memo/features/ai/application/ai_context_budgets.dart';
 import 'package:screen_memo/features/ai/application/ai_prompt_time_context.dart';
 import 'package:screen_memo/features/ai/application/ai_request_gateway.dart';
@@ -20,6 +23,7 @@ import 'package:screen_memo/features/nocturne_memory/application/nocturne_memory
 import 'package:screen_memo/features/nocturne_memory/application/nocturne_memory_prompts.dart';
 import 'package:screen_memo/features/ai/application/prompt_budget.dart';
 import 'package:screen_memo/data/database/screenshot_database.dart';
+import 'package:screen_memo/data/settings/user_settings_service.dart';
 import 'package:screen_memo/features/ai/application/ui_thinking_json_patcher.dart';
 
 export 'package:screen_memo/features/ai/application/ai_request_gateway.dart'

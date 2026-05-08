@@ -1414,6 +1414,27 @@ extension ScreenshotDatabaseMeta on ScreenshotDatabase {
     }
   }
 
+  /// 列出所有存在截图分库的应用包名。
+  ///
+  /// 全局历史压缩需要以包为单位更新分库记录与统计，因此这里直接以
+  /// shard_registry 为准，不依赖可能缺失或延迟更新的 app_registry。
+  Future<List<String>> listPackagesWithScreenshotShards() async {
+    final db = await database;
+    try {
+      final rows = await db.rawQuery(
+        'SELECT DISTINCT app_package_name FROM shard_registry ORDER BY app_package_name ASC',
+      );
+      return rows
+          .map((row) => (row['app_package_name'] as String?)?.trim())
+          .whereType<String>()
+          .where((pkg) => pkg.isNotEmpty)
+          .toList(growable: false);
+    } catch (e) {
+      print('listPackagesWithScreenshotShards 失败: $e');
+      return <String>[];
+    }
+  }
+
   Future<List<ScreenshotRecord>> getGlobalScreenshotsBetween({
     required int startMillis,
     required int endMillis,

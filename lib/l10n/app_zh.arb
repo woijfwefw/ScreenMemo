@@ -332,8 +332,25 @@
   "setCompressDaysDialogTitle": "设置天数",
   "compressDaysLabel": "天数",
   "compressDaysInputHint": "请输入天数",
+  "compressDaysInputHintAll": "输入 0 表示全部历史，或输入天数",
   "compressDaysInvalidError": "请输入大于 0 的天数。",
+  "compressDaysInvalidOrAllError": "请输入 0 或大于 0 的天数。",
   "compressHistoryTitle": "历史压缩",
+  "compressHistoryAllDays": "全部",
+  "globalCompressHistoryTitle": "全局历史压缩",
+  "globalCompressHistoryDescription": "将最近 {days} 天所有 App 的截图按 {size} KB 目标压缩，超过目标的才会处理。",
+  "@globalCompressHistoryDescription": {
+    "placeholders": {
+      "days": {},
+      "size": {}
+    }
+  },
+  "globalCompressHistoryDescriptionAll": "将所有 App 的全部截图按 {size} KB 目标压缩，超过目标的才会处理。",
+  "@globalCompressHistoryDescriptionAll": {
+    "placeholders": {
+      "size": {}
+    }
+  },
   "compressHistoryDescription": "将最近 {days} 天的截图按 {size} KB 目标压缩，超过目标的才会处理。",
   "@compressHistoryDescription": {
     "placeholders": {
@@ -362,6 +379,8 @@
     }
   },
   "compressHistoryAction": "开始压缩",
+  "compressHistoryCancelling": "正在停止，已开始的图片会完成…",
+  "compressHistoryCancelled": "压缩已取消，已完成的更改会保留。",
   "compressHistoryRequireTarget": "请先启用目标大小后再进行压缩。",
   "compressHistorySuccess": "已压缩 {count} 张图片，节省 {size}。",
   "@compressHistorySuccess": {
@@ -505,6 +524,26 @@
   "@targetSizeSavedSuccess": {
     "placeholders": {
       "kb": {}
+    }
+  },
+  "aiImageSendFormatTitle": "AI 发送图片格式",
+  "aiImageSendFormatCurrent": "当前：{format}（仅发送前临时转换）",
+  "@aiImageSendFormatCurrent": {
+    "placeholders": {
+      "format": {}
+    }
+  },
+  "aiImageSendFormatDialogTitle": "选择 AI 发送图片格式",
+  "aiImageSendFormatOriginal": "原格式",
+  "aiImageSendFormatOriginalDesc": "直接发送本地文件，不额外转码",
+  "aiImageSendFormatJpeg": "JPEG（兼容优先）",
+  "aiImageSendFormatJpegDesc": "发送前临时转为 JPEG；兼容性最好，文字边缘可能略糊",
+  "aiImageSendFormatPng": "PNG（无损）",
+  "aiImageSendFormatPngDesc": "发送前临时转为 PNG；画质无损，但体积可能明显变大",
+  "aiImageSendFormatSaved": "AI 发送图片格式已设置为 {format}",
+  "@aiImageSendFormatSaved": {
+    "placeholders": {
+      "format": {}
     }
   },
   "setExpireDaysDialogTitle": "设置截图过期天数",
@@ -2182,5 +2221,4 @@
   "updateInstallPermissionTitle": "需要安装权限",
   "updateInstallPermissionMessage": "请允许屏忆安装未知来源应用，然后返回后重新点击下载。",
   "updateOpenInstallSettingsAction": "打开设置"
-
 }

@@ -332,8 +332,25 @@
   "setCompressDaysDialogTitle": "Set days",
   "compressDaysLabel": "Days",
   "compressDaysInputHint": "Enter number of days",
+  "compressDaysInputHintAll": "Enter 0 for all history, or a number of days",
   "compressDaysInvalidError": "Please enter a positive number of days.",
+  "compressDaysInvalidOrAllError": "Please enter 0 or a positive number of days.",
   "compressHistoryTitle": "Compress history",
+  "compressHistoryAllDays": "All",
+  "globalCompressHistoryTitle": "Compress all app history",
+  "globalCompressHistoryDescription": "Compress screenshots from all apps in the last {days} days to {size} KB if they exceed the target.",
+  "@globalCompressHistoryDescription": {
+    "placeholders": {
+      "days": {},
+      "size": {}
+    }
+  },
+  "globalCompressHistoryDescriptionAll": "Compress screenshots from all apps to {size} KB if they exceed the target.",
+  "@globalCompressHistoryDescriptionAll": {
+    "placeholders": {
+      "size": {}
+    }
+  },
   "compressHistoryDescription": "Compress screenshots from the last {days} days to {size} KB if they exceed the target.",
   "@compressHistoryDescription": {
     "placeholders": {
@@ -362,6 +379,8 @@
     }
   },
   "compressHistoryAction": "Compress now",
+  "compressHistoryCancelling": "Stopping… images already in progress may finish.",
+  "compressHistoryCancelled": "Compression cancelled. Completed changes were kept.",
   "compressHistoryRequireTarget": "Enable target size before compressing.",
   "compressHistorySuccess": "Compressed {count} screenshots, saved {size}.",
   "@compressHistorySuccess": {
@@ -505,6 +524,26 @@
   "@targetSizeSavedSuccess": {
     "placeholders": {
       "kb": {}
+    }
+  },
+  "aiImageSendFormatTitle": "AI image send format",
+  "aiImageSendFormatCurrent": "Current: {format} (temporary conversion before sending only)",
+  "@aiImageSendFormatCurrent": {
+    "placeholders": {
+      "format": {}
+    }
+  },
+  "aiImageSendFormatDialogTitle": "Choose AI image send format",
+  "aiImageSendFormatOriginal": "Original format",
+  "aiImageSendFormatOriginalDesc": "Send the local file as-is without extra transcoding",
+  "aiImageSendFormatJpeg": "JPEG (compatibility)",
+  "aiImageSendFormatJpegDesc": "Temporarily convert to JPEG before sending; best compatibility, text edges may soften",
+  "aiImageSendFormatPng": "PNG (lossless)",
+  "aiImageSendFormatPngDesc": "Temporarily convert to PNG before sending; lossless but may be much larger",
+  "aiImageSendFormatSaved": "AI image send format set to {format}",
+  "@aiImageSendFormatSaved": {
+    "placeholders": {
+      "format": {}
     }
   },
   "setExpireDaysDialogTitle": "Set screenshot expiration days",
@@ -2182,5 +2221,4 @@
   "updateInstallPermissionTitle": "Install permission required",
   "updateInstallPermissionMessage": "Allow ScreenMemo to install unknown apps, then return and tap Download again.",
   "updateOpenInstallSettingsAction": "Open settings"
-
 }

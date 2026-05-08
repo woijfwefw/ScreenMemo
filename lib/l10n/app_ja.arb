@@ -330,8 +330,25 @@
   "setCompressDaysDialogTitle": "日数を設定",
   "compressDaysLabel": "日数",
   "compressDaysInputHint": "日数を入力してください",
+  "compressDaysInputHintAll": "すべての履歴は 0、または日数を入力してください",
   "compressDaysInvalidError": "1 以上の日数を入力してください。",
+  "compressDaysInvalidOrAllError": "0 または 1 以上の日数を入力してください。",
   "compressHistoryTitle": "履歴の圧縮",
+  "compressHistoryAllDays": "すべて",
+  "globalCompressHistoryTitle": "全アプリ履歴の圧縮",
+  "globalCompressHistoryDescription": "直近 {days} 日間のすべてのアプリのスクリーンショットを {size} KB に圧縮し、超過分のみ処理します。",
+  "@globalCompressHistoryDescription": {
+    "placeholders": {
+      "days": {},
+      "size": {}
+    }
+  },
+  "globalCompressHistoryDescriptionAll": "すべてのアプリのスクリーンショットを {size} KB に圧縮し、超過分のみ処理します。",
+  "@globalCompressHistoryDescriptionAll": {
+    "placeholders": {
+      "size": {}
+    }
+  },
   "compressHistoryDescription": "直近 {days} 日間のスクリーンショットを {size} KB に圧縮し、超過分のみ処理します。",
   "@compressHistoryDescription": {
     "placeholders": {
@@ -360,6 +377,8 @@
     }
   },
   "compressHistoryAction": "今すぐ圧縮",
+  "compressHistoryCancelling": "停止中です。開始済みの画像は完了する場合があります…",
+  "compressHistoryCancelled": "圧縮をキャンセルしました。完了済みの変更は保持されます。",
   "compressHistoryRequireTarget": "圧縮する前に目標サイズを有効にしてください。",
   "compressHistorySuccess": "{count} 件を圧縮し、{size} を節約しました。",
   "@compressHistorySuccess": {
@@ -503,6 +522,26 @@
   "@targetSizeSavedSuccess": {
     "placeholders": {
       "kb": {}
+    }
+  },
+  "aiImageSendFormatTitle": "AI 送信用画像形式",
+  "aiImageSendFormatCurrent": "現在：{format}（送信前のみ一時変換）",
+  "@aiImageSendFormatCurrent": {
+    "placeholders": {
+      "format": {}
+    }
+  },
+  "aiImageSendFormatDialogTitle": "AI 送信用画像形式を選択",
+  "aiImageSendFormatOriginal": "元の形式",
+  "aiImageSendFormatOriginalDesc": "ローカルファイルを追加変換せずそのまま送信します",
+  "aiImageSendFormatJpeg": "JPEG（互換性優先）",
+  "aiImageSendFormatJpegDesc": "送信前に一時的に JPEG へ変換します。互換性は高いですが、文字の輪郭が少しぼやける場合があります",
+  "aiImageSendFormatPng": "PNG（ロスレス）",
+  "aiImageSendFormatPngDesc": "送信前に一時的に PNG へ変換します。画質はロスレスですが、サイズが大きくなる場合があります",
+  "aiImageSendFormatSaved": "AI 送信用画像形式を {format} に設定しました",
+  "@aiImageSendFormatSaved": {
+    "placeholders": {
+      "format": {}
     }
   },
   "setExpireDaysDialogTitle": "スクリーンショットの保存日数を設定",
@@ -2182,5 +2221,4 @@
   "updateInstallPermissionTitle": "インストール権限が必要です",
   "updateInstallPermissionMessage": "ScreenMemo に不明なアプリのインストールを許可し、戻ってからもう一度ダウンロードをタップしてください。",
   "updateOpenInstallSettingsAction": "設定を開く"
-
 }

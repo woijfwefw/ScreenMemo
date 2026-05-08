@@ -52,6 +52,7 @@ class ScreenshotRecomputeProgress {
 class ScreenshotService {
   static ScreenshotService? _instance;
   static ScreenshotService get instance => _instance ??= ScreenshotService._();
+  static const String globalCompressionScopeKey = '__global_compression__';
 
   ScreenshotService._() {
     _setupMethodChannelHandlers();
@@ -94,14 +95,26 @@ class ScreenshotService {
   CompressionProgress? _latestCompressionProgress;
   final Map<String, CompressionProgress> _latestCompressionProgressByPackage =
       <String, CompressionProgress>{};
+  int _activeCompressionTotalOverride = 0;
+  int _activeCompressionHandledOffset = 0;
+  int _activeCompressionSuccessOffset = 0;
+  int _activeCompressionSkippedOffset = 0;
+  int _activeCompressionFailedOffset = 0;
+  int _activeCompressionSavedOffset = 0;
 
   CompressionProgress? latestCompressionProgressFor(String packageName) {
     return _latestCompressionProgressByPackage[packageName];
   }
 
+  CompressionProgress? get latestGlobalCompressionProgress =>
+      latestCompressionProgressFor(globalCompressionScopeKey);
+
   bool compressionInFlightFor(String packageName) {
     return _compressionInFlight && _activeCompressionPackage == packageName;
   }
+
+  bool get globalCompressionInFlight =>
+      compressionInFlightFor(globalCompressionScopeKey);
 
   void attachCompressionProgressListener(
     void Function(CompressionProgress)? listener, {
@@ -577,13 +590,26 @@ class ScreenshotService {
 
   void _handleCompressionProgress(Map<String, dynamic> raw) {
     try {
+      final int rawTotal = _coerceToInt(raw['total']);
+      final int total = _activeCompressionTotalOverride > 0
+          ? _activeCompressionTotalOverride
+          : rawTotal;
+      int capHandled(int value) {
+        if (total <= 0) return value < 0 ? 0 : value;
+        if (value < 0) return 0;
+        return value > total ? total : value;
+      }
+
       final progress = CompressionProgress(
-        total: _coerceToInt(raw['total']),
-        handled: _coerceToInt(raw['handled']),
-        success: _coerceToInt(raw['success']),
-        skipped: _coerceToInt(raw['skipped']),
-        failed: _coerceToInt(raw['failed']),
-        savedBytes: _coerceToInt(raw['savedBytes']),
+        total: total,
+        handled: capHandled(
+          _activeCompressionHandledOffset + _coerceToInt(raw['handled']),
+        ),
+        success: _activeCompressionSuccessOffset + _coerceToInt(raw['success']),
+        skipped: _activeCompressionSkippedOffset + _coerceToInt(raw['skipped']),
+        failed: _activeCompressionFailedOffset + _coerceToInt(raw['failed']),
+        savedBytes:
+            _activeCompressionSavedOffset + _coerceToInt(raw['savedBytes']),
       );
       _latestCompressionProgress = progress;
       final String? activePackage = _activeCompressionPackage;
@@ -610,6 +636,16 @@ class ScreenshotService {
       return int.tryParse(value) ?? 0;
     }
     return 0;
+  }
+
+  bool _coerceToBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final String normalized = value.toLowerCase().trim();
+      return normalized == 'true' || normalized == '1' || normalized == 'yes';
+    }
+    return false;
   }
 
   // 用于跟踪正在处理的文件路径，防止重复处理
@@ -1047,7 +1083,6 @@ class ScreenshotService {
       return result;
     }
 
-    final Map<int, ScreenshotRecord> recordByGid = <int, ScreenshotRecord>{};
     final List<Map<String, dynamic>> tasks = <Map<String, dynamic>>[];
     int aggregatedOriginalBytes = 0;
     for (final ScreenshotRecord record in records) {
@@ -1062,7 +1097,6 @@ class ScreenshotService {
         'originalSize': originalSize,
       });
       aggregatedOriginalBytes += originalSize;
-      recordByGid[gid] = record;
     }
 
     if (tasks.isEmpty) {
@@ -1096,6 +1130,12 @@ class ScreenshotService {
             finalFormat == 'jpg');
     final int finalQuality = (imageQuality ?? 90).clamp(1, 100);
 
+    _activeCompressionTotalOverride = 0;
+    _activeCompressionHandledOffset = 0;
+    _activeCompressionSuccessOffset = 0;
+    _activeCompressionSkippedOffset = 0;
+    _activeCompressionFailedOffset = 0;
+    _activeCompressionSavedOffset = 0;
     _activeCompressionPackage = packageName;
     _compressionInFlight = true;
     final CompressionProgress initialProgress = CompressionProgress(
@@ -1135,6 +1175,12 @@ class ScreenshotService {
       attachCompressionProgressListener(null, replayLatest: false);
       _compressionInFlight = false;
       _activeCompressionPackage = null;
+      _activeCompressionTotalOverride = 0;
+      _activeCompressionHandledOffset = 0;
+      _activeCompressionSuccessOffset = 0;
+      _activeCompressionSkippedOffset = 0;
+      _activeCompressionFailedOffset = 0;
+      _activeCompressionSavedOffset = 0;
     }
 
     final List<dynamic> successesRaw =
@@ -1215,6 +1261,353 @@ class ScreenshotService {
     );
     _latestCompressionProgress = result;
     _latestCompressionProgressByPackage[packageName] = result;
+    onProgress?.call(result);
+    return result;
+  }
+
+  /// 对所有应用的历史截图执行批量压缩。
+  ///
+  /// 该任务使用全局互斥锁，避免和单应用压缩同时修改同一批图片。
+  ///
+  /// 这里仍保持较大的 Dart 批次以减少通道开销；取消时会通知原生侧停止
+  /// 领取新图片，已经开始编码的少量图片会自然完成。
+  Future<CompressionResult> compressAllAppScreenshots({
+    required int days,
+    required int targetSizeKb,
+    String? imageFormat,
+    int? imageQuality,
+    bool useTargetSize = true,
+    CompressionCancellationToken? cancellationToken,
+    void Function(CompressionProgress progress)? onProgress,
+  }) async {
+    if (_compressionInFlight) {
+      throw ScreenshotServiceException('已有压缩任务正在执行');
+    }
+    if (targetSizeKb < 1) {
+      const result = CompressionResult.empty();
+      onProgress?.call(result);
+      return result;
+    }
+
+    final DateTime now = DateTime.now();
+    final bool allHistory = days < 1;
+    final DateTime start = allHistory
+        ? DateTime.fromMillisecondsSinceEpoch(0)
+        : now.subtract(Duration(days: days));
+    final int startMillis = allHistory ? 0 : start.millisecondsSinceEpoch;
+    final int endMillis = now.millisecondsSinceEpoch;
+    final int estimatedTotal = await getGlobalScreenshotCountBetween(
+      startMillis: startMillis,
+      endMillis: endMillis,
+    );
+    if (estimatedTotal <= 0) {
+      const result = CompressionResult.empty();
+      onProgress?.call(result);
+      return result;
+    }
+
+    final List<String> packages = await _database
+        .listPackagesWithScreenshotShards();
+    if (packages.isEmpty) {
+      const result = CompressionResult.empty();
+      onProgress?.call(result);
+      return result;
+    }
+    if (cancellationToken?.isCancelled ?? false) {
+      const result = CompressionResult.empty();
+      onProgress?.call(result);
+      return result;
+    }
+
+    final Stopwatch stopwatch = Stopwatch()..start();
+    final int targetBytes = ((targetSizeKb * 1024).clamp(
+      1024,
+      1024 * 1024 * 20,
+    )).toInt();
+    final String normalizedFormat = (imageFormat ?? 'webp_lossy')
+        .toLowerCase()
+        .trim();
+    final bool wantTarget = useTargetSize;
+    final bool formatIsLossy =
+        normalizedFormat == 'webp_lossy' ||
+        normalizedFormat == 'webp' ||
+        normalizedFormat == 'jpeg' ||
+        normalizedFormat == 'jpg';
+    final String finalFormat = wantTarget && !formatIsLossy
+        ? 'webp_lossy'
+        : normalizedFormat;
+    final bool finalUseTarget =
+        wantTarget &&
+        (finalFormat == 'webp_lossy' ||
+            finalFormat == 'webp' ||
+            finalFormat == 'jpeg' ||
+            finalFormat == 'jpg');
+    final int finalQuality = (imageQuality ?? 90).clamp(1, 100);
+
+    int handledTotal = 0;
+    int successTotal = 0;
+    int skippedTotal = 0;
+    int failedTotal = 0;
+    int savedTotal = 0;
+    int beforeTotal = 0;
+    int afterTotal = 0;
+    int durationTotal = 0;
+    int taskTotal = 0;
+    bool cancelled = false;
+    final Set<String> changedPackages = <String>{};
+
+    _activeCompressionTotalOverride = estimatedTotal;
+    _activeCompressionHandledOffset = 0;
+    _activeCompressionSuccessOffset = 0;
+    _activeCompressionSkippedOffset = 0;
+    _activeCompressionFailedOffset = 0;
+    _activeCompressionSavedOffset = 0;
+    _activeCompressionPackage = globalCompressionScopeKey;
+    _compressionInFlight = true;
+    final CompressionProgress initialProgress = CompressionProgress(
+      total: estimatedTotal,
+      handled: 0,
+      success: 0,
+      skipped: 0,
+      failed: 0,
+      savedBytes: 0,
+    );
+    _latestCompressionProgress = initialProgress;
+    _latestCompressionProgressByPackage[globalCompressionScopeKey] =
+        initialProgress;
+    attachCompressionProgressListener(
+      onProgress,
+      replayLatest: false,
+      packageName: globalCompressionScopeKey,
+    );
+    onProgress?.call(initialProgress);
+
+    final String compressionJobId =
+        'global_${DateTime.now().microsecondsSinceEpoch}_${identityHashCode(this)}';
+    final Future<void> Function() nativeCancelHandler = () async {
+      try {
+        await _channel.invokeMethod<void>('cancelCompressionBatch', {
+          'jobId': compressionJobId,
+        });
+      } catch (e) {
+        print('通知原生取消压缩失败: $e');
+      }
+    };
+
+    cancellationToken?.addCancelHandler(nativeCancelHandler);
+
+    const int chunkSize = 500;
+    try {
+      for (final String packageName in packages) {
+        if (cancellationToken?.isCancelled ?? false) {
+          cancelled = true;
+          break;
+        }
+        final List<ScreenshotRecord> records = await getScreenshotsByAppBetween(
+          packageName,
+          startMillis: startMillis,
+          endMillis: endMillis,
+        );
+        if (cancellationToken?.isCancelled ?? false) {
+          cancelled = true;
+          break;
+        }
+        if (records.isEmpty) continue;
+
+        final List<Map<String, dynamic>> tasks = <Map<String, dynamic>>[];
+        for (final ScreenshotRecord record in records) {
+          final int? gid = record.id;
+          if (gid == null) continue;
+          if (cancellationToken?.isCancelled ?? false) {
+            cancelled = true;
+            break;
+          }
+          final int originalSize = record.fileSize;
+          if (targetBytes > 0 &&
+              originalSize > 0 &&
+              originalSize <= targetBytes) {
+            taskTotal += 1;
+            handledTotal += 1;
+            skippedTotal += 1;
+            final progress = CompressionProgress(
+              total: estimatedTotal,
+              handled: handledTotal,
+              success: successTotal,
+              skipped: skippedTotal,
+              failed: failedTotal,
+              savedBytes: savedTotal,
+            );
+            _latestCompressionProgress = progress;
+            _latestCompressionProgressByPackage[globalCompressionScopeKey] =
+                progress;
+            onProgress?.call(progress);
+            continue;
+          }
+          tasks.add(<String, dynamic>{
+            'filePath': record.filePath,
+            'gid': gid,
+            'originalSize': originalSize,
+          });
+        }
+        if (cancelled) break;
+        if (tasks.isEmpty) continue;
+        taskTotal += tasks.length;
+
+        for (
+          int startIndex = 0;
+          startIndex < tasks.length;
+          startIndex += chunkSize
+        ) {
+          final int endIndex = (startIndex + chunkSize) > tasks.length
+              ? tasks.length
+              : startIndex + chunkSize;
+          final List<Map<String, dynamic>> chunk = tasks.sublist(
+            startIndex,
+            endIndex,
+          );
+          if (cancellationToken?.isCancelled ?? false) {
+            cancelled = true;
+            break;
+          }
+
+          _activeCompressionHandledOffset = handledTotal;
+          _activeCompressionSuccessOffset = successTotal;
+          _activeCompressionSkippedOffset = skippedTotal;
+          _activeCompressionFailedOffset = failedTotal;
+          _activeCompressionSavedOffset = savedTotal;
+
+          final Stopwatch chunkStopwatch = Stopwatch()..start();
+          Map<String, dynamic> response = const <String, dynamic>{};
+          final Map<String, dynamic>? raw = await _channel
+              .invokeMapMethod<String, dynamic>(
+                'compressScreenshotsBatch',
+                <String, dynamic>{
+                  'tasks': chunk,
+                  'format': finalFormat,
+                  'targetBytes': targetBytes,
+                  'quality': finalQuality,
+                  'useTargetSize': finalUseTarget,
+                  'jobId': compressionJobId,
+                },
+              );
+          if (raw != null) {
+            response = raw;
+          }
+          chunkStopwatch.stop();
+
+          final List<dynamic> successesRaw =
+              (response['successes'] as List?) ?? const <dynamic>[];
+          final List<dynamic> failuresRaw =
+              (response['failures'] as List?) ?? const <dynamic>[];
+          final List<dynamic> skippedRaw =
+              (response['skippedEntries'] as List?) ?? const <dynamic>[];
+
+          final int successCount = successesRaw.length;
+          final int skippedCount = skippedRaw.length;
+          final int failedCount = failuresRaw.length;
+          final int handledCount = _coerceToInt(response['handled']);
+          final int rawSavedBytes = _coerceToInt(response['savedBytes']);
+          final int rawTotalBefore = _coerceToInt(response['totalBeforeBytes']);
+          final int rawTotalAfter = _coerceToInt(response['totalAfterBytes']);
+          final int durationMillis = _coerceToInt(response['durationMillis']);
+          final bool nativeCancelled = _coerceToBool(response['cancelled']);
+
+          for (final dynamic entry in successesRaw) {
+            if (entry is! Map) continue;
+            final map = Map<String, dynamic>.from(entry);
+            final int gid = _coerceToInt(map['gid']);
+            final int newSize = _coerceToInt(map['newSize']);
+            if (gid > 0 && newSize > 0) {
+              await _database.updateFileSizeByGid(
+                packageName: packageName,
+                gid: gid,
+                newSize: newSize,
+              );
+              changedPackages.add(packageName);
+            }
+          }
+
+          final int fallbackBefore = successesRaw.fold<int>(0, (
+            previousValue,
+            element,
+          ) {
+            if (element is! Map) return previousValue;
+            return previousValue + _coerceToInt(element['originalSize']);
+          });
+          final int totalBeforeBytes = rawTotalBefore > 0
+              ? rawTotalBefore
+              : fallbackBefore;
+          final int fallbackAfter = totalBeforeBytes - rawSavedBytes;
+          final int totalAfterBytes = rawTotalAfter > 0
+              ? rawTotalAfter
+              : (fallbackAfter < 0 ? 0 : fallbackAfter);
+          final int computedSaved = totalBeforeBytes - totalAfterBytes;
+          final int safeSavedBytes = computedSaved < 0 ? 0 : computedSaved;
+
+          handledTotal += handledCount == 0
+              ? successCount + skippedCount + failedCount
+              : handledCount;
+          successTotal += successCount;
+          skippedTotal += skippedCount;
+          failedTotal += failedCount;
+          savedTotal += safeSavedBytes;
+          beforeTotal += totalBeforeBytes;
+          afterTotal += totalAfterBytes;
+          durationTotal += durationMillis == 0
+              ? chunkStopwatch.elapsedMilliseconds
+              : durationMillis;
+          if (nativeCancelled || (cancellationToken?.isCancelled ?? false)) {
+            cancelled = true;
+            break;
+          }
+        }
+        if (cancelled) break;
+      }
+    } finally {
+      cancellationToken?.removeCancelHandler(nativeCancelHandler);
+      attachCompressionProgressListener(null, replayLatest: false);
+      _compressionInFlight = false;
+      _activeCompressionPackage = null;
+      _activeCompressionTotalOverride = 0;
+      _activeCompressionHandledOffset = 0;
+      _activeCompressionSuccessOffset = 0;
+      _activeCompressionSkippedOffset = 0;
+      _activeCompressionFailedOffset = 0;
+      _activeCompressionSavedOffset = 0;
+    }
+
+    if (changedPackages.isNotEmpty) {
+      try {
+        for (final String packageName in changedPackages) {
+          await _database.recomputeAppStatsForPackage(packageName);
+        }
+        await _database.recalculateTotals();
+        await _refreshStatsCache(force: true);
+      } catch (e) {
+        print('全局压缩后刷新统计失败: $e');
+      }
+      _screenshotStreamController.add(null);
+    }
+
+    stopwatch.stop();
+    final int resultTotal = taskTotal > 0
+        ? (cancelled && estimatedTotal > 0 ? estimatedTotal : taskTotal)
+        : (estimatedTotal > handledTotal ? estimatedTotal : handledTotal);
+    final CompressionResult result = CompressionResult(
+      total: resultTotal,
+      handled: handledTotal,
+      success: successTotal,
+      skipped: skippedTotal,
+      failed: failedTotal,
+      savedBytes: savedTotal,
+      durationMillis: durationTotal == 0
+          ? stopwatch.elapsedMilliseconds
+          : durationTotal,
+      totalBeforeBytes: beforeTotal,
+      totalAfterBytes: afterTotal,
+    );
+    _latestCompressionProgress = result;
+    _latestCompressionProgressByPackage[globalCompressionScopeKey] = result;
     onProgress?.call(result);
     return result;
   }
@@ -2353,4 +2746,44 @@ class CompressionResult extends CompressionProgress {
         failed: 0,
         savedBytes: 0,
       );
+}
+
+class CompressionCancellationToken {
+  bool _cancelled = false;
+  final List<FutureOr<void> Function()> _cancelHandlers =
+      <FutureOr<void> Function()>[];
+
+  bool get isCancelled => _cancelled;
+
+  void addCancelHandler(FutureOr<void> Function() handler) {
+    if (_cancelled) {
+      _runCancelHandler(handler);
+      return;
+    }
+    _cancelHandlers.add(handler);
+  }
+
+  void removeCancelHandler(FutureOr<void> Function() handler) {
+    _cancelHandlers.remove(handler);
+  }
+
+  void cancel() {
+    if (_cancelled) return;
+    _cancelled = true;
+    final handlers = List<FutureOr<void> Function()>.of(_cancelHandlers);
+    for (final handler in handlers) {
+      _runCancelHandler(handler);
+    }
+  }
+
+  void _runCancelHandler(FutureOr<void> Function() handler) {
+    unawaited(
+      Future<void>.sync(handler).catchError((
+        Object error,
+        StackTrace stackTrace,
+      ) {
+        print('压缩取消回调失败: $error');
+      }),
+    );
+  }
 }

@@ -1464,17 +1464,53 @@ abstract class AppLocalizations {
   /// **'Enter number of days'**
   String get compressDaysInputHint;
 
+  /// No description provided for @compressDaysInputHintAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter 0 for all history, or a number of days'**
+  String get compressDaysInputHintAll;
+
   /// No description provided for @compressDaysInvalidError.
   ///
   /// In en, this message translates to:
   /// **'Please enter a positive number of days.'**
   String get compressDaysInvalidError;
 
+  /// No description provided for @compressDaysInvalidOrAllError.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter 0 or a positive number of days.'**
+  String get compressDaysInvalidOrAllError;
+
   /// No description provided for @compressHistoryTitle.
   ///
   /// In en, this message translates to:
   /// **'Compress history'**
   String get compressHistoryTitle;
+
+  /// No description provided for @compressHistoryAllDays.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get compressHistoryAllDays;
+
+  /// No description provided for @globalCompressHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Compress all app history'**
+  String get globalCompressHistoryTitle;
+
+  /// No description provided for @globalCompressHistoryDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Compress screenshots from all apps in the last {days} days to {size} KB if they exceed the target.'**
+  String globalCompressHistoryDescription(Object days, Object size);
+
+  /// No description provided for @globalCompressHistoryDescriptionAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Compress screenshots from all apps to {size} KB if they exceed the target.'**
+  String globalCompressHistoryDescriptionAll(Object size);
 
   /// No description provided for @compressHistoryDescription.
   ///
@@ -1505,6 +1541,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Compress now'**
   String get compressHistoryAction;
+
+  /// No description provided for @compressHistoryCancelling.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopping… images already in progress may finish.'**
+  String get compressHistoryCancelling;
+
+  /// No description provided for @compressHistoryCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Compression cancelled. Completed changes were kept.'**
+  String get compressHistoryCancelled;
 
   /// No description provided for @compressHistoryRequireTarget.
   ///
@@ -1877,6 +1925,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Target size set to {kb} KB'**
   String targetSizeSavedSuccess(Object kb);
+
+  /// No description provided for @aiImageSendFormatTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI image send format'**
+  String get aiImageSendFormatTitle;
+
+  /// No description provided for @aiImageSendFormatCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current: {format} (temporary conversion before sending only)'**
+  String aiImageSendFormatCurrent(Object format);
+
+  /// No description provided for @aiImageSendFormatDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose AI image send format'**
+  String get aiImageSendFormatDialogTitle;
+
+  /// No description provided for @aiImageSendFormatOriginal.
+  ///
+  /// In en, this message translates to:
+  /// **'Original format'**
+  String get aiImageSendFormatOriginal;
+
+  /// No description provided for @aiImageSendFormatOriginalDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Send the local file as-is without extra transcoding'**
+  String get aiImageSendFormatOriginalDesc;
+
+  /// No description provided for @aiImageSendFormatJpeg.
+  ///
+  /// In en, this message translates to:
+  /// **'JPEG (compatibility)'**
+  String get aiImageSendFormatJpeg;
+
+  /// No description provided for @aiImageSendFormatJpegDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporarily convert to JPEG before sending; best compatibility, text edges may soften'**
+  String get aiImageSendFormatJpegDesc;
+
+  /// No description provided for @aiImageSendFormatPng.
+  ///
+  /// In en, this message translates to:
+  /// **'PNG (lossless)'**
+  String get aiImageSendFormatPng;
+
+  /// No description provided for @aiImageSendFormatPngDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporarily convert to PNG before sending; lossless but may be much larger'**
+  String get aiImageSendFormatPngDesc;
+
+  /// No description provided for @aiImageSendFormatSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'AI image send format set to {format}'**
+  String aiImageSendFormatSaved(Object format);
 
   /// No description provided for @setExpireDaysDialogTitle.
   ///

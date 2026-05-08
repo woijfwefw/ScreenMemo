@@ -2,6 +2,48 @@ part of 'settings_page.dart';
 
 // ========== 截图采集与压缩设置 ==========
 extension _SettingsScreenshotPart on _SettingsPageState {
+  String _globalCompressDaysText(BuildContext context) {
+    return _globalCompressDays <= 0
+        ? AppLocalizations.of(context).compressHistoryAllDays
+        : _globalCompressDays.toString();
+  }
+
+  String _normalizeAiImageSendFormat(String? value) {
+    switch ((value ?? '').trim().toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'jpeg';
+      case 'png':
+        return 'png';
+      default:
+        return 'original';
+    }
+  }
+
+  String _aiImageSendFormatLabel(BuildContext context, String value) {
+    final l10n = AppLocalizations.of(context);
+    switch (_normalizeAiImageSendFormat(value)) {
+      case 'jpeg':
+        return l10n.aiImageSendFormatJpeg;
+      case 'png':
+        return l10n.aiImageSendFormatPng;
+      default:
+        return l10n.aiImageSendFormatOriginal;
+    }
+  }
+
+  String _aiImageSendFormatDesc(BuildContext context, String value) {
+    final l10n = AppLocalizations.of(context);
+    switch (_normalizeAiImageSendFormat(value)) {
+      case 'jpeg':
+        return l10n.aiImageSendFormatJpegDesc;
+      case 'png':
+        return l10n.aiImageSendFormatPngDesc;
+      default:
+        return l10n.aiImageSendFormatOriginalDesc;
+    }
+  }
+
   Widget _buildScreenshotIntervalItem(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -177,6 +219,310 @@ extension _SettingsScreenshotPart on _SettingsPageState {
     );
   }
 
+  Widget _buildGlobalHistoryCompressionItem(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
+
+    Widget buildUnderlinedValueText({
+      required String text,
+      required String value,
+      required bool enabled,
+    }) {
+      final int index = text.indexOf(value);
+      if (index < 0) {
+        return Text(
+          text,
+          style: TextStyle(
+            decoration: enabled
+                ? TextDecoration.underline
+                : TextDecoration.none,
+          ),
+        );
+      }
+
+      return Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(text: text.substring(0, index)),
+            TextSpan(
+              text: value,
+              style: TextStyle(
+                decoration: enabled
+                    ? TextDecoration.underline
+                    : TextDecoration.none,
+              ),
+            ),
+            TextSpan(text: text.substring(index + value.length)),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.spacing4,
+        vertical: AppTheme.spacing3 - 2,
+      ),
+      decoration: BoxDecoration(
+        border: Border(top: _settingsDividerSide(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSettingsLeadingIcon(context, Icons.auto_fix_high_outlined),
+              const SizedBox(width: AppTheme.spacing3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.globalCompressHistoryTitle,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _globalCompressDays <= 0
+                          ? l10n.globalCompressHistoryDescriptionAll(
+                              _targetSizeKb,
+                            )
+                          : l10n.globalCompressHistoryDescription(
+                              _globalCompressDays,
+                              _targetSizeKb,
+                            ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.spacing3),
+          Wrap(
+            spacing: AppTheme.spacing2,
+            runSpacing: AppTheme.spacing2,
+            children: [
+              TextButton(
+                onPressed: _compressingGlobalHistory
+                    ? null
+                    : _showGlobalCompressDaysDialog,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTheme.spacing3,
+                    vertical: AppTheme.spacing1,
+                  ),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  minimumSize: Size.zero,
+                ),
+                child: buildUnderlinedValueText(
+                  text: l10n.compressHistorySetDays(
+                    _globalCompressDaysText(context),
+                  ),
+                  value: _globalCompressDaysText(context),
+                  enabled: !_compressingGlobalHistory,
+                ),
+              ),
+              TextButton(
+                onPressed: _compressingGlobalHistory
+                    ? null
+                    : _showTargetSizeDialog,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTheme.spacing3,
+                    vertical: AppTheme.spacing1,
+                  ),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  minimumSize: Size.zero,
+                ),
+                child: buildUnderlinedValueText(
+                  text: l10n.compressHistorySetTarget(_targetSizeKb),
+                  value: _targetSizeKb.toString(),
+                  enabled: !_compressingGlobalHistory,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.spacing3),
+          if (_globalCompressionProgress != null &&
+              (_globalCompressionProgress!.handled > 0 ||
+                  _compressingGlobalHistory))
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                UIProgress(
+                  value: _globalCompressionProgress!.ratio.clamp(0.0, 1.0),
+                  height: 4,
+                ),
+                const SizedBox(height: AppTheme.spacing1),
+                Text(
+                  l10n.compressHistoryProgress(
+                    _globalCompressionProgress!.handled,
+                    _globalCompressionProgress!.total,
+                    formatBytes(
+                      _globalCompressionProgress!.savedBytes > 0
+                          ? _globalCompressionProgress!.savedBytes
+                          : 0,
+                    ),
+                  ),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spacing2),
+              ],
+            ),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _compressingGlobalHistory
+                  ? null
+                  : _startGlobalHistoryCompression,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTheme.spacing3,
+                  vertical: AppTheme.spacing2,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                ),
+              ),
+              child: _compressingGlobalHistory
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          theme.colorScheme.onPrimary,
+                        ),
+                      ),
+                    )
+                  : Text(l10n.compressHistoryAction),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAiImageSendFormatItem(BuildContext context) {
+    final String label = _aiImageSendFormatLabel(context, _aiImageSendFormat);
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.spacing4,
+        vertical: AppTheme.spacing3 - 2,
+      ),
+      decoration: BoxDecoration(
+        border: Border(top: _settingsDividerSide(context)),
+      ),
+      child: Row(
+        children: [
+          _buildSettingsLeadingIcon(context, Icons.send_to_mobile_outlined),
+          const SizedBox(width: AppTheme.spacing3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  AppLocalizations.of(context).aiImageSendFormatTitle,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  AppLocalizations.of(context).aiImageSendFormatCurrent(label),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppTheme.spacing2),
+          TextButton(
+            onPressed: _showAiImageSendFormatDialog,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTheme.spacing3,
+                vertical: AppTheme.spacing1 - 1,
+              ),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              minimumSize: Size.zero,
+              visualDensity: VisualDensity.compact,
+            ),
+            child: Text(AppLocalizations.of(context).actionSet),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAiImageSendFormatDialog() {
+    String selected = _normalizeAiImageSendFormat(_aiImageSendFormat);
+    showUIDialog<void>(
+      context: context,
+      title: AppLocalizations.of(context).aiImageSendFormatDialogTitle,
+      content: StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          Widget option(String value) {
+            return RadioListTile<String>(
+              value: value,
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(_aiImageSendFormatLabel(ctx, value)),
+              subtitle: Text(_aiImageSendFormatDesc(ctx, value)),
+            );
+          }
+
+          return RadioGroup<String>(
+            groupValue: selected,
+            onChanged: (v) {
+              if (v == null) return;
+              setDialogState(() {
+                selected = v;
+              });
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [option('original'), option('jpeg'), option('png')],
+            ),
+          );
+        },
+      ),
+      actions: [
+        UIDialogAction(text: AppLocalizations.of(context).dialogCancel),
+        UIDialogAction(
+          text: AppLocalizations.of(context).dialogOk,
+          style: UIDialogActionStyle.primary,
+          closeOnPress: false,
+          onPressed: (ctx) async {
+            final String normalized = _normalizeAiImageSendFormat(selected);
+            _settingsSetState(() {
+              _aiImageSendFormat = normalized;
+            });
+            await _saveAiImageSendFormat(showToast: false);
+            if (ctx.mounted) {
+              Navigator.of(ctx).pop();
+              UINotifier.success(
+                ctx,
+                AppLocalizations.of(ctx).aiImageSendFormatSaved(
+                  _aiImageSendFormatLabel(ctx, normalized),
+                ),
+              );
+            }
+          },
+        ),
+      ],
+    );
+  }
+
   Future<void> _loadScreenshotInterval() async {
     final interval = await _appService.getScreenshotInterval();
     if (mounted) {
@@ -336,6 +682,269 @@ extension _SettingsScreenshotPart on _SettingsPageState {
         ),
       ],
     );
+  }
+
+  void _showGlobalCompressDaysDialog() {
+    final TextEditingController controller = TextEditingController(
+      text: _globalCompressDays <= 0 ? '0' : _globalCompressDays.toString(),
+    );
+    showUIDialog<void>(
+      context: context,
+      title: AppLocalizations.of(context).setCompressDaysDialogTitle,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+            ),
+            child: TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(
+                labelText: AppLocalizations.of(context).compressDaysLabel,
+                hintText: AppLocalizations.of(context).compressDaysInputHintAll,
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.all(AppTheme.spacing3),
+                floatingLabelBehavior: FloatingLabelBehavior.always,
+                labelStyle: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.w500,
+                ),
+                hintStyle: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: AppTheme.fontSizeBase,
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        UIDialogAction(text: AppLocalizations.of(context).dialogCancel),
+        UIDialogAction(
+          text: AppLocalizations.of(context).dialogOk,
+          style: UIDialogActionStyle.primary,
+          closeOnPress: false,
+          onPressed: (ctx) async {
+            final int? days = int.tryParse(controller.text.trim());
+            if (days == null || days < 0) {
+              UINotifier.error(
+                ctx,
+                AppLocalizations.of(ctx).compressDaysInvalidOrAllError,
+              );
+              return;
+            }
+            _settingsSetState(() {
+              _globalCompressDays = days;
+            });
+            if (ctx.mounted) {
+              Navigator.of(ctx).pop();
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  void _handleGlobalCompressionProgress(CompressionProgress progress) {
+    if (!mounted) return;
+    _settingsSetState(() {
+      _globalCompressionProgress = progress;
+      _compressingGlobalHistory =
+          ScreenshotService.instance.globalCompressionInFlight;
+    });
+  }
+
+  void _restoreGlobalCompressionState() {
+    final service = ScreenshotService.instance;
+    final bool ongoing = service.globalCompressionInFlight;
+    final CompressionProgress? latest = service.latestGlobalCompressionProgress;
+    if (!mounted) return;
+    _settingsSetState(() {
+      _compressingGlobalHistory = ongoing;
+      if (latest != null) {
+        _globalCompressionProgress = latest;
+      }
+    });
+    if (ongoing) {
+      service.attachCompressionProgressListener(
+        _handleGlobalCompressionProgress,
+        packageName: ScreenshotService.globalCompressionScopeKey,
+      );
+    }
+  }
+
+  Widget _buildGlobalCompressionDialogContent(
+    AppLocalizations l10n,
+    ValueListenable<CompressionProgress> progressListenable,
+    ValueListenable<bool> cancellationListenable,
+  ) {
+    final theme = Theme.of(context);
+    return ValueListenableBuilder<CompressionProgress>(
+      valueListenable: progressListenable,
+      builder: (context, progress, _) {
+        final double? value = progress.total <= 0
+            ? null
+            : progress.ratio.clamp(0.0, 1.0);
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            UIProgress(value: value, height: 8),
+            const SizedBox(height: AppTheme.spacing3),
+            Text(
+              l10n.compressHistoryProgress(
+                progress.handled,
+                progress.total,
+                formatBytes(progress.savedBytes > 0 ? progress.savedBytes : 0),
+              ),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            ValueListenableBuilder<bool>(
+              valueListenable: cancellationListenable,
+              builder: (context, isCancelling, _) {
+                if (!isCancelling) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: AppTheme.spacing2),
+                  child: Text(
+                    l10n.compressHistoryCancelling,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _startGlobalHistoryCompression() async {
+    if (_compressingGlobalHistory) return;
+    final l10n = AppLocalizations.of(context);
+    if (_targetSizeKb < 50) {
+      UINotifier.error(context, l10n.targetSizeInvalidError);
+      return;
+    }
+
+    final CompressionProgress initialProgress = CompressionProgress(
+      total: 0,
+      handled: 0,
+      success: 0,
+      skipped: 0,
+      failed: 0,
+      savedBytes: 0,
+    );
+    final ValueNotifier<CompressionProgress> progressNotifier =
+        ValueNotifier<CompressionProgress>(initialProgress);
+    final ValueNotifier<bool> cancellationNotifier = ValueNotifier<bool>(false);
+    final CompressionCancellationToken cancellationToken =
+        CompressionCancellationToken();
+    final Completer<BuildContext> dialogContextCompleter =
+        Completer<BuildContext>();
+
+    _settingsSetState(() {
+      _compressingGlobalHistory = true;
+      _globalCompressionProgress = initialProgress;
+    });
+
+    final Future<void> progressDialog = showUIDialog<void>(
+      context: context,
+      title: l10n.globalCompressHistoryTitle,
+      barrierDismissible: false,
+      canPop: false,
+      constraints: const BoxConstraints(maxWidth: 420, minWidth: 280),
+      content: Builder(
+        builder: (dialogContext) {
+          if (!dialogContextCompleter.isCompleted) {
+            dialogContextCompleter.complete(dialogContext);
+          }
+          return _buildGlobalCompressionDialogContent(
+            l10n,
+            progressNotifier,
+            cancellationNotifier,
+          );
+        },
+      ),
+      actions: <UIDialogAction<void>>[
+        UIDialogAction<void>(
+          text: l10n.dialogCancel,
+          closeOnPress: false,
+          onPressed: (ctx) async {
+            if (cancellationToken.isCancelled) return;
+            cancellationToken.cancel();
+            cancellationNotifier.value = true;
+          },
+        ),
+      ],
+    );
+
+    final BuildContext dialogContext = await dialogContextCompleter.future;
+    CompressionResult? finalResult;
+    try {
+      finalResult = await ScreenshotService.instance.compressAllAppScreenshots(
+        days: _globalCompressDays,
+        targetSizeKb: _targetSizeKb,
+        imageFormat: _imageFormat,
+        imageQuality: _imageQuality,
+        useTargetSize: true,
+        cancellationToken: cancellationToken,
+        onProgress: (progress) {
+          progressNotifier.value = progress;
+          _handleGlobalCompressionProgress(progress);
+        },
+      );
+    } catch (_) {
+      if (mounted) {
+        UINotifier.error(context, l10n.compressHistoryFailure);
+      }
+    } finally {
+      if (dialogContext.mounted) {
+        Navigator.of(dialogContext).pop();
+      }
+      await progressDialog.catchError((_) {});
+      progressNotifier.dispose();
+      cancellationNotifier.dispose();
+      if (mounted) {
+        _settingsSetState(() {
+          _compressingGlobalHistory = false;
+          if (finalResult != null) {
+            _globalCompressionProgress = finalResult;
+          }
+        });
+      }
+    }
+
+    if (!mounted || finalResult == null) return;
+    if (cancellationToken.isCancelled) {
+      UINotifier.info(context, l10n.compressHistoryCancelled);
+      return;
+    }
+    if (finalResult.success > 0) {
+      UINotifier.success(
+        context,
+        l10n.compressHistorySuccess(
+          finalResult.success,
+          formatBytes(finalResult.savedBytes > 0 ? finalResult.savedBytes : 0),
+        ),
+      );
+    } else if (finalResult.failed == 0) {
+      UINotifier.info(context, l10n.compressHistoryNothing);
+    } else {
+      UINotifier.error(context, l10n.compressHistoryFailure);
+    }
   }
 
   Widget _buildScreenshotExpireItem(BuildContext context) {
@@ -576,12 +1185,17 @@ extension _SettingsScreenshotPart on _SettingsPageState {
         defaultValue: 50,
         legacyPrefKeys: const <String>['target_size_kb'],
       );
+      final String? aiSendFormat = await UserSettingsService.instance.getString(
+        UserSettingKeys.aiImageSendFormat,
+        defaultValue: 'original',
+      );
       if (mounted) {
         _settingsSetState(() {
           _imageFormat = format ?? 'webp_lossless';
           _imageQuality = quality.clamp(1, 100);
           _useTargetSize = useTarget;
           _targetSizeKb = targetKb < 50 ? 50 : targetKb;
+          _aiImageSendFormat = _normalizeAiImageSendFormat(aiSendFormat);
           _grayscale = false; // 灰度已移除
         });
       }
@@ -701,6 +1315,31 @@ extension _SettingsScreenshotPart on _SettingsPageState {
         UINotifier.success(
           context,
           AppLocalizations.of(context).screenshotQualitySettingsSaved,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        UINotifier.error(
+          context,
+          AppLocalizations.of(context).saveFailedError(e.toString()),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveAiImageSendFormat({bool showToast = true}) async {
+    try {
+      final String format = _normalizeAiImageSendFormat(_aiImageSendFormat);
+      await UserSettingsService.instance.setString(
+        UserSettingKeys.aiImageSendFormat,
+        format,
+      );
+      if (mounted && showToast) {
+        UINotifier.success(
+          context,
+          AppLocalizations.of(
+            context,
+          ).aiImageSendFormatSaved(_aiImageSendFormatLabel(context, format)),
         );
       }
     } catch (e) {
