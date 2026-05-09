@@ -72,6 +72,8 @@ class _TimelinePageState extends State<TimelinePage>
   final GlobalKey _gridKey = GlobalKey();
   final Map<int, GlobalKey> _itemKeys = <int, GlobalKey>{};
   StreamSubscription<AppLifecycleEvent>? _lifecycleSub;
+  StreamSubscription<void>? _screenshotSub;
+  Timer? _screenshotRefreshDebounce;
   TimelineJumpRequest? _pendingJump;
   VoidCallback? _jumpListener;
   bool _jumpInProgress = false;
@@ -98,6 +100,11 @@ class _TimelinePageState extends State<TimelinePage>
       setState(() {
         _privacyMode = enabled;
       });
+    });
+    // 截图服务会在新截图入库后发出通知。时间线页常驻在 IndexedStack 中，
+    // 所以这里仅在“最新日期发生变化”时重建日期 Tab，避免每张截图都重扫全局列表。
+    _screenshotSub = ScreenshotService.instance.onScreenshotSaved.listen((_) {
+      _scheduleRefreshAfterScreenshotChanged();
     });
     // 订阅应用生命周期事件：进入应用/首次进入时自动刷新
     _lifecycleSub = AppLifecycleService.instance.events.listen((event) {
@@ -239,6 +246,7 @@ class _TimelinePageState extends State<TimelinePage>
 
     if (!mounted) return;
     setState(() {
+      _resetIndexedTabStateForDayRebuild();
       // 已加载日期列表按倒序（越靠前越新）
       _allDayTabs
         ..clear()
@@ -264,6 +272,8 @@ class _TimelinePageState extends State<TimelinePage>
       } else {
         _currentTabIndex = 0;
         _tabController = null;
+        _dateStartMillis = null;
+        _dateEndMillis = null;
       }
     });
     await _reloadForCurrentTab(reset: true);
@@ -282,6 +292,101 @@ class _TimelinePageState extends State<TimelinePage>
     if (v is int) return v;
     if (v is num) return v.toInt();
     return int.tryParse(v.toString().trim()) ?? 0;
+  }
+
+  void _resetIndexedTabStateForDayRebuild() {
+    _screenshots = <ScreenshotRecord>[];
+    _pageOffset = 0;
+    _hasMore = true;
+    _isLoadingMore = false;
+    _tabCache.clear();
+    _tabOffset.clear();
+    _tabHasMore.clear();
+    _tabScrollOffset.clear();
+    _itemKeys.clear();
+    final List<AutoScrollController> oldControllers = _tabScrollControllers
+        .values
+        .toList(growable: false);
+    _tabScrollControllers.clear();
+
+    // 旧 GridView 会在本帧结束后卸载。延后一帧释放旧控制器，避免仍被
+    // Scrollable 挂载时直接 dispose。
+    if (oldControllers.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        for (final controller in oldControllers) {
+          try {
+            controller.dispose();
+          } catch (_) {}
+        }
+      });
+    }
+  }
+
+  void _scheduleRefreshAfterScreenshotChanged() {
+    _screenshotRefreshDebounce?.cancel();
+    _screenshotRefreshDebounce = Timer(const Duration(milliseconds: 600), () {
+      if (!mounted) return;
+      // ignore: discarded_futures
+      _refreshAfterScreenshotChanged();
+    });
+  }
+
+  Future<void> _refreshAfterScreenshotChanged() async {
+    if (!mounted) return;
+    if (_loading || _refreshing || _jumpInProgress) return;
+
+    try {
+      if (_dayTabs.isEmpty) {
+        await _refresh();
+        return;
+      }
+      final int? latestMillis = await ScreenshotService.instance
+          .getGlobalLatestCaptureTimeMillis();
+      if (!mounted || latestMillis == null || latestMillis <= 0) return;
+
+      final DateTime latest = DateTime.fromMillisecondsSinceEpoch(latestMillis);
+      final DateTime latestDay = DateTime(
+        latest.year,
+        latest.month,
+        latest.day,
+      );
+
+      // 只在日期前缀变化时自动刷新；同一天新增截图仍由进入时间线、
+      // 回到前台或手动刷新处理，避免后台高频截图导致全局列表频繁重载。
+      if (!_DayTabInfo._isSameYMD(latestDay, _dayTabs.first.day)) {
+        await _refresh();
+      }
+    } catch (_) {}
+  }
+
+  Future<bool> _rebuildDayTabsIfLatestDayChanged() async {
+    if (_dayTabs.isEmpty) return false;
+    try {
+      final int? latestMillis = await ScreenshotService.instance
+          .getGlobalLatestCaptureTimeMillis();
+      if (latestMillis == null || latestMillis <= 0) return false;
+
+      final DateTime latest = DateTime.fromMillisecondsSinceEpoch(latestMillis);
+      final DateTime latestDay = DateTime(
+        latest.year,
+        latest.month,
+        latest.day,
+      );
+      if (_DayTabInfo._isSameYMD(latestDay, _dayTabs.first.day)) {
+        return false;
+      }
+
+      try {
+        FlutterLogger.nativeInfo(
+          'Timeline',
+          '检测到最新日期变化，重建日期标签 latest=${latestDay.toIso8601String()} first=${_dayTabs.first.day.toIso8601String()}',
+        );
+      } catch (_) {}
+      await _prepareDayTabs();
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> _computeDayCountsConcurrently(
@@ -548,6 +653,9 @@ class _TimelinePageState extends State<TimelinePage>
         await _prepareDayTabs();
         return;
       }
+      final bool rebuiltTabs = await _rebuildDayTabsIfLatestDayChanged();
+      if (rebuiltTabs) return;
+
       final int idx = _currentTabIndex;
       setState(() {
         _screenshots.clear();
@@ -809,6 +917,9 @@ class _TimelinePageState extends State<TimelinePage>
 
   Widget _buildGridForIndex(int tabIndex) {
     final bool isCurrent = tabIndex == _currentTabIndex;
+    final int dayStartMillis = tabIndex >= 0 && tabIndex < _dayTabs.length
+        ? _dayTabs[tabIndex].startMillis
+        : 0;
     final List<ScreenshotRecord> data = isCurrent
         ? _screenshots
         : List<ScreenshotRecord>.from(
@@ -845,7 +956,9 @@ class _TimelinePageState extends State<TimelinePage>
                 return false;
               },
               child: GridView.builder(
-                key: PageStorageKey<String>('timeline_grid_tab_$tabIndex'),
+                key: PageStorageKey<String>(
+                  'timeline_grid_tab_${tabIndex}_$dayStartMillis',
+                ),
                 controller: _controllerForTab(tabIndex),
                 // 仅缓存当前视窗上下各一屏，超出即回收
                 cacheExtent: MediaQuery.of(context).size.height,
@@ -1656,6 +1769,7 @@ class _TimelinePageState extends State<TimelinePage>
 
   @override
   void dispose() {
+    _screenshotRefreshDebounce?.cancel();
     _tabController?.removeListener(_onTabChanged);
     _tabController?.dispose();
     // 逐一释放各Tab滚动控制器
@@ -1664,6 +1778,7 @@ class _TimelinePageState extends State<TimelinePage>
     }
     // 取消生命周期订阅
     _lifecycleSub?.cancel();
+    _screenshotSub?.cancel();
     try {
       if (_jumpListener != null)
         TimelineJumpService.instance.requestNotifier.removeListener(
