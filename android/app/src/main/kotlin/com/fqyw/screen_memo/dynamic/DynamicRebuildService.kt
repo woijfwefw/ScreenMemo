@@ -48,13 +48,17 @@ class DynamicRebuildService : Service() {
         private const val DEFAULT_DAY_CONCURRENCY = 1
         private const val MAX_DAY_CONCURRENCY = 10
         private const val DAY_RETRY_LIMIT = 3
+        private const val TASK_MODE_REBUILD = "rebuild"
+        private const val TASK_MODE_BACKFILL = "backfill"
 
         fun startOrResumeTask(
             context: Context,
             resumeExisting: Boolean = false,
             dayConcurrency: Int? = null,
+            taskMode: String? = null,
         ): Map<String, Any?> {
             val appCtx = try { context.applicationContext } catch (_: Exception) { context }
+            val normalizedTaskMode = normalizeTaskMode(taskMode)
             val normalizedConcurrency =
                 normalizeDayConcurrency(
                     dayConcurrency
@@ -122,12 +126,12 @@ class DynamicRebuildService : Service() {
                 current.aiChatPath = aiConfig.chatPath
                 current.aiProviderId = aiConfig.providerId
                 current.currentStage = "resume_requested"
-                current.currentStageLabel = "继续重建"
+                current.currentStageLabel = if (current.isBackfillMode()) "继续补全" else "继续重建"
                 current.currentStageDetail =
                     "已重新读取当前模型 ${aiConfig.model}，沿用现有进度继续处理"
                 current.appendRecentLog(
                     buildStageLogLine(
-                        "继续重建",
+                        if (current.isBackfillMode()) "继续补全" else "继续重建",
                         "已重新读取当前模型 ${aiConfig.model}，沿用现有进度继续处理",
                     ),
                 )
@@ -140,6 +144,7 @@ class DynamicRebuildService : Service() {
             val now = System.currentTimeMillis()
             val next = DynamicRebuildTaskState(
                 taskId = "dynamic_rebuild_$now",
+                taskMode = normalizedTaskMode,
                 status = DynamicRebuildTaskState.STATUS_PREPARING,
                 startedAt = now,
                 updatedAt = now,
@@ -153,8 +158,12 @@ class DynamicRebuildService : Service() {
                 currentSegmentId = 0L,
                 currentRangeLabel = "",
                 currentStage = "queued",
-                currentStageLabel = "等待后台启动",
-                currentStageDetail = "任务已创建，等待后台服务开始准备",
+                currentStageLabel = if (normalizedTaskMode == TASK_MODE_BACKFILL) "等待补全启动" else "等待后台启动",
+                currentStageDetail = if (normalizedTaskMode == TASK_MODE_BACKFILL) {
+                    "补全任务已创建，等待后台服务扫描缺漏"
+                } else {
+                    "任务已创建，等待后台服务开始准备"
+                },
                 lastError = null,
                 segmentDurationSec = 0,
                 segmentSampleIntervalSec = 0,
@@ -166,8 +175,12 @@ class DynamicRebuildService : Service() {
                 aiProviderId = null,
                 recentLogs = mutableListOf(
                     buildStageLogLine(
-                        "等待后台启动",
-                        "任务已创建，等待后台服务开始准备",
+                        if (normalizedTaskMode == TASK_MODE_BACKFILL) "等待补全启动" else "等待后台启动",
+                        if (normalizedTaskMode == TASK_MODE_BACKFILL) {
+                            "补全任务已创建，等待后台服务扫描缺漏"
+                        } else {
+                            "任务已创建，等待后台服务开始准备"
+                        },
                     ),
                 ),
                 dayWorks = mutableListOf(),
@@ -209,11 +222,12 @@ class DynamicRebuildService : Service() {
             current.updatedAt = current.completedAt
             current.currentStage = "cancelled"
             current.currentStageLabel = "已停止"
-            current.currentStageDetail = "已停止后台重建，当前进度可稍后继续"
+            current.currentStageDetail =
+                if (current.isBackfillMode()) "已停止后台补全，当前进度可稍后继续" else "已停止后台重建，当前进度可稍后继续"
             current.appendRecentLog(
                 buildStageLogLine(
                     "已停止",
-                    "已停止后台重建，当前进度可稍后继续",
+                    current.currentStageDetail,
                 ),
             )
             DynamicRebuildTaskStore.save(context, current)
@@ -233,6 +247,16 @@ class DynamicRebuildService : Service() {
 
         private fun normalizeDayConcurrency(raw: Int): Int {
             return raw.coerceIn(DEFAULT_DAY_CONCURRENCY, MAX_DAY_CONCURRENCY)
+        }
+
+        private fun normalizeTaskMode(raw: String?): String {
+            return when (raw?.trim()?.lowercase(Locale.US)) {
+                TASK_MODE_BACKFILL,
+                "complete",
+                "completion",
+                "fill_missing" -> TASK_MODE_BACKFILL
+                else -> TASK_MODE_REBUILD
+            }
         }
 
         private fun startService(context: Context, action: String) {
@@ -344,7 +368,7 @@ class DynamicRebuildService : Service() {
                 state = state,
                 stage = "worker_started",
                 label = "后台任务启动",
-                detail = "已进入按天并发重建流程",
+                detail = if (state.isBackfillMode()) "已进入按天并发补全流程" else "已进入按天并发重建流程",
             )
 
             if (!state.hasPreparedWorks()) {
@@ -363,8 +387,12 @@ class DynamicRebuildService : Service() {
             recordStage(
                 state = state,
                 stage = "running",
-                label = "开始按天并发重建",
-                detail = "按天分组处理，最多 ${state.dayConcurrency} 天同时执行",
+                label = if (state.isBackfillMode()) "开始按天并发补全" else "开始按天并发重建",
+                detail = if (state.isBackfillMode()) {
+                    "按天分组补齐缺失动态，最多 ${state.dayConcurrency} 天同时执行"
+                } else {
+                    "按天分组处理，最多 ${state.dayConcurrency} 天同时执行"
+                },
             )
 
             finalState = processPreparedDays(state)
@@ -412,33 +440,51 @@ class DynamicRebuildService : Service() {
 
         val durationSec = readSegmentDurationSec()
         val sampleIntervalSec = readSegmentSampleIntervalSec()
+        val backfillMode = state.isBackfillMode()
         recordStage(
             state = state,
             stage = "prepare_worklist",
-            label = "生成按天清单",
-            detail = "按截图时间顺序计算全量重建范围，并按日期分组",
+            label = if (backfillMode) "扫描缺漏清单" else "生成按天清单",
+            detail = if (backfillMode) {
+                "按截图时间逐日扫描，跳过已有动态结果，仅收集缺失窗口"
+            } else {
+                "按截图时间顺序计算全量重建范围，并按日期分组"
+            },
         )
-        val windows = SegmentSummaryManager.buildFullRebuildWorklist(this, durationSec)
+        val windows = if (backfillMode) {
+            SegmentSummaryManager.buildMissingBackfillWorklist(this, durationSec)
+        } else {
+            SegmentSummaryManager.buildFullRebuildWorklist(this, durationSec)
+        }
         val dayWorks = buildDayWorkItems(windows)
         val aiConfig = if (windows.isNotEmpty()) {
             recordStage(
                 state = state,
                 stage = "prepare_ai_config",
                 label = "读取 AI 配置",
-                detail = "准备动态重建所需的模型配置",
+                detail = if (backfillMode) "准备动态补全所需的模型配置" else "准备动态重建所需的模型配置",
             )
             AISettingsNative.readConfigSnapshot(this, "segments")
         } else {
             null
         }
 
-        recordStage(
-            state = state,
-            stage = "prepare_reset",
-            label = "清空旧动态数据",
-            detail = "删除旧的动态、总结与样本，准备重建",
-        )
-        SegmentDatabaseHelper.resetAllDynamicRebuildArtifacts(this)
+        if (!backfillMode) {
+            recordStage(
+                state = state,
+                stage = "prepare_reset",
+                label = "清空旧动态数据",
+                detail = "删除旧的动态、总结与样本，准备重建",
+            )
+            SegmentDatabaseHelper.resetAllDynamicRebuildArtifacts(this)
+        } else {
+            recordStage(
+                state = state,
+                stage = "prepare_keep_existing",
+                label = "保留现有动态",
+                detail = "补全模式不会清空已有动态，只处理扫描出的缺失窗口",
+            )
+        }
 
         state.segmentDurationSec = durationSec
         state.segmentSampleIntervalSec = sampleIntervalSec
@@ -475,11 +521,11 @@ class DynamicRebuildService : Service() {
             state.updatedAt = state.completedAt
             state.currentStage = "completed_empty"
             state.currentStageLabel = "准备完成"
-            state.currentStageDetail = "没有找到可重建的动态"
+            state.currentStageDetail = if (backfillMode) "没有找到需要补全的动态" else "没有找到可重建的动态"
             state.appendRecentLog(
                 buildStageLogLine(
                     "准备完成",
-                    "没有找到可重建的动态",
+                    if (backfillMode) "没有找到需要补全的动态" else "没有找到可重建的动态",
                 ),
             )
             synchronized(stateLock) {
@@ -498,7 +544,11 @@ class DynamicRebuildService : Service() {
             stage = "prepare_done",
             label = "准备完成",
             detail =
-                "共 ${state.totalSegments} 条动态，覆盖 ${state.totalDays()} 天，并发 ${state.dayConcurrency} 天",
+                if (backfillMode) {
+                    "发现 ${state.totalSegments} 条需补全动态，覆盖 ${state.totalDays()} 天，并发 ${state.dayConcurrency} 天"
+                } else {
+                    "共 ${state.totalSegments} 条动态，覆盖 ${state.totalDays()} 天，并发 ${state.dayConcurrency} 天"
+                },
         )
         return state
     }
@@ -666,7 +716,13 @@ class DynamicRebuildService : Service() {
             recordStage(
                 state = state,
                 stage = "window_start",
-                label = if (snapshot.retryCount > 0) "继续处理失败日期" else "开始处理当天动态",
+                label = if (snapshot.retryCount > 0) {
+                    "继续处理失败日期"
+                } else if (state.isBackfillMode()) {
+                    "开始补全当天动态"
+                } else {
+                    "开始处理当天动态"
+                },
                 detail =
                     "第 ${snapshot.processedSegments + 1}/${snapshot.totalSegments} 条 · ${snapshot.dayKey} ${snapshot.rangeLabel}".trim(),
                 slotId = slotId,
@@ -740,7 +796,11 @@ class DynamicRebuildService : Service() {
                         state = state,
                         stage = "day_completed",
                         label = "当天完成",
-                        detail = "已完成 ${snapshot.dayKey} 的 ${snapshot.totalSegments} 条动态",
+                        detail = if (state.isBackfillMode()) {
+                            "已补全 ${snapshot.dayKey} 的 ${snapshot.totalSegments} 条缺失动态"
+                        } else {
+                            "已完成 ${snapshot.dayKey} 的 ${snapshot.totalSegments} 条动态"
+                        },
                         slotId = slotId,
                         dayKey = snapshot.dayKey,
                         dayIndex = dayIndex,
@@ -940,7 +1000,11 @@ class DynamicRebuildService : Service() {
                 state.currentStage = "completed_with_failures"
                 state.currentStageLabel = "部分完成"
                 state.currentStageDetail =
-                    "已完成 ${state.processedSegments}/${state.totalSegments} 条动态，仍有 $failedDays/${state.totalDays()} 天待继续"
+                    if (state.isBackfillMode()) {
+                        "已补全 ${state.processedSegments}/${state.totalSegments} 条动态，仍有 $failedDays/${state.totalDays()} 天待继续"
+                    } else {
+                        "已完成 ${state.processedSegments}/${state.totalSegments} 条动态，仍有 $failedDays/${state.totalDays()} 天待继续"
+                    }
                 state.appendRecentLog(
                     buildStageLogLine(
                         "部分完成",
@@ -952,7 +1016,11 @@ class DynamicRebuildService : Service() {
                 state.currentStage = "completed"
                 state.currentStageLabel = "全部完成"
                 state.currentStageDetail =
-                    "共完成 ${state.processedSegments}/${state.totalSegments} 条动态"
+                    if (state.isBackfillMode()) {
+                        "共补全 ${state.processedSegments}/${state.totalSegments} 条缺失动态"
+                    } else {
+                        "共完成 ${state.processedSegments}/${state.totalSegments} 条动态"
+                    }
                 state.appendRecentLog(
                     buildStageLogLine(
                         "全部完成",
@@ -1001,6 +1069,8 @@ class DynamicRebuildService : Service() {
         slot.currentStageDetail =
             if (day.retryCount > 0) {
                 "准备从失败位置继续第 ${day.retryCount}/${DAY_RETRY_LIMIT} 次续跑"
+            } else if (state.isBackfillMode()) {
+                "准备补全 ${day.dayKey} 的 ${day.totalSegments()} 条缺失动态"
             } else {
                 "准备处理 ${day.dayKey} 的 ${day.totalSegments()} 条动态"
             }
@@ -1038,7 +1108,11 @@ class DynamicRebuildService : Service() {
             slot.processedSegments = day.processedSegments
             slot.currentRangeLabel = ""
             slot.currentStageLabel = "当天完成"
-            slot.currentStageDetail = "已完成 ${day.dayKey} 的 ${day.totalSegments()} 条动态"
+            slot.currentStageDetail = if (state.isBackfillMode()) {
+                "已补全 ${day.dayKey} 的 ${day.totalSegments()} 条缺失动态"
+            } else {
+                "已完成 ${day.dayKey} 的 ${day.totalSegments()} 条动态"
+            }
             slot.currentSegmentId = 0L
             slot.retryCount = day.retryCount
             slot.retryLimit = DAY_RETRY_LIMIT
@@ -1161,44 +1235,68 @@ class DynamicRebuildService : Service() {
     }
 
     private fun buildNotification(state: DynamicRebuildTaskState): Notification {
+        val backfill = state.isBackfillMode()
         val title = when (state.status) {
-            DynamicRebuildTaskState.STATUS_PREPARING -> getString(R.string.dynamic_rebuild_notif_preparing_title)
-            DynamicRebuildTaskState.STATUS_COMPLETED -> getString(R.string.dynamic_rebuild_notif_done_title)
-            DynamicRebuildTaskState.STATUS_COMPLETED_WITH_FAILURES -> getString(R.string.dynamic_rebuild_notif_done_title)
-            DynamicRebuildTaskState.STATUS_FAILED -> getString(R.string.dynamic_rebuild_notif_failed_title)
-            DynamicRebuildTaskState.STATUS_CANCELLED -> getString(R.string.dynamic_rebuild_notif_cancelled_title)
-            else -> getString(R.string.dynamic_rebuild_notif_running_title)
+            DynamicRebuildTaskState.STATUS_PREPARING ->
+                if (backfill) "正在准备动态补全" else getString(R.string.dynamic_rebuild_notif_preparing_title)
+            DynamicRebuildTaskState.STATUS_COMPLETED ->
+                if (backfill) "动态补全完成" else getString(R.string.dynamic_rebuild_notif_done_title)
+            DynamicRebuildTaskState.STATUS_COMPLETED_WITH_FAILURES ->
+                if (backfill) "动态补全完成" else getString(R.string.dynamic_rebuild_notif_done_title)
+            DynamicRebuildTaskState.STATUS_FAILED ->
+                if (backfill) "动态补全失败" else getString(R.string.dynamic_rebuild_notif_failed_title)
+            DynamicRebuildTaskState.STATUS_CANCELLED ->
+                if (backfill) "动态补全已停止" else getString(R.string.dynamic_rebuild_notif_cancelled_title)
+            else ->
+                if (backfill) "正在补全动态" else getString(R.string.dynamic_rebuild_notif_running_title)
         }
 
         val detail = when (state.status) {
             DynamicRebuildTaskState.STATUS_PREPARING ->
-                getString(R.string.dynamic_rebuild_notif_preparing_text)
+                if (backfill) "正在扫描历史截图并查找缺失动态" else getString(R.string.dynamic_rebuild_notif_preparing_text)
             DynamicRebuildTaskState.STATUS_COMPLETED ->
                 if (state.totalSegments <= 0) {
-                    getString(R.string.dynamic_rebuild_notif_done_empty_text)
+                    if (backfill) "没有需要补全的动态" else getString(R.string.dynamic_rebuild_notif_done_empty_text)
                 } else {
-                    getString(
-                        R.string.dynamic_rebuild_notif_done_text,
-                        state.processedSegments,
-                    )
+                    if (backfill) {
+                        "已补全 ${state.processedSegments} 个缺失动态"
+                    } else {
+                        getString(
+                            R.string.dynamic_rebuild_notif_done_text,
+                            state.processedSegments,
+                        )
+                    }
                 }
             DynamicRebuildTaskState.STATUS_COMPLETED_WITH_FAILURES ->
-                "已完成 ${state.processedSegments}/${state.totalSegments} 条动态，仍有 ${state.failedDayCount()}/${state.totalDays()} 天待继续"
+                if (backfill) {
+                    "已补全 ${state.processedSegments}/${state.totalSegments} 条缺失动态，仍有 ${state.failedDayCount()}/${state.totalDays()} 天待继续"
+                } else {
+                    "已完成 ${state.processedSegments}/${state.totalSegments} 条动态，仍有 ${state.failedDayCount()}/${state.totalDays()} 天待继续"
+                }
             DynamicRebuildTaskState.STATUS_FAILED ->
-                state.lastError ?: getString(R.string.dynamic_rebuild_notif_failed_generic)
+                state.lastError ?: if (backfill) "补全任务执行失败，请打开动态页查看详情" else getString(R.string.dynamic_rebuild_notif_failed_generic)
             DynamicRebuildTaskState.STATUS_CANCELLED ->
-                getString(
-                    R.string.dynamic_rebuild_notif_cancelled_text,
-                    state.processedSegments,
-                    state.totalSegments,
-                )
+                if (backfill) {
+                    "已停止在 ${state.processedSegments}/${state.totalSegments}，可稍后继续补全"
+                } else {
+                    getString(
+                        R.string.dynamic_rebuild_notif_cancelled_text,
+                        state.processedSegments,
+                        state.totalSegments,
+                    )
+                }
             else -> {
-                val summary = getString(
-                    R.string.dynamic_rebuild_notif_running_text,
-                    state.currentWorkOrdinal(),
-                    state.totalSegments,
-                    state.progressPercentText(),
-                )
+                val summary =
+                    if (backfill) {
+                        "正在补全第 ${state.currentWorkOrdinal()}/${state.totalSegments} 条缺失动态（${state.progressPercentText()}）"
+                    } else {
+                        getString(
+                            R.string.dynamic_rebuild_notif_running_text,
+                            state.currentWorkOrdinal(),
+                            state.totalSegments,
+                            state.progressPercentText(),
+                        )
+                    }
                 val activeDays = state.activeDayKeys(limit = state.dayConcurrency)
                 val scopeLines = mutableListOf<String>()
                 scopeLines.add("并发 ${state.dayConcurrency} 天")
@@ -1207,7 +1305,9 @@ class DynamicRebuildService : Service() {
                 } else if (state.timelineCutoffDayKey.isNotBlank()) {
                     scopeLines.add("排队到：${state.timelineCutoffDayKey}")
                 } else {
-                    scopeLines.add(getString(R.string.dynamic_rebuild_notif_running_scope_default))
+                    scopeLines.add(
+                        if (backfill) "正在扫描缺失动态" else getString(R.string.dynamic_rebuild_notif_running_scope_default)
+                    )
                 }
                 "$summary\n${scopeLines.joinToString(" · ")}"
             }
@@ -1319,7 +1419,8 @@ class DynamicRebuildService : Service() {
 
     private fun buildTaskReport(state: DynamicRebuildTaskState): String {
         val sb = StringBuilder()
-        sb.appendLine("ScreenMemo 动态重建报告")
+        sb.appendLine(if (state.isBackfillMode()) "ScreenMemo 动态补全报告" else "ScreenMemo 动态重建报告")
+        sb.appendLine("模式: ${state.taskMode}")
         sb.appendLine("状态: ${state.status}")
         sb.appendLine("开始时间: ${state.startedAt}")
         sb.appendLine("完成时间: ${state.completedAt}")
@@ -1728,6 +1829,7 @@ private data class DayRunResult(
 
 private data class DynamicRebuildTaskState(
     val taskId: String,
+    var taskMode: String,
     var status: String,
     val startedAt: Long,
     var updatedAt: Long,
@@ -1769,6 +1871,7 @@ private data class DynamicRebuildTaskState(
         fun idle(): DynamicRebuildTaskState {
             return DynamicRebuildTaskState(
                 taskId = "",
+                taskMode = "rebuild",
                 status = STATUS_IDLE,
                 startedAt = 0L,
                 updatedAt = 0L,
@@ -1803,6 +1906,8 @@ private data class DynamicRebuildTaskState(
     fun isRecoverable(): Boolean {
         return status == STATUS_PREPARING || status == STATUS_PENDING || status == STATUS_RUNNING
     }
+
+    fun isBackfillMode(): Boolean = taskMode == "backfill"
 
     fun hasPreparedWorks(): Boolean = dayWorks.isNotEmpty() || totalSegments > 0
 
@@ -1885,6 +1990,7 @@ private data class DynamicRebuildTaskState(
     }
 
     fun prepareForExecution() {
+        taskMode = if (taskMode == "backfill") "backfill" else "rebuild"
         dayConcurrency = dayConcurrency.coerceIn(1, 10)
         while (workerSlots.size < dayConcurrency) {
             workerSlots.add(
@@ -1969,6 +2075,7 @@ private data class DynamicRebuildTaskState(
     fun toMap(): Map<String, Any?> {
         return hashMapOf(
             "taskId" to taskId,
+            "taskMode" to taskMode,
             "status" to status,
             "startedAt" to startedAt,
             "updatedAt" to updatedAt,
@@ -2045,6 +2152,10 @@ private object DynamicRebuildTaskStore {
             val workerSlots = loadWorkerSlots(obj, dayConcurrency)
             DynamicRebuildTaskState(
                 taskId = obj.optString("taskId", ""),
+                taskMode = when (obj.optString("taskMode", "rebuild").trim().lowercase(Locale.US)) {
+                    "backfill", "complete", "completion", "fill_missing" -> "backfill"
+                    else -> "rebuild"
+                },
                 status = obj.optString("status", DynamicRebuildTaskState.STATUS_IDLE),
                 startedAt = obj.optLong("startedAt", 0L),
                 updatedAt = obj.optLong("updatedAt", 0L),
@@ -2104,6 +2215,7 @@ private object DynamicRebuildTaskStore {
         state.recentLogs.forEach { recentLogs.put(it) }
         val obj = JSONObject()
             .put("taskId", state.taskId)
+            .put("taskMode", state.taskMode)
             .put("status", state.status)
             .put("startedAt", state.startedAt)
             .put("updatedAt", state.updatedAt)

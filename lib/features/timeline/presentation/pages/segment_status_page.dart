@@ -225,6 +225,7 @@ class _SegmentStatusPageState extends State<SegmentStatusPage>
   DynamicRebuildTaskStatus _dynamicRebuildTaskStatus =
       const DynamicRebuildTaskStatus(
         taskId: '',
+        taskMode: 'rebuild',
         status: 'idle',
         startedAt: 0,
         updatedAt: 0,
@@ -374,7 +375,7 @@ class _SegmentStatusPageState extends State<SegmentStatusPage>
                 color: _dynamicRebuildTaskColor(_dynamicRebuildTaskStatus),
               ),
             ),
-            tooltip: '重建动态',
+            tooltip: '动态任务',
             onPressed: _openDynamicRebuildTaskSheet,
           ),
           IconButton(

@@ -1336,6 +1336,41 @@ object SegmentDatabaseHelper {
     }
 
     /**
+     * 查询给定时间窗是否已经被一条可展示的全局动态结果覆盖。
+     *
+     * 补全任务会按截图重新推导标准时间窗；若此前相邻窗口已经被合并为一条更长动态，
+     * 这里用覆盖关系跳过，避免为已合并内容重复创建动态。
+     */
+    fun hasUsableResultCoveringWindow(context: Context, startMillis: Long, endMillis: Long): Boolean {
+        var db: SQLiteDatabase? = null
+        var cursor: Cursor? = null
+        return try {
+            db = openMasterDb(context, writable = false) ?: return false
+            cursor = db.rawQuery(
+                """
+                SELECT 1
+                FROM segments s
+                JOIN segment_results r ON r.segment_id = s.id
+                WHERE (s.segment_kind IS NULL OR s.segment_kind = 'global')
+                  AND s.status = 'completed'
+                  AND (s.merged_into_id IS NULL)
+                  AND s.start_time <= ? AND s.end_time >= ?
+                  AND (
+                    (r.output_text IS NOT NULL AND LOWER(TRIM(r.output_text)) NOT IN ('', 'null'))
+                    OR (r.structured_json IS NOT NULL AND LOWER(TRIM(r.structured_json)) NOT IN ('', 'null'))
+                  )
+                LIMIT 1
+                """.trimIndent(),
+                arrayOf(startMillis.toString(), endMillis.toString())
+            )
+            cursor.moveToFirst()
+        } catch (_: Exception) { false } finally {
+            try { cursor?.close() } catch (_: Exception) {}
+            try { db?.close() } catch (_: Exception) {}
+        }
+    }
+
+    /**
      * 查询：某个 segment 是否已经有结果。
      */
     fun hasResultForSegment(context: Context, segmentId: Long): Boolean {

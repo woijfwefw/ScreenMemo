@@ -34,8 +34,8 @@
     <string name="import_ocr_notif_failed_generic">任务执行失败，请打开导入诊断查看详情</string>
     <string name="import_ocr_notif_cancelled_title">图片文字修复已取消</string>
     <string name="import_ocr_notif_cancelled_text">修复任务已停止，可稍后重新继续</string>
-    <string name="dynamic_rebuild_channel_name">动态重建</string>
-    <string name="dynamic_rebuild_channel_desc">显示动态全量重建进度</string>
+    <string name="dynamic_rebuild_channel_name">动态任务</string>
+    <string name="dynamic_rebuild_channel_desc">显示动态重建与补全进度</string>
     <string name="dynamic_rebuild_notif_preparing_title">正在准备动态重建</string>
     <string name="dynamic_rebuild_notif_preparing_text">正在清空旧动态并扫描历史截图</string>
     <string name="dynamic_rebuild_notif_running_title">正在重建动态</string>

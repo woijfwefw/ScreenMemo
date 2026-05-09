@@ -5307,6 +5307,43 @@ object SegmentSummaryManager {
         return works
     }
 
+    fun buildMissingBackfillWorklist(ctx: Context, durationSec: Int): List<DynamicRebuildWindow> {
+        val allWindows = buildFullRebuildWorklist(ctx, durationSec)
+        if (allWindows.isEmpty()) return emptyList()
+
+        val now = System.currentTimeMillis()
+        val missing = ArrayList<DynamicRebuildWindow>()
+        val dayStats = LinkedHashMap<String, Int>()
+        for (window in allWindows) {
+            if (window.endTime > now) continue
+            val covered = try {
+                SegmentDatabaseHelper.hasUsableResultCoveringWindow(
+                    ctx,
+                    window.startTime,
+                    window.endTime,
+                )
+            } catch (_: Exception) {
+                false
+            }
+            if (covered) continue
+            missing.add(window)
+            val dayKey = dateKeyFromMillis(window.startTime)
+            dayStats[dayKey] = (dayStats[dayKey] ?: 0) + 1
+        }
+        if (missing.isNotEmpty()) {
+            val preview = dayStats.entries.take(12).joinToString(", ") { "${it.key}:${it.value}" }
+            try {
+                FileLogger.i(
+                    TAG,
+                    "backfillMissing: scanned=${allWindows.size} missing=${missing.size} days=${dayStats.size} preview=$preview",
+                )
+            } catch (_: Exception) {}
+        } else {
+            try { FileLogger.i(TAG, "backfillMissing: scanned=${allWindows.size} missing=0") } catch (_: Exception) {}
+        }
+        return missing
+    }
+
     fun rebuildWindowStrict(
         ctx: Context,
         windowStart: Long,

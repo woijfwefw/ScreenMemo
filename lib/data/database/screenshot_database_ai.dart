@@ -84,6 +84,7 @@ class DynamicRebuildWorkerState {
 
 class DynamicRebuildTaskStatus {
   final String taskId;
+  final String taskMode;
   final String status;
   final int startedAt;
   final int updatedAt;
@@ -112,6 +113,7 @@ class DynamicRebuildTaskStatus {
 
   const DynamicRebuildTaskStatus({
     required this.taskId,
+    required this.taskMode,
     required this.status,
     required this.startedAt,
     required this.updatedAt,
@@ -150,6 +152,7 @@ class DynamicRebuildTaskStatus {
         : lastErrorRaw;
     return DynamicRebuildTaskStatus(
       taskId: (data['taskId'] as String?) ?? '',
+      taskMode: _normalizeTaskMode(data['taskMode']),
       status: (data['status'] as String?) ?? 'idle',
       startedAt: _safeTaskInt(data['startedAt']),
       updatedAt: _safeTaskInt(data['updatedAt']),
@@ -210,7 +213,22 @@ class DynamicRebuildTaskStatus {
 
   static int safeTaskInt(Object? value) => _safeTaskInt(value);
 
+  static String _normalizeTaskMode(Object? value) {
+    final String raw = value?.toString().trim().toLowerCase() ?? '';
+    switch (raw) {
+      case 'backfill':
+      case 'complete':
+      case 'completion':
+      case 'fill_missing':
+        return 'backfill';
+      default:
+        return 'rebuild';
+    }
+  }
+
   bool get isIdle => status == 'idle' || taskId.isEmpty;
+  bool get isBackfillMode => taskMode == 'backfill';
+  bool get isRebuildMode => !isBackfillMode;
   bool get isPreparing => status == 'preparing';
   bool get isPending => status == 'pending';
   bool get isRunning => status == 'running';
@@ -238,8 +256,9 @@ class DynamicRebuildTaskStatus {
 
   String toText() {
     final StringBuffer sb = StringBuffer();
-    sb.writeln('ScreenMemo 动态全量重建');
+    sb.writeln(isBackfillMode ? 'ScreenMemo 动态缺漏补全' : 'ScreenMemo 动态全量重建');
     sb.writeln('taskId: ${taskId.isEmpty ? '(none)' : taskId}');
+    sb.writeln('taskMode: $taskMode');
     sb.writeln('status: $status');
     sb.writeln(
       'startedAt: ${startedAt > 0 ? _fmtTaskTime(startedAt) : '(null)'}',
@@ -2745,14 +2764,14 @@ ORDER BY day ASC
   Future<DynamicRebuildTaskStatus> startDynamicRebuildTask({
     bool resumeExisting = false,
     int dayConcurrency = 1,
+    String taskMode = 'rebuild',
   }) async {
-    final dynamic raw = await ScreenshotDatabase._channel.invokeMethod(
-      'startDynamicRebuildTask',
-      <String, dynamic>{
-        'resumeExisting': resumeExisting,
-        'dayConcurrency': dayConcurrency,
-      },
-    );
+    final dynamic raw = await ScreenshotDatabase._channel
+        .invokeMethod('startDynamicRebuildTask', <String, dynamic>{
+          'resumeExisting': resumeExisting,
+          'dayConcurrency': dayConcurrency,
+          'taskMode': taskMode,
+        });
     if (raw is Map) {
       return DynamicRebuildTaskStatus.fromMap(raw);
     }

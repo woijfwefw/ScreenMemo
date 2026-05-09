@@ -6,6 +6,7 @@ void main() {
     final DynamicRebuildTaskStatus status = DynamicRebuildTaskStatus.fromMap(
       <String, Object?>{
         'taskId': 'dynamic_rebuild_1',
+        'taskMode': 'backfill',
         'status': 'completed_with_failures',
         'startedAt': 100,
         'updatedAt': 200,
@@ -69,6 +70,8 @@ void main() {
     );
 
     expect(status.dayConcurrency, 3);
+    expect(status.taskMode, 'backfill');
+    expect(status.isBackfillMode, isTrue);
     expect(status.totalDays, 4);
     expect(status.completedDays, 2);
     expect(status.pendingDays, 2);
