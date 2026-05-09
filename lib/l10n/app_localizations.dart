@@ -5310,12 +5310,6 @@ abstract class AppLocalizations {
   /// **'Do not query'**
   String get balanceEndpointNone;
 
-  /// No description provided for @balanceEndpointNewApi.
-  ///
-  /// In en, this message translates to:
-  /// **'new-api (/dashboard/billing)'**
-  String get balanceEndpointNewApi;
-
   /// No description provided for @balanceEndpointSub2api.
   ///
   /// In en, this message translates to:

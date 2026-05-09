@@ -1529,7 +1529,6 @@
   "providerDeleteAllKeys": "删除全部",
   "providerNoApiKeys": "暂无 API Key。",
   "balanceEndpointNone": "不查询",
-  "balanceEndpointNewApi": "new-api（/dashboard/billing）",
   "balanceEndpointSub2api": "sub2api（/v1/usage）",
   "segmentEntryLogHint": "直接长按选择文本，或点复制按钮一次性复制。",
   "segmentEntryLogCopied": "已复制动态进入日志",

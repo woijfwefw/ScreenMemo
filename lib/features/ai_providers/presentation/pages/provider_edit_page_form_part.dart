@@ -627,10 +627,6 @@ extension _ProviderEditFormPart on _ProviderEditPageState {
         child: Text(l10n.balanceEndpointNone),
       ),
       DropdownMenuItem(
-        value: AIBalanceEndpointTypes.newApi,
-        child: Text(l10n.balanceEndpointNewApi),
-      ),
-      DropdownMenuItem(
         value: AIBalanceEndpointTypes.sub2api,
         child: Text(l10n.balanceEndpointSub2api),
       ),

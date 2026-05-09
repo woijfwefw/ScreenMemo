@@ -2880,9 +2880,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get balanceEndpointNone => '不查询';
 
   @override
-  String get balanceEndpointNewApi => 'new-api（/dashboard/billing）';
-
-  @override
   String get balanceEndpointSub2api => 'sub2api（/v1/usage）';
 
   @override

@@ -1529,7 +1529,6 @@
   "providerDeleteAllKeys": "모두 삭제",
   "providerNoApiKeys": "API Key가 없습니다.",
   "balanceEndpointNone": "조회 안 함",
-  "balanceEndpointNewApi": "new-api（/dashboard/billing）",
   "balanceEndpointSub2api": "sub2api（/v1/usage）",
   "segmentEntryLogHint": "길게 눌러 텍스트를 선택하거나 복사 버튼을 눌러 한 번에 복사하세요.",
   "segmentEntryLogCopied": "동적 진입 로그를 복사했습니다",

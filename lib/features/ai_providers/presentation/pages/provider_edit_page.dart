@@ -64,7 +64,7 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
   String _type = AIProviderTypes.openai;
   bool _useResponseApi = false;
 
-  /// 余额查询接口类型，'none' / 'new_api' / 'sub2api'。
+  /// 余额查询接口类型，'none' / 'sub2api'。
   String _balanceEndpointType = AIBalanceEndpointTypes.none;
 
   /// 余额为 0 时自动删除该 key。

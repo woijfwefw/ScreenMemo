@@ -386,7 +386,7 @@ extension ScreenshotDatabaseAI on ScreenshotDatabase {
   /// 保证 ai_providers 表拥有余额相关列（增量迁移、幂等）。
   ///
   /// 存在两个列：
-  /// - balance_endpoint_type: 余额查询接口类型（'none' / 'new_api' / 'sub2api'）
+  /// - balance_endpoint_type: 余额查询接口类型（'none' / 'sub2api'）
   /// - balance_auto_delete_zero_key: 余额为 0 时是否自动删除该 key（0/1）
   ///
   /// 另保留一个历史字段 balance_path（早期实现预留、当前未使用）。
@@ -735,7 +735,7 @@ extension ScreenshotDatabaseAI on ScreenshotDatabase {
         base_url TEXT,
         chat_path TEXT,
         models_path TEXT,
-        balance_endpoint_type TEXT,                               -- 余额接口类型：none | new_api | sub2api
+        balance_endpoint_type TEXT,                               -- 余额接口类型：none | sub2api
         balance_auto_delete_zero_key INTEGER NOT NULL DEFAULT 0,  -- 余额=0 时自动删除 key
         use_response_api INTEGER NOT NULL DEFAULT 0,              -- OpenAI Response API 兼容
         enabled INTEGER NOT NULL DEFAULT 1,

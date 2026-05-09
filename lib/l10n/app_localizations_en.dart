@@ -2993,9 +2993,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get balanceEndpointNone => 'Do not query';
 
   @override
-  String get balanceEndpointNewApi => 'new-api (/dashboard/billing)';
-
-  @override
   String get balanceEndpointSub2api => 'sub2api (/v1/usage)';
 
   @override

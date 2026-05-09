@@ -59,25 +59,25 @@ class AIProviderTypes {
   ];
 }
 
-/// 余额查询接口类型：仅适配 new-api 与 sub2api 两个开源项目。
+/// 余额查询接口类型。
 class AIBalanceEndpointTypes {
   /// 不查询余额。
   static const String none = 'none';
-
-  /// new-api：GET /dashboard/billing/subscription + /dashboard/billing/usage，
-  /// Bearer 鉴权，主余额 = hard_limit_usd - total_usage / 100。
-  static const String newApi = 'new_api';
 
   /// sub2api：GET /v1/usage，Bearer 鉴权，
   /// 顶层 remaining 字段（USD），unrestricted 模式还包含 balance。
   static const String sub2api = 'sub2api';
 
-  static const List<String> all = <String>[none, newApi, sub2api];
+  // 历史配置值。new-api 的普通模型 Key 无法稳定代表用户实际余额，
+  // 因此旧配置统一降级为 none，不再发起余额查询。
+  static const String _legacyNewApi = 'new_api';
 
-  /// 规范化字符串：把空 / null / 未识别值都归一为 [none]。
+  static const List<String> all = <String>[none, sub2api];
+
+  /// 规范化字符串：把空 / null / 未识别值和历史 new-api 值都归一为 [none]。
   static String normalize(String? value) {
     final v = (value ?? '').trim().toLowerCase();
-    if (v == newApi) return newApi;
+    if (v == _legacyNewApi) return none;
     if (v == sub2api) return sub2api;
     return none;
   }
@@ -847,8 +847,7 @@ class AIProvidersService {
 
   /// 调用提供商的余额接口，返回 [ProviderKeyBalance]。
   ///
-  /// - 仅支持 [AIBalanceEndpointTypes.newApi] 与 [AIBalanceEndpointTypes.sub2api]
-  ///   两种接口类型；其他类型会抛出异常。
+  /// - 仅支持 [AIBalanceEndpointTypes.sub2api]；其他类型会抛出异常。
   /// - 失败时抛出 [Exception]，调用方应捕获并降级处理。
   Future<ProviderKeyBalance> fetchBalance({
     required AIProvider provider,
@@ -864,8 +863,6 @@ class AIProvidersService {
     }
     final baseUrl = _baseUrlOrDefaultOpenAI(provider.baseUrl);
     switch (type) {
-      case AIBalanceEndpointTypes.newApi:
-        return _fetchNewApiBalance(baseUrl: baseUrl, apiKey: trimmedKey);
       case AIBalanceEndpointTypes.sub2api:
         return _fetchSub2ApiBalance(baseUrl: baseUrl, apiKey: trimmedKey);
       default:
@@ -965,66 +962,6 @@ class AIProvidersService {
     }
 
     return balance;
-  }
-
-  /// new-api 兼容：
-  /// - GET {baseUrl}/dashboard/billing/subscription → hard_limit_usd
-  /// - GET {baseUrl}/dashboard/billing/usage        → total_usage（usage*100）
-  /// 主余额 = hard_limit_usd - total_usage / 100。
-  Future<ProviderKeyBalance> _fetchNewApiBalance({
-    required String baseUrl,
-    required String apiKey,
-  }) async {
-    final headers = <String, String>{'Authorization': 'Bearer $apiKey'};
-    final subUri = Uri.parse('$baseUrl/dashboard/billing/subscription');
-    final usageUri = Uri.parse('$baseUrl/dashboard/billing/usage');
-
-    final subResp = await http.get(subUri, headers: headers);
-    if (subResp.statusCode < 200 || subResp.statusCode >= 300) {
-      throw Exception(
-        'new-api subscription request failed: ${subResp.statusCode} ${subResp.body}',
-      );
-    }
-    double? hardLimit;
-    try {
-      final body = jsonDecode(subResp.body);
-      if (body is Map) {
-        final v =
-            body['hard_limit_usd'] ??
-            body['system_hard_limit_usd'] ??
-            body['soft_limit_usd'];
-        hardLimit = _coerceDouble(v);
-      }
-    } catch (_) {}
-    if (hardLimit == null) {
-      throw Exception(
-        'new-api subscription parse failed: ${_clipBody(subResp.body)}',
-      );
-    }
-
-    double totalUsage = 0;
-    try {
-      final usageResp = await http.get(usageUri, headers: headers);
-      if (usageResp.statusCode >= 200 && usageResp.statusCode < 300) {
-        final body = jsonDecode(usageResp.body);
-        if (body is Map) {
-          // total_usage 单位是 amount * 100（美分级），实际美元 = total_usage / 100
-          final v = _coerceDouble(body['total_usage']);
-          if (v != null) totalUsage = v;
-        }
-      }
-    } catch (_) {
-      // usage 查询失败时按 0 处理（仍可显示总额度，余额=hard_limit）
-    }
-
-    final remaining = hardLimit - (totalUsage / 100.0);
-    final formatted = _formatUsd(remaining);
-    return ProviderKeyBalance(
-      display: '\$$formatted',
-      total: remaining,
-      currency: 'USD',
-      raw: _clipBody(subResp.body),
-    );
   }
 
   /// sub2api 兼容：

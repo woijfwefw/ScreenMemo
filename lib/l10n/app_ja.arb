@@ -1529,7 +1529,6 @@
   "providerDeleteAllKeys": "すべて削除",
   "providerNoApiKeys": "API Key はありません。",
   "balanceEndpointNone": "照会しない",
-  "balanceEndpointNewApi": "new-api（/dashboard/billing）",
   "balanceEndpointSub2api": "sub2api（/v1/usage）",
   "segmentEntryLogHint": "長押しでテキストを選択するか、コピーを押してまとめてコピーします。",
   "segmentEntryLogCopied": "動的エントリーログをコピーしました",

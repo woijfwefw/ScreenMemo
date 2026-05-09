@@ -1529,7 +1529,6 @@
   "providerDeleteAllKeys": "Delete all",
   "providerNoApiKeys": "No API Keys.",
   "balanceEndpointNone": "Do not query",
-  "balanceEndpointNewApi": "new-api (/dashboard/billing)",
   "balanceEndpointSub2api": "sub2api (/v1/usage)",
   "segmentEntryLogHint": "Long-press to select text, or tap Copy to copy everything.",
   "segmentEntryLogCopied": "Dynamic entry log copied",
