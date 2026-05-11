@@ -28,7 +28,8 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
               ? (status.isBackfillMode ? '无缺失动态' : '无可重建动态')
               : '0/0 (${status.progressPercent})');
     final String summaryLine =
-        '已完成 ${status.processedSegments}/${status.totalSegments} 条动态 · '
+        '已处理 ${status.processedSegments}/${status.totalSegments} 条动态 · '
+        '失败 ${status.failedSegments} 条 · '
         '已完成 ${status.completedDays}/${status.totalDays} 天 · '
         '并发 $dayConcurrency · '
         '待续失败天数 ${status.failedDays}';
@@ -252,9 +253,7 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
     }
 
     Widget startButton({
-      required IconData icon,
       required String label,
-      required String subtitle,
       required Color backgroundColor,
       required Color foregroundColor,
       required VoidCallback onPressed,
@@ -264,7 +263,7 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
           ? cs.onSurfaceVariant
           : foregroundColor;
       return SizedBox(
-        height: 58,
+        height: 42,
         child: FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: backgroundColor,
@@ -272,42 +271,18 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
             disabledBackgroundColor: cs.surfaceContainerHigh,
             disabledForegroundColor: cs.onSurfaceVariant,
             shape: shape,
-            padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacing3),
+            padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacing2),
           ),
           onPressed: disabled ? null : onPressed,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 20),
-              const SizedBox(width: AppTheme.spacing2),
-              Flexible(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: effectiveForeground,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: effectiveForeground.withValues(alpha: 0.82),
-                        height: 1.1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: effectiveForeground,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
       );
@@ -317,9 +292,7 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
       children: [
         Expanded(
           child: startButton(
-            icon: Icons.restart_alt,
             label: '重建',
-            subtitle: '清空后全量重跑',
             backgroundColor: cs.error,
             foregroundColor: cs.onError,
             onPressed: _confirmStartDynamicRebuild,
@@ -328,9 +301,7 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
         const SizedBox(width: AppTheme.spacing2),
         Expanded(
           child: startButton(
-            icon: Icons.fact_check_outlined,
             label: '补全',
-            subtitle: '扫描缺漏并补齐',
             backgroundColor: _dynamicBackfillColor(),
             foregroundColor: _dynamicBackfillOnColor(),
             onPressed: _confirmStartDynamicBackfill,

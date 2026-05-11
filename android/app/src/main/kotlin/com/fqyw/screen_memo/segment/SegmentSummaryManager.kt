@@ -1847,7 +1847,7 @@ object SegmentSummaryManager {
             .retryOnConnectionFailure(true)
         if (requestTimeoutMs != null && requestTimeoutMs > 0L) {
             clientBuilder
-                .callTimeout(requestTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                // 不设置 callTimeout：动态流式生成可能持续超过 3 分钟，只按读/写空闲超时中断。
                 .readTimeout(requestTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
                 .writeTimeout(requestTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
         } else {

@@ -27,10 +27,14 @@ import androidx.core.app.ServiceCompat
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
+import java.util.Collections
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.ExecutorCompletionService
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 private const val RECENT_STREAM_CHUNK_LIMIT = 3
@@ -100,10 +104,14 @@ class DynamicRebuildService : Service() {
                 current.dayConcurrency = normalizedConcurrency
                 current.dayWorks.forEach { day ->
                     when (day.status) {
-                        DynamicRebuildDayWorkItem.STATUS_FAILED_WAITING ->
+                        DynamicRebuildDayWorkItem.STATUS_FAILED_WAITING -> {
                             day.status = DynamicRebuildDayWorkItem.STATUS_RETRY_PENDING
-                        DynamicRebuildDayWorkItem.STATUS_RUNNING ->
+                            day.failedSegments = 0
+                        }
+                        DynamicRebuildDayWorkItem.STATUS_RUNNING -> {
                             day.status = DynamicRebuildDayWorkItem.STATUS_PENDING
+                            day.failedSegments = 0
+                        }
                     }
                 }
                 current.workerSlots.forEach { slot ->
@@ -223,13 +231,29 @@ class DynamicRebuildService : Service() {
             current.currentStage = "cancelled"
             current.currentStageLabel = "已停止"
             current.currentStageDetail =
-                if (current.isBackfillMode()) "已停止后台补全，当前进度可稍后继续" else "已停止后台重建，当前进度可稍后继续"
+                if (current.isBackfillMode()) "已请求停止所有补全线程，当前进度可稍后继续" else "已请求停止所有重建线程，当前进度可稍后继续"
+            current.dayWorks.forEach { day ->
+                if (day.status == DynamicRebuildDayWorkItem.STATUS_RUNNING) {
+                    day.status = DynamicRebuildDayWorkItem.STATUS_PENDING
+                }
+            }
+            current.workerSlots.forEach { slot ->
+                if (slot.status == DynamicRebuildWorkerSlotState.STATUS_RUNNING ||
+                    slot.status == DynamicRebuildWorkerSlotState.STATUS_RETRYING
+                ) {
+                    slot.status = DynamicRebuildWorkerSlotState.STATUS_IDLE
+                    slot.currentStageLabel = "已停止"
+                    slot.currentStageDetail = current.currentStageDetail
+                    slot.recentStreamChunks.clear()
+                }
+            }
             current.appendRecentLog(
                 buildStageLogLine(
                     "已停止",
                     current.currentStageDetail,
                 ),
             )
+            current.refreshDerivedFields()
             DynamicRebuildTaskStore.save(context, current)
             SegmentSummaryManager.cancelDynamicRebuildInFlightRequests("user_stop")
             startService(context, ACTION_CANCEL)
@@ -278,6 +302,9 @@ class DynamicRebuildService : Service() {
     private val workerExecutor = Executors.newSingleThreadExecutor()
     private val workerStarted = AtomicBoolean(false)
     private val stateLock = Any()
+    @Volatile private var activeDayExecutor: ExecutorService? = null
+    private val activeDayFutures =
+        Collections.synchronizedList(mutableListOf<Future<DayRunResult>>())
     private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -294,6 +321,7 @@ class DynamicRebuildService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action ?: ACTION_RESUME
         if (action == ACTION_CANCEL) {
+            requestCancelAllWorkers("action_cancel")
             if (workerStarted.get()) {
                 return START_STICKY
             }
@@ -574,14 +602,48 @@ class DynamicRebuildService : Service() {
         }
 
         val dayExecutor = Executors.newFixedThreadPool(parallelism)
+        activeDayExecutor = dayExecutor
+        synchronized(activeDayFutures) {
+            activeDayFutures.clear()
+        }
         val completion = ExecutorCompletionService<DayRunResult>(dayExecutor)
         var inFlight = 0
         try {
             inFlight += submitAvailableDayAssignments(state, completion)
             while (inFlight > 0) {
-                val future = completion.take()
-                val result = future.get()
+                if (isCancellationRequested()) {
+                    requestCancelAllWorkers("cancel_before_wait")
+                    return markCancelled(state, "已停止所有并发线程，后台任务退出")
+                }
+                val future = completion.poll(250L, TimeUnit.MILLISECONDS) ?: continue
+                synchronized(activeDayFutures) {
+                    activeDayFutures.remove(future)
+                }
+                val result = try {
+                    future.get()
+                } catch (_: java.util.concurrent.CancellationException) {
+                    DayRunResult(0, -1, DayRunOutcome.CANCELLED)
+                } catch (e: java.lang.InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    if (isCancellationRequested()) {
+                        requestCancelAllWorkers("interrupted_after_cancel")
+                        return markCancelled(state, "已停止所有并发线程，后台任务退出")
+                    }
+                    throw e
+                } catch (e: java.util.concurrent.ExecutionException) {
+                    if (isCancellationRequested()) {
+                        requestCancelAllWorkers("execution_failed_after_cancel")
+                        return markCancelled(state, "已停止所有并发线程，后台任务退出")
+                    }
+                    val cause = e.cause
+                    if (cause is Exception) throw cause
+                    throw e
+                }
                 inFlight -= 1
+                if (result.outcome == DayRunOutcome.CANCELLED || isCancellationRequested()) {
+                    requestCancelAllWorkers("worker_cancelled")
+                    return markCancelled(state, "已停止所有并发线程，后台任务退出")
+                }
                 if (result.outcome == DayRunOutcome.FATAL) {
                     synchronized(stateLock) {
                         state.status = DynamicRebuildTaskState.STATUS_FAILED
@@ -607,6 +669,12 @@ class DynamicRebuildService : Service() {
             }
         } finally {
             dayExecutor.shutdownNow()
+            if (activeDayExecutor === dayExecutor) {
+                activeDayExecutor = null
+            }
+            synchronized(activeDayFutures) {
+                activeDayFutures.clear()
+            }
         }
 
         if (isCancellationRequested()) {
@@ -664,10 +732,42 @@ class DynamicRebuildService : Service() {
                     slotId = assignment.slotId,
                     dayIndex = assignment.dayIndex,
                 )
+            }.also { future ->
+                synchronized(activeDayFutures) {
+                    activeDayFutures.add(future)
+                }
             }
             submitted += 1
         }
         return submitted
+    }
+
+    private fun requestCancelAllWorkers(reason: String) {
+        val cancelledCalls = try {
+            SegmentSummaryManager.cancelDynamicRebuildInFlightRequests(reason)
+        } catch (_: Exception) {
+            0
+        }
+        val futures = synchronized(activeDayFutures) {
+            activeDayFutures.toList()
+        }
+        var cancelledFutures = 0
+        for (future in futures) {
+            try {
+                if (!future.isDone && future.cancel(true)) {
+                    cancelledFutures += 1
+                }
+            } catch (_: Exception) {}
+        }
+        try {
+            activeDayExecutor?.shutdownNow()
+        } catch (_: Exception) {}
+        try {
+            FileLogger.w(
+                TAG,
+                "动态重建：已请求停止所有并发线程，futures=$cancelledFutures/${futures.size}, aiCalls=$cancelledCalls, reason=$reason",
+            )
+        } catch (_: Exception) {}
     }
 
     private fun processDayAssignment(
@@ -772,12 +872,13 @@ class DynamicRebuildService : Service() {
                         day.nextWindowIndex += 1
                     }
                     day.processedSegments = day.nextWindowIndex.coerceAtMost(day.totalSegments())
+                    day.failedSegments = 0
                     day.lastError = null
                     val slot = state.workerSlots.firstOrNull { it.slotId == slotId }
                     if (slot != null) {
                         slot.currentSegmentId = 0L
                         slot.totalSegments = day.totalSegments()
-                        slot.processedSegments = day.processedSegments
+                        slot.processedSegments = day.accountedSegments()
                         slot.retryCount = day.retryCount
                         slot.retryLimit = DAY_RETRY_LIMIT
                     }
@@ -911,12 +1012,14 @@ class DynamicRebuildService : Service() {
             if (probe.success) {
                 day.lastError = errorMessage
                 day.retryCount = (day.retryCount + 1).coerceAtMost(DAY_RETRY_LIMIT - 1)
+                day.failedSegments = 0
                 day.status = DynamicRebuildDayWorkItem.STATUS_RETRY_PENDING
                 if (slot != null) {
                     slot.status = DynamicRebuildWorkerSlotState.STATUS_FAILED_WAITING
                     slot.currentStageLabel = "测试通过，继续自动续跑"
                     slot.currentStageDetail =
                         "连续测试通过：${clipForUi(probe.successSummary, 180)}"
+                    slot.processedSegments = day.accountedSegments()
                     slot.retryCount = day.retryCount
                     slot.retryLimit = DAY_RETRY_LIMIT
                 }
@@ -928,12 +1031,14 @@ class DynamicRebuildService : Service() {
                 day.lastError =
                     "动态请求失败：${clipForUi(errorMessage, 500)}；连续测试失败：${clipForUi(probeFailure, 500)}"
                 day.retryCount = DAY_RETRY_LIMIT
+                day.failedSegments = day.pendingFailureCredit()
                 day.status = DynamicRebuildDayWorkItem.STATUS_FAILED_WAITING
                 if (slot != null) {
                     slot.status = DynamicRebuildWorkerSlotState.STATUS_FAILED_WAITING
                     slot.currentStageLabel = "等待手动继续"
                     slot.currentStageDetail =
                         "连续测试全部失败：${clipForUi(probeFailure, 180)}"
+                    slot.processedSegments = day.accountedSegments()
                     slot.retryCount = day.retryCount
                     slot.retryLimit = DAY_RETRY_LIMIT
                 }
@@ -1001,9 +1106,9 @@ class DynamicRebuildService : Service() {
                 state.currentStageLabel = "部分完成"
                 state.currentStageDetail =
                     if (state.isBackfillMode()) {
-                        "已补全 ${state.processedSegments}/${state.totalSegments} 条动态，仍有 $failedDays/${state.totalDays()} 天待继续"
+                        "已处理 ${state.processedSegments}/${state.totalSegments} 条动态，失败 ${state.failedSegments} 条，仍有 $failedDays/${state.totalDays()} 天待继续"
                     } else {
-                        "已完成 ${state.processedSegments}/${state.totalSegments} 条动态，仍有 $failedDays/${state.totalDays()} 天待继续"
+                        "已处理 ${state.processedSegments}/${state.totalSegments} 条动态，失败 ${state.failedSegments} 条，仍有 $failedDays/${state.totalDays()} 天待继续"
                     }
                 state.appendRecentLog(
                     buildStageLogLine(
@@ -1063,7 +1168,7 @@ class DynamicRebuildService : Service() {
             }
         slot.dayKey = day.dayKey
         slot.totalSegments = day.totalSegments()
-        slot.processedSegments = day.processedSegments
+        slot.processedSegments = day.accountedSegments()
         slot.currentRangeLabel = currentWindow?.rangeLabel.orEmpty()
         slot.currentStageLabel = if (day.retryCount > 0) "恢复失败日期" else "等待执行"
         slot.currentStageDetail =
@@ -1099,13 +1204,14 @@ class DynamicRebuildService : Service() {
         val slot = state.workerSlots.firstOrNull { it.slotId == slotId }
         day.nextWindowIndex = day.totalSegments()
         day.processedSegments = day.totalSegments()
+        day.failedSegments = 0
         day.status = DynamicRebuildDayWorkItem.STATUS_COMPLETED
         day.lastError = null
         if (slot != null) {
             slot.status = DynamicRebuildWorkerSlotState.STATUS_COMPLETED
             slot.dayKey = day.dayKey
             slot.totalSegments = day.totalSegments()
-            slot.processedSegments = day.processedSegments
+            slot.processedSegments = day.accountedSegments()
             slot.currentRangeLabel = ""
             slot.currentStageLabel = "当天完成"
             slot.currentStageDetail = if (state.isBackfillMode()) {
@@ -1269,9 +1375,9 @@ class DynamicRebuildService : Service() {
                 }
             DynamicRebuildTaskState.STATUS_COMPLETED_WITH_FAILURES ->
                 if (backfill) {
-                    "已补全 ${state.processedSegments}/${state.totalSegments} 条缺失动态，仍有 ${state.failedDayCount()}/${state.totalDays()} 天待继续"
+                    "已处理 ${state.processedSegments}/${state.totalSegments} 条缺失动态，失败 ${state.failedSegments} 条，仍有 ${state.failedDayCount()}/${state.totalDays()} 天待继续"
                 } else {
-                    "已完成 ${state.processedSegments}/${state.totalSegments} 条动态，仍有 ${state.failedDayCount()}/${state.totalDays()} 天待继续"
+                    "已处理 ${state.processedSegments}/${state.totalSegments} 条动态，失败 ${state.failedSegments} 条，仍有 ${state.failedDayCount()}/${state.totalDays()} 天待继续"
                 }
             DynamicRebuildTaskState.STATUS_FAILED ->
                 state.lastError ?: if (backfill) "补全任务执行失败，请打开动态页查看详情" else getString(R.string.dynamic_rebuild_notif_failed_generic)
@@ -1427,6 +1533,7 @@ class DynamicRebuildService : Service() {
         sb.appendLine("并发天数: ${state.dayConcurrency}")
         sb.appendLine("总段落数: ${state.totalSegments}")
         sb.appendLine("已处理段落: ${state.processedSegments}")
+        sb.appendLine("失败段落: ${state.failedSegments}")
         sb.appendLine("待继续天数: ${state.failedDayCount()}/${state.totalDays()}")
         if (state.aiModel.isNotBlank()) {
             sb.appendLine("model: ${state.aiModel}")
@@ -1505,7 +1612,7 @@ class DynamicRebuildService : Service() {
                 val day = state.dayWorks.getOrNull(dayIndex)
                 if (day != null) {
                     slot.totalSegments = day.totalSegments()
-                    slot.processedSegments = day.processedSegments
+                    slot.processedSegments = day.accountedSegments()
                     slot.retryCount = day.retryCount
                     slot.retryLimit = DAY_RETRY_LIMIT
                     if (slot.status != DynamicRebuildWorkerSlotState.STATUS_COMPLETED &&
@@ -1554,7 +1661,7 @@ class DynamicRebuildService : Service() {
             val day = state.dayWorks.getOrNull(dayIndex)
             if (day != null) {
                 slot.totalSegments = day.totalSegments()
-                slot.processedSegments = day.processedSegments
+                slot.processedSegments = day.accountedSegments()
                 slot.retryCount = day.retryCount
                 slot.retryLimit = DAY_RETRY_LIMIT
             }
@@ -1675,6 +1782,7 @@ private data class DynamicRebuildDayWorkItem(
     val windows: MutableList<DynamicRebuildWindowWorkItem>,
     var nextWindowIndex: Int = 0,
     var processedSegments: Int = 0,
+    var failedSegments: Int = 0,
     var status: String = STATUS_PENDING,
     var retryCount: Int = 0,
     var lastError: String? = null,
@@ -1698,6 +1806,7 @@ private data class DynamicRebuildDayWorkItem(
                 windows = windows,
                 nextWindowIndex = obj.optInt("nextWindowIndex", 0),
                 processedSegments = obj.optInt("processedSegments", 0),
+                failedSegments = obj.optInt("failedSegments", 0),
                 status = obj.optString("status", STATUS_PENDING),
                 retryCount = obj.optInt("retryCount", 0),
                 lastError = obj.optString("lastError", "").takeIf { it.isNotBlank() },
@@ -1712,6 +1821,28 @@ private data class DynamicRebuildDayWorkItem(
         return windows[nextWindowIndex]
     }
 
+    fun pendingFailureCredit(): Int {
+        return if (nextWindowIndex in 0 until windows.size) 1 else 0
+    }
+
+    fun accountedSegments(): Int {
+        return (processedSegments + failedSegments).coerceIn(0, totalSegments())
+    }
+
+    fun normalizeProgressCounters() {
+        val total = totalSegments()
+        nextWindowIndex = nextWindowIndex.coerceIn(0, total)
+        processedSegments = processedSegments.coerceIn(0, total)
+        failedSegments =
+            if (status == STATUS_FAILED_WAITING) {
+                failedSegments
+                    .coerceAtLeast(pendingFailureCredit())
+                    .coerceIn(0, (total - processedSegments).coerceAtLeast(0))
+            } else {
+                0
+            }
+    }
+
     fun toJson(): JSONObject {
         val windowsJson = JSONArray()
         windows.forEach { windowsJson.put(it.toJson()) }
@@ -1719,6 +1850,7 @@ private data class DynamicRebuildDayWorkItem(
             .put("dayKey", dayKey)
             .put("nextWindowIndex", nextWindowIndex)
             .put("processedSegments", processedSegments)
+            .put("failedSegments", failedSegments)
             .put("status", status)
             .put("retryCount", retryCount)
             .put("lastError", lastError ?: JSONObject.NULL)
@@ -2019,16 +2151,16 @@ private data class DynamicRebuildTaskState(
             if (day.status == DynamicRebuildDayWorkItem.STATUS_RUNNING) {
                 day.status = DynamicRebuildDayWorkItem.STATUS_PENDING
             }
-            day.nextWindowIndex = day.nextWindowIndex.coerceIn(0, day.totalSegments())
-            day.processedSegments = day.processedSegments.coerceIn(0, day.totalSegments())
+            day.normalizeProgressCounters()
         }
         refreshDerivedFields()
     }
 
     fun refreshDerivedFields() {
+        dayWorks.forEach { day -> day.normalizeProgressCounters() }
         totalSegments = dayWorks.sumOf { it.totalSegments() }
-        processedSegments = dayWorks.sumOf { it.processedSegments }
-        failedSegments = failedDayCount()
+        processedSegments = dayWorks.sumOf { it.accountedSegments() }
+        failedSegments = dayWorks.sumOf { it.failedSegments }
         val primarySlot = workerSlots.firstOrNull {
             it.status == DynamicRebuildWorkerSlotState.STATUS_RUNNING ||
                 it.status == DynamicRebuildWorkerSlotState.STATUS_RETRYING
@@ -2255,8 +2387,7 @@ private object DynamicRebuildTaskStore {
         }
         if (dayWorks.isNotEmpty()) {
             dayWorks.forEach { day ->
-                day.nextWindowIndex = day.nextWindowIndex.coerceIn(0, day.totalSegments())
-                day.processedSegments = day.processedSegments.coerceIn(0, day.totalSegments())
+                day.normalizeProgressCounters()
             }
             return dayWorks
         }
