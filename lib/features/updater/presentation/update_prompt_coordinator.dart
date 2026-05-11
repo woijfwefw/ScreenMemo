@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'package:screen_memo/core/logging/flutter_logger.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
 import 'package:screen_memo/core/widgets/ui_components.dart';
 import 'package:screen_memo/core/widgets/ui_dialog.dart';
@@ -19,6 +20,7 @@ class UpdatePromptCoordinator {
   UpdatePromptCoordinator._();
 
   static final UpdatePromptCoordinator instance = UpdatePromptCoordinator._();
+  static const String _logTag = 'UpdatePrompt';
 
   final UpdateService _updateService = UpdateService.instance;
   final UpdateDownloadService _downloadService = UpdateDownloadService();
@@ -128,7 +130,21 @@ class UpdatePromptCoordinator {
     if (_downloading) return;
     final l10n = AppLocalizations.of(context);
 
+    unawaited(
+      FlutterLogger.nativeInfo(
+        _logTag,
+        'download_install_start version=${candidate.release.version} '
+        'asset=${candidate.asset.name} size=${candidate.asset.sizeBytes ?? -1}',
+      ),
+    );
+
     if (!await _ensureInstallPermission(context)) {
+      unawaited(
+        FlutterLogger.nativeWarn(
+          _logTag,
+          'download_install_abort reason=install_permission_not_ready',
+        ),
+      );
       return;
     }
     if (!context.mounted) return;
@@ -178,11 +194,21 @@ class UpdatePromptCoordinator {
 
     late final String apkPath;
     try {
+      unawaited(
+        FlutterLogger.nativeInfo(
+          _logTag,
+          'download_start url=${candidate.asset.downloadUrl}',
+        ),
+      );
       apkPath = await _downloadService.downloadApk(
         candidate.asset,
         onProgress: (value) => progress.value = value,
       );
+      unawaited(
+        FlutterLogger.nativeInfo(_logTag, 'download_complete path=$apkPath'),
+      );
     } catch (e) {
+      unawaited(FlutterLogger.nativeError(_logTag, 'download_failed error=$e'));
       if (context.mounted) {
         UINotifier.error(context, l10n.updateDownloadFailed(e.toString()));
       }
@@ -204,7 +230,13 @@ class UpdatePromptCoordinator {
     if (!context.mounted) return;
     UINotifier.success(context, l10n.updateDownloadComplete);
     try {
+      unawaited(
+        FlutterLogger.nativeInfo(_logTag, 'install_apk_start path=$apkPath'),
+      );
       final opened = await _platform.installApk(apkPath);
+      unawaited(
+        FlutterLogger.nativeInfo(_logTag, 'install_apk_result opened=$opened'),
+      );
       if (!context.mounted) return;
       if (opened) {
         UINotifier.info(context, l10n.updateInstalling);
@@ -215,6 +247,9 @@ class UpdatePromptCoordinator {
         );
       }
     } catch (e) {
+      unawaited(
+        FlutterLogger.nativeError(_logTag, 'install_apk_failed error=$e'),
+      );
       if (context.mounted) {
         UINotifier.error(context, l10n.updateInstallFailed(e.toString()));
       }
@@ -224,8 +259,21 @@ class UpdatePromptCoordinator {
   Future<bool> _ensureInstallPermission(BuildContext context) async {
     if (!Platform.isAndroid) return false;
     try {
-      if (await _platform.canRequestPackageInstalls()) return true;
+      final allowed = await _platform.canRequestPackageInstalls();
+      unawaited(
+        FlutterLogger.nativeInfo(
+          _logTag,
+          'install_permission_check allowed=$allowed',
+        ),
+      );
+      if (allowed) return true;
     } catch (_) {
+      unawaited(
+        FlutterLogger.nativeWarn(
+          _logTag,
+          'install_permission_check_failed fallback_allow=true',
+        ),
+      );
       return true;
     }
     if (!context.mounted) return false;
@@ -248,6 +296,9 @@ class UpdatePromptCoordinator {
         false;
     if (!openSettings) return false;
     try {
+      unawaited(
+        FlutterLogger.nativeInfo(_logTag, 'open_install_permission_settings'),
+      );
       await _platform.openInstallPermissionSettings();
     } catch (_) {}
     return false;

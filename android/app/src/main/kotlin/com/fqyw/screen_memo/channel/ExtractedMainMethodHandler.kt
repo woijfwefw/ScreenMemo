@@ -441,15 +441,19 @@ class ExtractedMainMethodHandler(
     private fun installApk(call: MethodCall, result: MethodChannel.Result) {
         try {
             val path = call.argument<String>("path")?.trim()
+            FileLogger.i(tag, "installApk request started path=${path ?: ""}")
             if (path.isNullOrEmpty()) {
+                FileLogger.e(tag, "installApk failed: path is empty")
                 result.error("invalid_path", "path is required", null)
                 return
             }
             val apk = File(path)
             if (!apk.exists() || !apk.isFile || apk.extension.lowercase() != "apk") {
+                FileLogger.e(tag, "installApk failed: APK does not exist or extension is invalid path=$path")
                 result.error("file_not_found", "APK does not exist: $path", null)
                 return
             }
+            FileLogger.i(tag, "installApk APK validated path=$path size=${apk.length()}")
 
             val uri = FileProvider.getUriForFile(
                 activity,
@@ -462,8 +466,10 @@ class ExtractedMainMethodHandler(
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             activity.startActivity(intent)
+            FileLogger.i(tag, "installApk system installer launched path=$path")
             result.success(true)
         } catch (e: Exception) {
+            FileLogger.e(tag, "installApk failed to launch system installer", e)
             result.error("install_apk_failed", e.message, null)
         }
     }
