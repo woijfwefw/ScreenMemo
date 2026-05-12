@@ -141,9 +141,6 @@ class AISettingsService {
   // 是否显示 AIChat 页面的性能日志悬浮窗（UiPerfOverlay）。默认关闭。
   static const String _keyAiChatPerfOverlayEnabled =
       'ai_chat_perf_overlay_enabled';
-  // 是否显示左侧边栏中的 Nocturne 记忆入口。默认隐藏，仅通过对话上下文面板解锁。
-  static const String _keyNocturneMemorySidebarEntryVisible =
-      'nocturne_memory_sidebar_entry_visible';
   static const String _keyActiveGroupId = 'active_group_id'; // 当前激活的分组
   // 提示词键名（历史兼容 + 语言区分）
   static const String _keyPromptSegmentExtraZh = 'prompt_segment_extra_zh';
@@ -164,9 +161,6 @@ class AISettingsService {
   static const int _defaultSegmentsJsonAutoRetryMax = 1;
   static const int _defaultRawResponseCleanupDays = 30;
   static const int _rawResponseCleanupThrottleMs = 12 * 60 * 60 * 1000;
-  static const String eventNocturneMemorySidebarEntryVisibilityChanged =
-      'ui:nocturne_memory_sidebar_entry_visibility_changed';
-
   // 历史限制（仅保存最近 N 条，避免无限膨胀）
   static const int _maxHistoryMessages = 40;
   bool _rawResponseCleanupRunning = false;
@@ -211,23 +205,6 @@ class AISettingsService {
   Future<void> setAiChatPerfOverlayEnabled(bool enabled) async {
     final db = ScreenshotDatabase.instance;
     await db.setAiSetting(_keyAiChatPerfOverlayEnabled, enabled ? '1' : '0');
-  }
-
-  Future<bool> getNocturneMemorySidebarEntryVisible() async {
-    final db = ScreenshotDatabase.instance;
-    final v = await db.getAiSetting(_keyNocturneMemorySidebarEntryVisible);
-    if (v == null || v.isEmpty) return false;
-    final s = v.toLowerCase();
-    return s == '1' || s == 'true' || s == 'yes';
-  }
-
-  Future<void> setNocturneMemorySidebarEntryVisible(bool visible) async {
-    final db = ScreenshotDatabase.instance;
-    await db.setAiSetting(
-      _keyNocturneMemorySidebarEntryVisible,
-      visible ? '1' : '0',
-    );
-    notifyContextChanged(eventNocturneMemorySidebarEntryVisibilityChanged);
   }
 
   // ========== 动态（segments）自动重试 ==========

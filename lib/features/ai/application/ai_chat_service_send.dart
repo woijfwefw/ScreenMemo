@@ -1006,9 +1006,6 @@ extension AIChatServiceSendExt on AIChatService {
     } catch (_) {}
 
     final String systemPrompt = _systemPromptForLocale(allowCharts: true);
-    final String memoryAddon = NocturneMemoryPrompts.chatSystemAddon(
-      _effectivePromptLocale(),
-    );
     List<String> extras = <String>[];
     String ctxMsg = '';
     try {
@@ -1037,7 +1034,6 @@ extension AIChatServiceSendExt on AIChatService {
       userMemoryMsg: umMsg,
       atomicMemoryMsg: amMsg,
       extraSystemMessages: <String>[
-        if (memoryAddon.trim().isNotEmpty) memoryAddon,
         if (summaryAppsMsg.trim().isNotEmpty) summaryAppsMsg,
       ],
       effectivePromptCapTokens: effectivePromptCapTokens,
@@ -1145,7 +1141,6 @@ extension AIChatServiceSendExt on AIChatService {
           userMemoryMsg: umMsg,
           atomicMemoryMsg: amMsg,
           extraSystemMessages: <String>[
-            if (memoryAddon.trim().isNotEmpty) memoryAddon,
             if (summaryAppsMsg.trim().isNotEmpty) summaryAppsMsg,
           ],
           effectivePromptCapTokens: effectivePromptCapTokens,
@@ -1579,9 +1574,6 @@ extension AIChatServiceSendExt on AIChatService {
     final String systemPrompt = _systemPromptForLocale(
       allowCharts: context == 'chat',
     );
-    final String memoryAddon = NocturneMemoryPrompts.chatSystemAddon(
-      _effectivePromptLocale(),
-    );
 
     effectiveExtras = await _buildHistoryFirstExtras(
       cid: cid,
@@ -1597,7 +1589,6 @@ extension AIChatServiceSendExt on AIChatService {
       userMemoryMsg: umMsg,
       atomicMemoryMsg: amMsg,
       extraSystemMessages: <String>[
-        if (memoryAddon.trim().isNotEmpty) memoryAddon,
         if (summaryAppsMsg.trim().isNotEmpty) summaryAppsMsg,
         ...extraSystemMessages,
       ],
@@ -1721,7 +1712,6 @@ extension AIChatServiceSendExt on AIChatService {
           userMemoryMsg: umMsg,
           atomicMemoryMsg: amMsg,
           extraSystemMessages: <String>[
-            if (memoryAddon.trim().isNotEmpty) memoryAddon,
             if (summaryAppsMsg.trim().isNotEmpty) summaryAppsMsg,
             ...extraSystemMessages,
           ],
@@ -1962,9 +1952,6 @@ extension AIChatServiceSendExt on AIChatService {
     final String systemPrompt = _systemPromptForLocale(
       allowCharts: context == 'chat',
     );
-    final String memoryAddon = NocturneMemoryPrompts.chatSystemAddon(
-      _effectivePromptLocale(),
-    );
     final bool includeHistoryEffective = AIChatService.includeHistoryEffective(
       context: context,
       includeHistory: includeHistory,
@@ -2010,7 +1997,6 @@ extension AIChatServiceSendExt on AIChatService {
       userMemoryMsg: umMsg,
       atomicMemoryMsg: amMsg,
       extraSystemMessages: <String>[
-        if (memoryAddon.trim().isNotEmpty) memoryAddon,
         if (summaryAppsMsg.trim().isNotEmpty) summaryAppsMsg,
         ...extraSystemMessages,
       ],
@@ -2129,7 +2115,6 @@ extension AIChatServiceSendExt on AIChatService {
           userMemoryMsg: umMsg,
           atomicMemoryMsg: amMsg,
           extraSystemMessages: <String>[
-            if (memoryAddon.trim().isNotEmpty) memoryAddon,
             if (summaryAppsMsg.trim().isNotEmpty) summaryAppsMsg,
             ...extraSystemMessages,
           ],

@@ -177,7 +177,7 @@ Flutter 代码按分层架构整理：
 - `lib/app/`：应用入口装配、`MaterialApp`、全局路由与启动后的后台任务恢复
 - `lib/core/`：跨功能基础设施，包括主题、通用组件、日志、性能记录、生命周期、语言服务和通用工具
 - `lib/data/`：跨功能数据、平台与安全基础设施，例如数据库、路径、设置和安全存储
-- `lib/features/`：按功能收拢页面、组件与应用服务代码，例如应用选择、收藏、备份、AI、AI 对话、诊断、桌面合并、图库、搜索、存储分析、设置、权限、采集、App 运行状态、NSFW、每日总结、夜间记忆与时间线
+- `lib/features/`：按功能收拢页面、组件与应用服务代码，例如应用选择、收藏、备份、AI、AI 对话、诊断、桌面合并、图库、搜索、存储分析、设置、权限、采集、App 运行状态、NSFW、每日总结与时间线
   - `lib/features/settings/presentation/pages/settings_page*.dart`：设置页按功能拆成入口状态、布局、权限、截图、段落总结、备份、显示/高级、App 运行状态、NSFW 与每日提醒等 part 文件，避免继续形成单个超大页面文件
   - `lib/features/search/presentation/pages/search_page*.dart`：搜索页按搜索加载、筛选、视图、文档、动态结果和通用组件拆分
   - `lib/features/timeline/presentation/pages/segment_status_page*.dart`：动态状态页按状态辅助、动态重建、详情、时间轴和单条动态卡片拆分
@@ -198,7 +198,6 @@ Android 原生层按职责建立子包，入口类保留在 `android/app/src/mai
 - `dynamic/`：动态重建前台任务
 - `importing/`：导入后 OCR 修复任务
 - `logging/`：原生日志与输出日志
-- `memory/`：记忆重建通知
 - `network/`：原生网络客户端工厂
 - `permissions/`：权限引导与权限报告
 - `replay/`：时间线回放视频生成与通知

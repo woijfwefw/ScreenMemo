@@ -47,29 +47,6 @@ class UserSettingKeys {
   static const String autoUpdateEnabled = 'auto_update_enabled';
   static const String autoUpdateLastCheckMs = 'auto_update_last_check_ms';
   static const String autoUpdateIgnoredVersion = 'auto_update_ignored_version';
-
-  // Nocturne-style memory (URI graph)
-  static const String nocturneMemoryLastUri = 'nocturne_memory_last_uri';
-  static const String nocturneMemoryRebuildState =
-      'nocturne_memory_rebuild_state';
-  static const String nocturneMemoryMaintenanceLastRunMs =
-      'nocturne_memory_maintenance_last_run_ms';
-  static const String nocturneMemoryMaintenanceLastReport =
-      'nocturne_memory_maintenance_last_report';
-  static const String nocturneMemoryMaintenanceLastRaw =
-      'nocturne_memory_maintenance_last_raw';
-  static const String nocturneMemoryMaintenanceLastError =
-      'nocturne_memory_maintenance_last_error';
-  static const String nocturneMemoryMaintenanceLastStatus =
-      'nocturne_memory_maintenance_last_status';
-  static const String nocturneMemoryMaintenanceLastSuggestionsJson =
-      'nocturne_memory_maintenance_last_suggestions_json';
-  static const String nocturneMemoryMaintenanceLastApplyAtMs =
-      'nocturne_memory_maintenance_last_apply_at_ms';
-  static const String nocturneMemoryMaintenanceLastApplyStatus =
-      'nocturne_memory_maintenance_last_apply_status';
-  static const String nocturneMemoryMaintenanceLastApplyResult =
-      'nocturne_memory_maintenance_last_apply_result';
 }
 
 /// 兼容旧版 SharedPreferences 中的键名，用于迁移历史数据。

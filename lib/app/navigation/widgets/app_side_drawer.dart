@@ -3,7 +3,6 @@ import 'package:screen_memo/l10n/app_localizations.dart';
 import 'package:screen_memo/core/theme/theme_service.dart';
 import 'package:screen_memo/features/ai_providers/presentation/pages/provider_list_page.dart';
 import 'package:screen_memo/features/ai_chat/presentation/pages/prompt_manager_page.dart';
-import 'package:screen_memo/features/nocturne_memory/presentation/pages/nocturne_memory_page.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
 import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
 import 'package:screen_memo/core/widgets/model_logo.dart';
@@ -40,38 +39,6 @@ class AppSideDrawer extends StatelessWidget {
               onTap: () {
                 Navigator.of(context).pop();
                 NavigationService.instance.openSegmentStatus();
-              },
-            ),
-            StreamBuilder<String>(
-              stream: AISettingsService.instance.onContextChanged.where(
-                (String evt) =>
-                    evt ==
-                    AISettingsService
-                        .eventNocturneMemorySidebarEntryVisibilityChanged,
-              ),
-              builder: (ctx, _) {
-                return FutureBuilder<bool>(
-                  future: AISettingsService.instance
-                      .getNocturneMemorySidebarEntryVisible(),
-                  builder: (ctx, snap) {
-                    final bool visible = snap.data ?? false;
-                    if (!visible) return const SizedBox.shrink();
-                    return _buildMenuItem(
-                      context: context,
-                      icon: Icons.memory_outlined,
-                      title: t.chatContextTitleMemory,
-                      isFirst: false,
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const NocturneMemoryPage(),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                );
               },
             ),
             // 提供商

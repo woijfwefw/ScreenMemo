@@ -2762,68 +2762,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importDiagnosticsRepairIndex => '修复索引';
 
   @override
-  String get memoryTabView => '查看记忆';
-
-  @override
-  String get memoryTabRebuild => '一键重建';
-
-  @override
-  String memorySignalStatusChip(Object label, Object count) {
-    return '$label $count';
-  }
-
-  @override
-  String get memoryForceCreate => '强制新建';
-
-  @override
-  String get actionIgnore => '忽略';
-
-  @override
-  String get memoryGenerateSuggestions => '生成建议';
-
-  @override
-  String get memoryApplyAllSuggestions => '全部应用';
-
-  @override
-  String get memoryApplyThisSuggestion => '应用这条';
-
-  @override
-  String get memoryDontApplySuggestion => '不应用';
-
-  @override
-  String get memoryCopyError => '复制错误';
-
-  @override
-  String get actionDescription => '说明';
-
-  @override
-  String get memoryRebuildAction => '一键重建';
-
-  @override
-  String get actionStop => '停止';
-
-  @override
-  String get memoryUriInputHint => '输入 URI（如 core://my_user）';
-
-  @override
-  String get memorySearchHint => '搜索记忆内容/路径…';
-
-  @override
-  String get memoryRoot => '根';
-
-  @override
-  String get memoryParent => '上级';
-
-  @override
-  String get memoryBoot => 'boot';
-
-  @override
-  String get memoryRecent => 'recent';
-
-  @override
-  String get memoryIndex => 'index';
-
-  @override
   String get providerAddAtLeastOneEnabledApiKey => '请至少添加一个已启用的 API Key。';
 
   @override

@@ -16,7 +16,6 @@ import com.fqyw.screen_memo.logging.FileLogger
 import com.fqyw.screen_memo.importing.ImportOcrRepairService
 import com.fqyw.screen_memo.settings.LegacySettingKeysNative
 import com.fqyw.screen_memo.MainActivity
-import com.fqyw.screen_memo.memory.MemoryRebuildNotifier
 import com.fqyw.screen_memo.diagnostics.OEMCompatibilityHelper
 import com.fqyw.screen_memo.logging.OutputFileLogger
 import com.fqyw.screen_memo.permissions.PermissionGuideHelper
@@ -88,8 +87,6 @@ class ExtractedMainMethodHandler(
             "getDynamicRebuildTaskStatus" -> getDynamicRebuildTaskStatus(result)
             "ensureDynamicRebuildTaskResumed" -> ensureDynamicRebuildTaskResumed(result)
             "cancelDynamicRebuildTask" -> cancelDynamicRebuildTask(result)
-            "showMemoryRebuildNotification" -> showMemoryRebuildNotification(call, result)
-            "cancelMemoryRebuildNotification" -> cancelMemoryRebuildNotification(result)
             "triggerSegmentTick" -> triggerSegmentTick(result)
             "retrySegments" -> retrySegments(call, result)
             "forceMergeSegment" -> forceMergeSegment(call, result)
@@ -626,47 +623,6 @@ class ExtractedMainMethodHandler(
             result.success(DynamicRebuildService.cancelTask(activity.applicationContext))
         } catch (e: Exception) {
             result.error("cancel_dynamic_rebuild_task_failed", e.message, null)
-        }
-    }
-
-    private fun showMemoryRebuildNotification(call: MethodCall, result: MethodChannel.Result) {
-        try {
-            val status = call.argument<String>("status") ?: "running"
-            val processed = call.argument<Int>("processed") ?: 0
-            val failed = call.argument<Int>("failed") ?: 0
-            val total = call.argument<Int>("total") ?: 0
-            val currentPosition = call.argument<Int>("currentPosition") ?: 0
-            val currentSegmentId = call.argument<Int>("currentSegmentId") ?: 0
-            val segmentSampleCursor = call.argument<Int>("segmentSampleCursor") ?: 0
-            val segmentSampleTotal = call.argument<Int>("segmentSampleTotal") ?: 0
-            val pauseReason = call.argument<String>("pauseReason")
-            val lastError = call.argument<String>("lastError")
-            result.success(
-                MemoryRebuildNotifier.show(
-                    activity.applicationContext,
-                    status,
-                    processed,
-                    failed,
-                    total,
-                    currentPosition,
-                    currentSegmentId,
-                    segmentSampleCursor,
-                    segmentSampleTotal,
-                    pauseReason,
-                    lastError,
-                )
-            )
-        } catch (e: Exception) {
-            result.error("show_memory_rebuild_notification_failed", e.message, null)
-        }
-    }
-
-    private fun cancelMemoryRebuildNotification(result: MethodChannel.Result) {
-        try {
-            MemoryRebuildNotifier.cancel(activity.applicationContext)
-            result.success(true)
-        } catch (e: Exception) {
-            result.error("cancel_memory_rebuild_notification_failed", e.message, null)
         }
     }
 

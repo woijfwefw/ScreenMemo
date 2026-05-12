@@ -2791,68 +2791,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get importDiagnosticsRepairIndex => 'インデックスを修復';
 
   @override
-  String get memoryTabView => 'メモリを見る';
-
-  @override
-  String get memoryTabRebuild => 'ワンタップ再構築';
-
-  @override
-  String memorySignalStatusChip(Object label, Object count) {
-    return '$label $count';
-  }
-
-  @override
-  String get memoryForceCreate => '強制新規作成';
-
-  @override
-  String get actionIgnore => '無視';
-
-  @override
-  String get memoryGenerateSuggestions => '提案を生成';
-
-  @override
-  String get memoryApplyAllSuggestions => 'すべて適用';
-
-  @override
-  String get memoryApplyThisSuggestion => 'これを適用';
-
-  @override
-  String get memoryDontApplySuggestion => '適用しない';
-
-  @override
-  String get memoryCopyError => 'エラーをコピー';
-
-  @override
-  String get actionDescription => '説明';
-
-  @override
-  String get memoryRebuildAction => 'ワンタップ再構築';
-
-  @override
-  String get actionStop => '停止';
-
-  @override
-  String get memoryUriInputHint => 'URI を入力（例：core://my_user）';
-
-  @override
-  String get memorySearchHint => 'メモリ内容/パスを検索…';
-
-  @override
-  String get memoryRoot => 'ルート';
-
-  @override
-  String get memoryParent => '上位';
-
-  @override
-  String get memoryBoot => 'boot';
-
-  @override
-  String get memoryRecent => 'recent';
-
-  @override
-  String get memoryIndex => 'index';
-
-  @override
   String get providerAddAtLeastOneEnabledApiKey =>
       '有効な API Key を少なくとも 1 つ追加してください。';
 

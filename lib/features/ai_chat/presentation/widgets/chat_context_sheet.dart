@@ -445,8 +445,6 @@ class ChatContextPanel extends StatefulWidget {
 class _ChatContextPanelState extends State<ChatContextPanel> {
   static const int _trimEventsDefaultLimit = 50;
   static const int _trimEventsMaxLimit = 200;
-  static const int _memoryEntryUnlockTapTarget = 10;
-  static const int _memoryEntryUnlockHintThreshold = 3;
 
   Future<ChatContextSnapshot>? _future;
   // Cache the last successful snapshot/token count so periodic refresh won't "flash"
@@ -463,8 +461,6 @@ class _ChatContextPanelState extends State<ChatContextPanel> {
   int? _activeModelContextTokens;
   int? _activeModelOutputTokens;
   String _lastPromptModelForCapOverride = '';
-  int _memoryEntryUnlockTapCount = 0;
-  bool _memoryEntryVisible = false;
 
   void _panelSetState(VoidCallback fn) => setState(fn);
 
@@ -472,7 +468,6 @@ class _ChatContextPanelState extends State<ChatContextPanel> {
   void initState() {
     super.initState();
     _reload();
-    unawaited(_loadMemorySidebarEntryVisibility());
     _ctxSub = AISettingsService.instance.onContextChanged.listen((String evt) {
       if (!mounted) return;
       // Fast-path: prompt usage is recorded per request (including tool-loop
@@ -515,15 +510,7 @@ class _ChatContextPanelState extends State<ChatContextPanel> {
         style: titleStyle,
         children: <InlineSpan>[
           TextSpan(text: l10n.chatContextTitlePrefix),
-          WidgetSpan(
-            alignment: PlaceholderAlignment.baseline,
-            baseline: TextBaseline.alphabetic,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: _onMemoryEntryUnlockTap,
-              child: Text(l10n.chatContextTitleMemory, style: titleStyle),
-            ),
-          ),
+          TextSpan(text: l10n.chatContextTitleMemory),
           TextSpan(text: l10n.chatContextTitleSuffix),
         ],
       ),

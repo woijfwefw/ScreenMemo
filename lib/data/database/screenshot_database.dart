@@ -19,8 +19,6 @@ import 'package:screen_memo/features/backup/data/backup_inventory_service.dart';
 part 'screenshot_database_ai.dart';
 part 'screenshot_database_meta.dart';
 part 'screenshot_database_import_diagnostics.dart';
-part 'screenshot_database_nocturne_memory.dart';
-part 'screenshot_database_memory_entities.dart';
 part 'screenshot_database_search.dart';
 part 'screenshot_database_merge.dart';
 part 'screenshot_database_query.dart';
@@ -756,19 +754,12 @@ class ScreenshotDatabase {
     // 统一 SearchIndex（可选用，不影响现有搜索路径）
     await _createSearchIndexTables(db);
 
-    // Nocturne Memory（URI 图谱记忆）表结构
-    await _createNocturneMemoryTables(db);
-    await _createMemoryEntityTables(db);
-
     // App 运行状态（结构化健康数据）
     await _createAppHealthTables(db);
   }
 
   /// 升级回调：按版本增量迁移
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 42) {
-      await _renameLegacyUriFirstSignalTables(db);
-    }
     if (oldVersion < 44) {
       await _createAiProviderKeysTable(db);
       await _migrateLegacyProviderKeys(db);
@@ -1235,13 +1226,6 @@ class ScreenshotDatabase {
       } catch (_) {}
     }
 
-    // v35: Nocturne Memory（URI 图谱记忆）表结构
-    if (oldVersion < 35) {
-      try {
-        await _createNocturneMemoryTables(db);
-      } catch (_) {}
-    }
-
     // v36: Dynamic timeline query indexes
     if (oldVersion < 36) {
       try {
@@ -1261,43 +1245,6 @@ class ScreenshotDatabase {
       } catch (_) {}
     }
 
-    // v38: Entity-centric memory rebuild pipeline tables
-    if (oldVersion < 38) {
-      try {
-        await _createMemoryEntityTables(db);
-      } catch (_) {}
-    }
-
-    // v39: fully switched to entity-first memory signals.
-    // Legacy signal tables are no longer created for fresh installs; any
-    // existing legacy signal rows are migrated lazily into the entity tables
-    // by MemoryEntityStore on first use.
-    if (oldVersion < 39) {
-      try {
-        await _createMemoryEntityTables(db);
-      } catch (_) {}
-    }
-
-    // v40: persist claim evidence frames, event notes, and richer pipeline
-    // audit payloads for the entity-first memory pipeline.
-    if (oldVersion < 40) {
-      try {
-        await _createMemoryEntityTables(db);
-      } catch (_) {}
-    }
-
-    // v41: align entity schema with the AI-first pipeline, add retrieval FTS,
-    // and persist per-batch quality metrics.
-    if (oldVersion < 41) {
-      try {
-        await _createMemoryEntityTables(db);
-      } catch (_) {}
-    }
-    if (oldVersion < 42) {
-      try {
-        await _createMemoryEntityTables(db);
-      } catch (_) {}
-    }
     if (oldVersion < 43) {
       try {
         await _dropLegacyShardOcrTextIndexes(db);
@@ -1308,47 +1255,6 @@ class ScreenshotDatabase {
         await _ensureAiProviderKeyStatsColumns(db);
       } catch (_) {}
     }
-  }
-
-  Future<void> _renameLegacyUriFirstSignalTables(DatabaseExecutor db) async {
-    await _renameLegacyUriFirstSignalTable(
-      db,
-      sourceName: 'memory_signal_profiles',
-      legacyName: 'legacy_memory_signal_profiles',
-    );
-    await _renameLegacyUriFirstSignalTable(
-      db,
-      sourceName: 'memory_signal_episodes',
-      legacyName: 'legacy_memory_signal_episodes',
-    );
-  }
-
-  Future<void> _renameLegacyUriFirstSignalTable(
-    DatabaseExecutor db, {
-    required String sourceName,
-    required String legacyName,
-  }) async {
-    if (!await _tableExists(db, sourceName)) return;
-    final List<Map<String, Object?>> columns = await db.rawQuery(
-      'PRAGMA table_info($sourceName)',
-    );
-    final Set<String> columnNames = columns
-        .map((row) => (row['name'] ?? '').toString().trim())
-        .where((name) => name.isNotEmpty)
-        .toSet();
-    final bool looksLegacy =
-        columnNames.contains('uri') && !columnNames.contains('entity_id');
-    if (!looksLegacy) return;
-    if (await _tableExists(db, legacyName)) {
-      try {
-        await db.execute(
-          'INSERT OR IGNORE INTO $legacyName SELECT * FROM $sourceName',
-        );
-      } catch (_) {}
-      await db.execute('DROP TABLE IF EXISTS $sourceName');
-      return;
-    }
-    await db.execute('ALTER TABLE $sourceName RENAME TO $legacyName');
   }
 
   /// 创建汇总统计表（用于版本升级）

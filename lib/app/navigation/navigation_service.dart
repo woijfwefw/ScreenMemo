@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:screen_memo/features/daily_summary/presentation/pages/daily_summary_page.dart';
-import 'package:screen_memo/features/nocturne_memory/presentation/pages/nocturne_memory_page.dart';
 import 'package:screen_memo/features/timeline/presentation/pages/segment_status_page.dart';
 import 'package:screen_memo/core/logging/flutter_logger.dart';
 
@@ -43,21 +42,6 @@ class NavigationService {
       return;
     }
     nav.push(MaterialPageRoute(builder: (_) => SegmentStatusPage()));
-  }
-
-  Future<void> openNocturneMemory({int initialTabIndex = 1}) async {
-    final nav = navigatorKey.currentState;
-    if (nav == null) {
-      try {
-        await FlutterLogger.nativeWarn('Navigation', '导航器未就绪，忽略打开记忆页');
-      } catch (_) {}
-      return;
-    }
-    nav.push(
-      MaterialPageRoute(
-        builder: (_) => NocturneMemoryPage(initialTabIndex: initialTabIndex),
-      ),
-    );
   }
 
   String _todayKey() {

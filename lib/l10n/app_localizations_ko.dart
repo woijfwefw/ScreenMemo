@@ -2789,68 +2789,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get importDiagnosticsRepairIndex => '인덱스 수리';
 
   @override
-  String get memoryTabView => '메모리 보기';
-
-  @override
-  String get memoryTabRebuild => '한 번에 재구축';
-
-  @override
-  String memorySignalStatusChip(Object label, Object count) {
-    return '$label $count';
-  }
-
-  @override
-  String get memoryForceCreate => '강제 새로 만들기';
-
-  @override
-  String get actionIgnore => '무시';
-
-  @override
-  String get memoryGenerateSuggestions => '제안 생성';
-
-  @override
-  String get memoryApplyAllSuggestions => '모두 적용';
-
-  @override
-  String get memoryApplyThisSuggestion => '이 항목 적용';
-
-  @override
-  String get memoryDontApplySuggestion => '적용 안 함';
-
-  @override
-  String get memoryCopyError => '오류 복사';
-
-  @override
-  String get actionDescription => '설명';
-
-  @override
-  String get memoryRebuildAction => '한 번에 재구축';
-
-  @override
-  String get actionStop => '중지';
-
-  @override
-  String get memoryUriInputHint => 'URI 입력(예: core://my_user)';
-
-  @override
-  String get memorySearchHint => '메모리 내용/경로 검색…';
-
-  @override
-  String get memoryRoot => '루트';
-
-  @override
-  String get memoryParent => '상위';
-
-  @override
-  String get memoryBoot => 'boot';
-
-  @override
-  String get memoryRecent => 'recent';
-
-  @override
-  String get memoryIndex => 'index';
-
-  @override
   String get providerAddAtLeastOneEnabledApiKey => '활성화된 API Key를 하나 이상 추가하세요.';
 
   @override

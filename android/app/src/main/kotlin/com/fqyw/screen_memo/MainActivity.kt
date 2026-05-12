@@ -659,15 +659,6 @@ class MainActivity : FlutterActivity() {
                 return
             }
 
-            val fromMemoryRebuild = it.getBooleanExtra("from_memory_rebuild_notification", false)
-            if (fromMemoryRebuild) {
-                try { FileLogger.i(TAG, "通知启动：打开记忆重建页面") } catch (_: Exception) {}
-                try {
-                    methodChannel.invokeMethod("onMemoryRebuildNotificationTap", null)
-                } catch (e: Exception) {
-                    try { FileLogger.w(TAG, "调用 onMemoryRebuildNotificationTap 失败：${e.message}") } catch (_: Exception) {}
-                }
-            }
         } catch (_: Exception) {}
     }
 

@@ -16,8 +16,6 @@ import 'package:screen_memo/features/search/presentation/pages/search_page.dart'
 import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
 import 'package:screen_memo/features/daily_summary/application/daily_summary_service.dart';
 import 'package:screen_memo/app/navigation/navigation_service.dart';
-import 'package:screen_memo/features/nocturne_memory/application/nocturne_memory_maintenance_service.dart';
-import 'package:screen_memo/features/nocturne_memory/application/nocturne_memory_rebuild_service.dart';
 import 'package:screen_memo/data/database/screenshot_database.dart';
 import 'package:screen_memo/features/capture/application/screenshot_service.dart';
 import 'package:screen_memo/features/app_health/application/app_health_service.dart';
@@ -56,12 +54,6 @@ class _ScreenMemoAppState extends State<ScreenMemoApp>
       // 安排每日总结的自动预生成（08:00、12:00、17:00 + 提醒前1分钟）
       // ignore: discarded_futures
       DailySummaryService.instance.refreshAutoRefreshSchedule();
-      // ignore: discarded_futures
-      NocturneMemoryRebuildService.instance.ensureInitialized(autoResume: true);
-      // ignore: discarded_futures
-      NocturneMemoryMaintenanceService.instance.ensureInitialized(
-        autoResume: true,
-      );
       AppHealthService.instance.ensureAutoMonitorStarted();
     });
   }
@@ -92,12 +84,6 @@ class _ScreenMemoAppState extends State<ScreenMemoApp>
       // 回到前台时刷新一次“自动预生成”调度
       // ignore: discarded_futures
       DailySummaryService.instance.refreshAutoRefreshSchedule();
-      // ignore: discarded_futures
-      NocturneMemoryRebuildService.instance.ensureInitialized(autoResume: true);
-      // ignore: discarded_futures
-      NocturneMemoryMaintenanceService.instance.ensureInitialized(
-        autoResume: true,
-      );
       // 回到前台时如果距离上次自动检查较久，补跑一次。
       // ignore: discarded_futures
       AppHealthService.instance.runAutoMonitorCheckIfStale(reason: 'resumed');

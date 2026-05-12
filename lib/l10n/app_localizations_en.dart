@@ -2869,68 +2869,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importDiagnosticsRepairIndex => 'Repair index';
 
   @override
-  String get memoryTabView => 'View memory';
-
-  @override
-  String get memoryTabRebuild => 'One-tap rebuild';
-
-  @override
-  String memorySignalStatusChip(Object label, Object count) {
-    return '$label $count';
-  }
-
-  @override
-  String get memoryForceCreate => 'Force create';
-
-  @override
-  String get actionIgnore => 'Ignore';
-
-  @override
-  String get memoryGenerateSuggestions => 'Generate suggestions';
-
-  @override
-  String get memoryApplyAllSuggestions => 'Apply all';
-
-  @override
-  String get memoryApplyThisSuggestion => 'Apply this';
-
-  @override
-  String get memoryDontApplySuggestion => 'Do not apply';
-
-  @override
-  String get memoryCopyError => 'Copy error';
-
-  @override
-  String get actionDescription => 'Description';
-
-  @override
-  String get memoryRebuildAction => 'One-tap rebuild';
-
-  @override
-  String get actionStop => 'Stop';
-
-  @override
-  String get memoryUriInputHint => 'Enter URI (e.g. core://my_user)';
-
-  @override
-  String get memorySearchHint => 'Search memory content/path…';
-
-  @override
-  String get memoryRoot => 'Root';
-
-  @override
-  String get memoryParent => 'Parent';
-
-  @override
-  String get memoryBoot => 'Boot';
-
-  @override
-  String get memoryRecent => 'Recent';
-
-  @override
-  String get memoryIndex => 'Index';
-
-  @override
   String get providerAddAtLeastOneEnabledApiKey =>
       'Please add at least one enabled API Key.';
 
