@@ -479,12 +479,36 @@ class DynamicRebuildService : Service() {
                 "按截图时间顺序计算全量重建范围，并按日期分组"
             },
         )
+        if (backfillMode) {
+            recordStage(
+                state = state,
+                stage = "prepare_normalize_overlap",
+                label = "整理交错动态",
+                detail = "正在归一化已有顶层动态时间交错，避免补全后列表交叉",
+            )
+            val normalized = try {
+                SegmentSummaryManager.normalizeExistingRootOverlaps(this, limitClusters = 50)
+            } catch (_: Exception) {
+                0
+            }
+            if (normalized > 0) {
+                recordStage(
+                    state = state,
+                    stage = "prepare_normalize_overlap_done",
+                    label = "交错整理完成",
+                    detail = "已归一化 $normalized 组交错动态",
+                )
+            }
+        }
         val windows = if (backfillMode) {
             SegmentSummaryManager.buildMissingBackfillWorklist(this, durationSec)
         } else {
             SegmentSummaryManager.buildFullRebuildWorklist(this, durationSec)
         }
-        val dayWorks = buildDayWorkItems(windows)
+        val dayWorks = buildDayWorkItems(windows).toMutableList()
+        if (backfillMode) {
+            reorderBackfillDaysForOverlapSafety(dayWorks)
+        }
         val aiConfig = if (windows.isNotEmpty()) {
             recordStage(
                 state = state,
@@ -805,6 +829,7 @@ class DynamicRebuildService : Service() {
                     rangeLabel = window.rangeLabel,
                     windowStart = window.startTime,
                     windowEnd = window.endTime,
+                    existingSegmentId = window.existingSegmentId,
                     processedSegments = day.processedSegments,
                     totalSegments = day.totalSegments(),
                     retryCount = day.retryCount,
@@ -839,7 +864,8 @@ class DynamicRebuildService : Service() {
                     durationSec = state.segmentDurationSec,
                     sampleIntervalSec = state.segmentSampleIntervalSec,
                     aiConfig = aiConfig,
-                    existingSegmentId = snapshot.currentSegmentId,
+                    existingSegmentId = snapshot.currentSegmentId.takeIf { it > 0L }
+                        ?: snapshot.existingSegmentId,
                     stageReporter = { stage, label, detail, segmentId ->
                         if (stage == SegmentSummaryManager.DYNAMIC_AI_STAGE_STREAM_CHUNK_PREVIEW) {
                             recordWorkerStreamChunk(
@@ -1245,6 +1271,7 @@ class DynamicRebuildService : Service() {
                     startTime = window.startTime,
                     endTime = window.endTime,
                     rangeLabel = formatRangeLabel(window.startTime, window.endTime),
+                    existingSegmentId = window.existingSegmentId,
                 ),
             )
         }
@@ -1255,6 +1282,17 @@ class DynamicRebuildService : Service() {
                 status = DynamicRebuildDayWorkItem.STATUS_PENDING,
             )
         }
+    }
+
+    private fun reorderBackfillDaysForOverlapSafety(
+        dayWorks: MutableList<DynamicRebuildDayWorkItem>,
+    ) {
+        if (dayWorks.size <= 1) return
+        val ordered = dayWorks.sortedBy { day ->
+            day.windows.firstOrNull()?.startTime ?: Long.MAX_VALUE
+        }
+        dayWorks.clear()
+        dayWorks.addAll(ordered)
     }
 
     private fun handleForegroundStartupFailure(
@@ -1598,6 +1636,8 @@ class DynamicRebuildService : Service() {
             state.currentStageDetail = normalizedDetail
             if (segmentId > 0L) {
                 state.currentSegmentId = segmentId
+            } else if (normalizedStage == "window_done" || normalizedStage == "window_skip_overlap") {
+                state.currentSegmentId = 0L
             }
             if (slot != null) {
                 slot.dayKey = if (dayKey.isNotBlank()) dayKey else slot.dayKey
@@ -1608,6 +1648,8 @@ class DynamicRebuildService : Service() {
                 slot.currentStageDetail = normalizedDetail
                 if (segmentId > 0L) {
                     slot.currentSegmentId = segmentId
+                } else if (normalizedStage == "window_done" || normalizedStage == "window_skip_overlap") {
+                    slot.currentSegmentId = 0L
                 }
                 val day = state.dayWorks.getOrNull(dayIndex)
                 if (day != null) {
@@ -1758,12 +1800,14 @@ private data class DynamicRebuildWindowWorkItem(
     val startTime: Long,
     val endTime: Long,
     val rangeLabel: String,
+    val existingSegmentId: Long = 0L,
 ) {
     fun toJson(): JSONObject {
         return JSONObject()
             .put("startTime", startTime)
             .put("endTime", endTime)
             .put("rangeLabel", rangeLabel)
+            .put("existingSegmentId", existingSegmentId)
     }
 
     companion object {
@@ -1772,9 +1816,11 @@ private data class DynamicRebuildWindowWorkItem(
                 startTime = obj.optLong("startTime", 0L),
                 endTime = obj.optLong("endTime", 0L),
                 rangeLabel = obj.optString("rangeLabel", ""),
+                existingSegmentId = obj.optLong("existingSegmentId", 0L),
             )
         }
     }
+
 }
 
 private data class DynamicRebuildDayWorkItem(
@@ -1938,6 +1984,7 @@ private data class DayProcessingSnapshot(
     val rangeLabel: String,
     val windowStart: Long,
     val windowEnd: Long,
+    val existingSegmentId: Long,
     val processedSegments: Int,
     val totalSegments: Int,
     val retryCount: Int,
@@ -2444,11 +2491,13 @@ private object DynamicRebuildTaskStore {
             val rangeLabel = item.optString("rangeLabel", "").trim().ifEmpty {
                 legacyFormatRangeLabel(startTime, endTime)
             }
+            val existingSegmentId = item.optLong("existingSegmentId", 0L)
             windows.add(
                 DynamicRebuildWindowWorkItem(
                     startTime = startTime,
                     endTime = endTime,
                     rangeLabel = rangeLabel,
+                    existingSegmentId = existingSegmentId,
                 ),
             )
         }

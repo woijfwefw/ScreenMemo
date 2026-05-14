@@ -61,6 +61,12 @@ object SegmentDatabaseHelper {
         val appName: String
     )
 
+    data class SegmentOverlapCluster(
+        val segments: List<Segment>,
+        val startTime: Long,
+        val endTime: Long,
+    )
+
     private data class AiImageMeta(
         var tagsJson: String? = null,
         var nsfw: Int? = null,
@@ -71,6 +77,11 @@ object SegmentDatabaseHelper {
     private fun Cursor.getStringOrNull(index: Int): String? = if (isNull(index)) null else getString(index)
     private fun Cursor.getLongOrNull(index: Int): Long? = if (isNull(index)) null else getLong(index)
     private fun Cursor.getDoubleOrNull(index: Int): Double? = if (isNull(index)) null else getDouble(index)
+
+    private fun rootSegmentWhere(alias: String): String {
+        val p = if (alias.isBlank()) "" else "$alias."
+        return "(${p}merged_into_id IS NULL OR ${p}merged_into_id <= 0 OR NOT EXISTS (SELECT 1 FROM segments root WHERE root.id = ${p}merged_into_id))"
+    }
 
     // =============== 基础 ===============
 
@@ -1353,7 +1364,7 @@ object SegmentDatabaseHelper {
                 JOIN segment_results r ON r.segment_id = s.id
                 WHERE (s.segment_kind IS NULL OR s.segment_kind = 'global')
                   AND s.status = 'completed'
-                  AND (s.merged_into_id IS NULL)
+                  AND ${rootSegmentWhere("s")}
                   AND s.start_time <= ? AND s.end_time >= ?
                   AND (
                     (r.output_text IS NOT NULL AND LOWER(TRIM(r.output_text)) NOT IN ('', 'null'))
@@ -1469,7 +1480,7 @@ object SegmentDatabaseHelper {
                 FROM segments s
                 JOIN segment_results r ON r.segment_id = s.id
                 WHERE (s.segment_kind IS NULL OR s.segment_kind = 'global')
-                  AND s.status = 'completed' AND (s.merged_into_id IS NULL) AND (
+                  AND s.status = 'completed' AND ${rootSegmentWhere("s")} AND (
                   (r.output_text IS NOT NULL AND LOWER(TRIM(r.output_text)) NOT IN ('', 'null'))
                   OR (r.structured_json IS NOT NULL AND LOWER(TRIM(r.structured_json)) NOT IN ('', 'null'))
                 )
@@ -1496,6 +1507,258 @@ object SegmentDatabaseHelper {
             try { db?.close() } catch (_: Exception) {}
         }
         return list
+    }
+
+    fun listRootSegmentsOverlappingWindow(
+        context: Context,
+        startMillis: Long,
+        endMillis: Long,
+        excludeSegmentId: Long? = null,
+        requireResult: Boolean = false,
+    ): List<Segment> {
+        if (startMillis >= endMillis) return emptyList()
+        val list = ArrayList<Segment>()
+        var db: SQLiteDatabase? = null
+        var cursor: Cursor? = null
+        try {
+            db = openMasterDb(context, writable = false) ?: return emptyList()
+            val args = ArrayList<String>()
+            val sql = StringBuilder(
+                """
+                SELECT s.id, s.start_time, s.end_time, s.duration_sec, s.sample_interval_sec, s.status, s.app_packages, s.created_at, s.updated_at
+                FROM segments s
+                ${if (requireResult) "JOIN segment_results r ON r.segment_id = s.id" else ""}
+                WHERE (s.segment_kind IS NULL OR s.segment_kind = 'global')
+                  AND ${rootSegmentWhere("s")}
+                  AND s.start_time < ? AND s.end_time > ?
+                """.trimIndent()
+            )
+            args.add(endMillis.toString())
+            args.add(startMillis.toString())
+            if (excludeSegmentId != null && excludeSegmentId > 0L) {
+                sql.append("\n  AND s.id <> ?")
+                args.add(excludeSegmentId.toString())
+            }
+            if (requireResult) {
+                sql.append(
+                    "\n  AND (" +
+                        "\n    (r.output_text IS NOT NULL AND LOWER(TRIM(r.output_text)) NOT IN ('', 'null'))" +
+                        "\n    OR (r.structured_json IS NOT NULL AND LOWER(TRIM(r.structured_json)) NOT IN ('', 'null'))" +
+                        "\n  )"
+                )
+            }
+            sql.append("\nORDER BY s.start_time ASC, s.end_time ASC, s.id ASC")
+            cursor = db.rawQuery(sql.toString(), args.toTypedArray())
+            while (cursor.moveToNext()) {
+                list.add(
+                    Segment(
+                        id = cursor.getLong(0),
+                        startTime = cursor.getLong(1),
+                        endTime = cursor.getLong(2),
+                        durationSec = cursor.getInt(3),
+                        sampleIntervalSec = cursor.getInt(4),
+                        status = cursor.getString(5),
+                        appPackages = cursor.getStringOrNull(6),
+                        createdAt = cursor.getLongOrNull(7),
+                        updatedAt = cursor.getLongOrNull(8),
+                    )
+                )
+            }
+        } catch (_: Exception) {
+        } finally {
+            try { cursor?.close() } catch (_: Exception) {}
+            try { db?.close() } catch (_: Exception) {}
+        }
+        return list
+    }
+
+    fun hasRootSegmentOverlap(
+        context: Context,
+        startMillis: Long,
+        endMillis: Long,
+        excludeSegmentId: Long? = null,
+    ): Boolean {
+        return listRootSegmentsOverlappingWindow(
+            context = context,
+            startMillis = startMillis,
+            endMillis = endMillis,
+            excludeSegmentId = excludeSegmentId,
+            requireResult = false,
+        ).isNotEmpty()
+    }
+
+    fun listRootOverlapClusters(
+        context: Context,
+        startMillis: Long? = null,
+        endMillis: Long? = null,
+        limitClusters: Int = 20,
+    ): List<SegmentOverlapCluster> {
+        val roots = ArrayList<Segment>()
+        var db: SQLiteDatabase? = null
+        var cursor: Cursor? = null
+        try {
+            db = openMasterDb(context, writable = false) ?: return emptyList()
+            val where = StringBuilder(
+                "(s.segment_kind IS NULL OR s.segment_kind = 'global') AND ${rootSegmentWhere("s")}"
+            )
+            val args = ArrayList<String>()
+            if (startMillis != null) {
+                where.append(" AND s.end_time > ?")
+                args.add(startMillis.toString())
+            }
+            if (endMillis != null) {
+                where.append(" AND s.start_time < ?")
+                args.add(endMillis.toString())
+            }
+            cursor = db.rawQuery(
+                """
+                SELECT s.id, s.start_time, s.end_time, s.duration_sec, s.sample_interval_sec, s.status, s.app_packages, s.created_at, s.updated_at
+                FROM segments s
+                WHERE ${where}
+                ORDER BY s.start_time ASC, s.end_time ASC, s.id ASC
+                """.trimIndent(),
+                args.toTypedArray(),
+            )
+            while (cursor.moveToNext()) {
+                roots.add(
+                    Segment(
+                        id = cursor.getLong(0),
+                        startTime = cursor.getLong(1),
+                        endTime = cursor.getLong(2),
+                        durationSec = cursor.getInt(3),
+                        sampleIntervalSec = cursor.getInt(4),
+                        status = cursor.getString(5),
+                        appPackages = cursor.getStringOrNull(6),
+                        createdAt = cursor.getLongOrNull(7),
+                        updatedAt = cursor.getLongOrNull(8),
+                    )
+                )
+            }
+        } catch (_: Exception) {
+        } finally {
+            try { cursor?.close() } catch (_: Exception) {}
+            try { db?.close() } catch (_: Exception) {}
+        }
+
+        val clusters = ArrayList<SegmentOverlapCluster>()
+        var current = ArrayList<Segment>()
+        var currentStart = 0L
+        var currentEnd = 0L
+        for (seg in roots) {
+            if (seg.startTime >= seg.endTime) continue
+            if (current.isEmpty()) {
+                current = arrayListOf(seg)
+                currentStart = seg.startTime
+                currentEnd = seg.endTime
+                continue
+            }
+            if (seg.startTime < currentEnd) {
+                current.add(seg)
+                currentStart = kotlin.math.min(currentStart, seg.startTime)
+                currentEnd = kotlin.math.max(currentEnd, seg.endTime)
+                continue
+            }
+            if (current.size > 1) {
+                clusters.add(SegmentOverlapCluster(current.toList(), currentStart, currentEnd))
+                if (clusters.size >= limitClusters.coerceAtLeast(1)) return clusters
+            }
+            current = arrayListOf(seg)
+            currentStart = seg.startTime
+            currentEnd = seg.endTime
+        }
+        if (current.size > 1 && clusters.size < limitClusters.coerceAtLeast(1)) {
+            clusters.add(SegmentOverlapCluster(current.toList(), currentStart, currentEnd))
+        }
+        return clusters
+    }
+
+    fun mergeRootOverlapClusterStructurally(
+        context: Context,
+        cluster: SegmentOverlapCluster,
+    ): Long {
+        val ordered = cluster.segments
+            .filter { it.id > 0L && it.startTime < it.endTime }
+            .sortedWith(compareBy<Segment> { it.startTime }.thenBy { it.id })
+        if (ordered.size <= 1) return ordered.firstOrNull()?.id ?: 0L
+        val newStart = ordered.minOf { it.startTime }
+        val newEnd = ordered.maxOf { it.endTime }
+        val keep = ordered.firstOrNull { it.startTime == newStart && it.endTime == newEnd }
+            ?: ordered.maxWithOrNull(
+                compareBy<Segment> { if (hasResultForSegment(context, it.id)) 1 else 0 }
+                    .thenBy { it.endTime - it.startTime }
+                    .thenBy { it.id }
+            )
+            ?: return 0L
+        val mergedSamples = ArrayList<Sample>()
+        val seenPaths = HashSet<String>()
+        var pos = 0
+        for (seg in ordered) {
+            for (sample in getSamplesForSegment(context, seg.id).sortedBy { it.captureTime }) {
+                if (seenPaths.add(sample.filePath)) {
+                    mergedSamples.add(sample.copy(segmentId = keep.id, positionIndex = pos++))
+                }
+            }
+        }
+
+        var db: SQLiteDatabase? = null
+        try {
+            db = openMasterDb(context, writable = true) ?: return keep.id
+            db.beginTransaction()
+            try {
+                val now = System.currentTimeMillis()
+                val dur = (((newEnd - newStart) / 1000L).toInt()).coerceAtLeast(1)
+                db.update(
+                    "segments",
+                    ContentValues().apply {
+                        put("start_time", newStart)
+                        put("end_time", newEnd)
+                        put("duration_sec", dur)
+                        put("status", "completed")
+                        put("merged_flag", 1)
+                        put("updated_at", now)
+                    },
+                    "id = ?",
+                    arrayOf(keep.id.toString()),
+                )
+                db.delete("segment_samples", "segment_id = ?", arrayOf(keep.id.toString()))
+                for (sample in mergedSamples) {
+                    db.insertWithOnConflict(
+                        "segment_samples",
+                        null,
+                        ContentValues().apply {
+                            put("segment_id", keep.id)
+                            put("capture_time", sample.captureTime)
+                            put("file_path", sample.filePath)
+                            put("app_package_name", sample.appPackageName)
+                            put("app_name", sample.appName)
+                            put("position_index", sample.positionIndex)
+                        },
+                        SQLiteDatabase.CONFLICT_IGNORE,
+                    )
+                }
+                for (seg in ordered) {
+                    if (seg.id == keep.id) continue
+                    db.update(
+                        "segments",
+                        ContentValues().apply {
+                            put("merged_into_id", keep.id)
+                            put("updated_at", now)
+                        },
+                        "id = ? OR merged_into_id = ?",
+                        arrayOf(seg.id.toString(), seg.id.toString()),
+                    )
+                }
+                // 合并交错簇后，原摘要只覆盖旧窗口。清空保留段结果，让补全队列按并集样本重新生成。
+                db.delete("segment_results", "segment_id = ?", arrayOf(keep.id.toString()))
+                db.setTransactionSuccessful()
+            } finally {
+                try { db.endTransaction() } catch (_: Exception) {}
+            }
+        } catch (_: Exception) {
+        } finally {
+            try { db?.close() } catch (_: Exception) {}
+        }
+        return keep.id
     }
 
     /** 标记某段落已尝试合并 */
@@ -1749,11 +2012,11 @@ object SegmentDatabaseHelper {
             val effLimit = limit.coerceAtLeast(1)
             cursor = db.rawQuery(
                 """
-                SELECT id, start_time, end_time, duration_sec, sample_interval_sec, status
-                FROM segments
-                WHERE (segment_kind IS NULL OR segment_kind = 'global')
-                  AND status = 'completed' AND (merged_into_id IS NULL) AND start_time >= ? AND merge_attempted = 0
-                ORDER BY end_time ASC
+                SELECT s.id, s.start_time, s.end_time, s.duration_sec, s.sample_interval_sec, s.status
+                FROM segments s
+                WHERE (s.segment_kind IS NULL OR s.segment_kind = 'global')
+                  AND s.status = 'completed' AND ${rootSegmentWhere("s")} AND s.start_time >= ? AND s.merge_attempted = 0
+                ORDER BY s.end_time ASC
                 LIMIT ?
                 """.trimIndent(),
                 arrayOf(sinceMillis.toString(), effLimit.toString())
@@ -1789,7 +2052,7 @@ object SegmentDatabaseHelper {
                 FROM segments s
                 JOIN segment_results r ON r.segment_id = s.id
                 WHERE (s.segment_kind IS NULL OR s.segment_kind = 'global')
-                  AND s.end_time <= ? AND (s.merged_into_id IS NULL) AND s.status = 'completed' AND (
+                  AND s.end_time <= ? AND ${rootSegmentWhere("s")} AND s.status = 'completed' AND (
                   (r.output_text IS NOT NULL AND LOWER(TRIM(r.output_text)) NOT IN ('', 'null'))
                   OR (r.structured_json IS NOT NULL AND LOWER(TRIM(r.structured_json)) NOT IN ('', 'null'))
                 )
@@ -1949,7 +2212,12 @@ object SegmentDatabaseHelper {
     /**
      * 列出需要补救总结的段落（已完成、无结果但有样本），可按起始时间筛选并限制数量。
      */
-    fun listSegmentsNeedingSummary(context: Context, limit: Int = 5, sinceMillis: Long? = null): List<Segment> {
+    fun listSegmentsNeedingSummary(
+        context: Context,
+        limit: Int = 5,
+        sinceMillis: Long? = null,
+        endMillis: Long? = null,
+    ): List<Segment> {
         val list = ArrayList<Segment>()
         var db: SQLiteDatabase? = null
         var cursor: Cursor? = null
@@ -1957,12 +2225,16 @@ object SegmentDatabaseHelper {
             db = openMasterDb(context, writable = false) ?: return emptyList()
             val effLimit = limit.coerceAtLeast(1)
             val where = StringBuilder(
-                "(s.segment_kind IS NULL OR s.segment_kind = 'global') AND s.status = 'completed' AND (r.segment_id IS NULL OR ((r.output_text IS NULL OR LOWER(TRIM(r.output_text)) IN ('', 'null')) AND (r.structured_json IS NULL OR LOWER(TRIM(r.structured_json)) IN ('', 'null'))))"
+                "(s.segment_kind IS NULL OR s.segment_kind = 'global') AND ${rootSegmentWhere("s")} AND s.status = 'completed' AND (r.segment_id IS NULL OR ((r.output_text IS NULL OR LOWER(TRIM(r.output_text)) IN ('', 'null')) AND (r.structured_json IS NULL OR LOWER(TRIM(r.structured_json)) IN ('', 'null'))))"
             )
             val args = ArrayList<String>()
             if (sinceMillis != null) {
                 where.append(" AND s.start_time >= ?")
                 args.add(sinceMillis.toString())
+            }
+            if (endMillis != null) {
+                where.append(" AND s.start_time <= ?")
+                args.add(endMillis.toString())
             }
             args.add(effLimit.toString())
             cursor = db.rawQuery(

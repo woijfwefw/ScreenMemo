@@ -64,6 +64,12 @@ object SegmentSummaryManager {
     private val dynamicRebuildInFlightCalls =
         Collections.synchronizedSet(mutableSetOf<Call>())
 
+    data class ExistingDynamicWindow(
+        val startTime: Long,
+        val endTime: Long,
+        val segmentId: Long = 0L,
+    )
+
     // 读写设置（SharedPreferences）
     private fun prefs(ctx: Context) = ctx.getSharedPreferences("screen_memo_prefs", Context.MODE_PRIVATE)
 
@@ -508,18 +514,20 @@ object SegmentSummaryManager {
                 if (!SegmentDatabaseHelper.hasSegmentExact(ctx, startTime, endTime)) {
                     if (creatingWindows.add(windowKey)) {
                         try {
-                            val segId = SegmentDatabaseHelper.createSegment(
-                                ctx,
-                                startTime,
-                                endTime,
-                                durationSec,
-                                intervalSec,
-                                status = "collecting"
-                            )
-                            if (segId > 0) {
-                                activeSegmentId = segId
-                                created = true
-                                try { FileLogger.i(TAG, "段落(由当前截图创建)：id=${segId} start=${startTime} end=${endTime} duration=${durationSec}秒 interval=${intervalSec}秒") } catch (_: Exception) {}
+                            if (ensureNoRootOverlapBeforeCreate(ctx, startTime, endTime, "onScreenshotSaved")) {
+                                val segId = SegmentDatabaseHelper.createSegment(
+                                    ctx,
+                                    startTime,
+                                    endTime,
+                                    durationSec,
+                                    intervalSec,
+                                    status = "collecting"
+                                )
+                                if (segId > 0) {
+                                    activeSegmentId = segId
+                                    created = true
+                                    try { FileLogger.i(TAG, "段落(由当前截图创建)：id=${segId} start=${startTime} end=${endTime} duration=${durationSec}秒 interval=${intervalSec}秒") } catch (_: Exception) {}
+                                }
                             }
                         } finally {
                             creatingWindows.remove(windowKey)
@@ -666,24 +674,23 @@ object SegmentSummaryManager {
         val shots = try { SegmentDatabaseHelper.listShotsBetween(ctx, dayStartMillis, scanEnd) } catch (_: Exception) { emptyList() }
         if (shots.isEmpty()) return 0
 
+        val existing = loadExistingRootWindows(ctx, kotlin.math.max(0L, dayStartMillis - durationMs), scanEnd + durationMs)
+        val plan = planNonOverlappingWindows(
+            shotTimes = shots.map { it.captureTime },
+            existingWindows = existing,
+            durationMs = durationMs,
+            nowMillis = nowMillis,
+            dayEndMillis = dayEndMillis,
+        )
         var created = 0
-        // 若 0 点落在一个跨天段落窗口内，则不要从 0 点重新建段（会与跨天段落重叠）。
-        // 这里仅跳过“被覆盖的起始区间”，后续仍允许在 dayEnd 之前生成 start_time 属于本日的段落。
-        val coveredEnd = try { SegmentDatabaseHelper.getSegmentEndTimeCoveringMillis(ctx, dayStartMillis) } catch (_: Exception) { null }
-        var i = 0
-        if (coveredEnd != null && coveredEnd > dayStartMillis) {
-            while (i < shots.size && shots[i].captureTime < coveredEnd) i++
-        }
-        while (i < shots.size) {
-            val windowStart = shots[i].captureTime
-            if (windowStart <= 0L) { i++; continue }
-            if (windowStart > dayEndMillis) break // 仅生成 start_time 仍属于本日的段落
-
-            val windowEnd = windowStart + durationMs
-            if (windowEnd > nowMillis) break // 不满足“可完整结束”的动态生成条件
-
+        for (window in plan.windows) {
+            val windowStart = window.startTime
+            val windowEnd = window.endTime
             try {
-                if (!SegmentDatabaseHelper.hasSegmentExact(ctx, windowStart, windowEnd)) {
+                if (
+                    !SegmentDatabaseHelper.hasSegmentExact(ctx, windowStart, windowEnd) &&
+                    ensureNoRootOverlapBeforeCreate(ctx, windowStart, windowEnd, "repairMissingDay")
+                ) {
                     val segId = SegmentDatabaseHelper.createSegment(
                         ctx,
                         startMillis = windowStart,
@@ -707,15 +714,10 @@ object SegmentSummaryManager {
                     }
                 }
             } catch (_: Exception) {}
-
-            // 跳到"下一个有图片且时间 >= windowEnd"的索引
-            var j = i + 1
-            while (j < shots.size && shots[j].captureTime < windowEnd) j++
-            i = j
         }
 
         if (created > 0) {
-            try { FileLogger.i(TAG, "repairDays: rebuilt day=$dayKey createdSegments=$created") } catch (_: Exception) {}
+            try { FileLogger.i(TAG, "repairDays: rebuilt day=$dayKey createdSegments=$created skippedCovered=${plan.skippedCovered} mergedShortGaps=${plan.mergedShortGaps}") } catch (_: Exception) {}
         }
         return created
     }
@@ -985,8 +987,16 @@ object SegmentSummaryManager {
                 ) {
                     return
                 }
-                val windowStart = shots[i].captureTime
-                val windowEnd = windowStart + durationSec * 1000L
+                val planned = firstSafeWindowFromShots(
+                    ctx = ctx,
+                    shots = shots,
+                    startIndex = i,
+                    durationMs = durationSec * 1000L,
+                    nowMillis = now,
+                    dayEndMillis = null,
+                ) ?: break
+                val windowStart = planned.startTime
+                val windowEnd = planned.endTime
                 if (windowEnd > now) break // 仅处理已完整结束的窗口
                 if (windowStart <= progressEnd) {
                     // 窗口在进度之前，跳过到第一个 >= progressEnd 的截图
@@ -1008,6 +1018,13 @@ object SegmentSummaryManager {
                             i = j2
                             continue
                         }
+                    }
+
+                    if (!ensureNoRootOverlapBeforeCreate(ctx, windowStart, windowEnd, "backfillToLatest")) {
+                        var j2 = i + 1
+                        while (j2 < shots.size && shots[j2].captureTime < windowEnd) j2++
+                        i = if (j2 <= i) i + 1 else j2
+                        continue
                     }
 
                     val key = "$windowStart|$windowEnd"
@@ -3079,9 +3096,9 @@ object SegmentSummaryManager {
                         (ot.isNotEmpty() && !ot.equals("null", ignoreCase = true)) ||
                             (sj.isNotEmpty() && !sj.equals("null", ignoreCase = true))
                     } else false
-                    if (ok) s else SegmentDatabaseHelper.getPreviousCompletedSegmentWithResult(ctx, cur.startTime)
+                    if (ok) s else getOverlapOrPreviousCompletedSegmentWithResult(ctx, cur)
                 } else {
-                    SegmentDatabaseHelper.getPreviousCompletedSegmentWithResult(ctx, cur.startTime)
+                    getOverlapOrPreviousCompletedSegmentWithResult(ctx, cur)
                 }
             }
             if (prev == null) {
@@ -3118,8 +3135,11 @@ object SegmentSummaryManager {
             } catch (_: Exception) { 3600 }
             val maxSpanSec = if (maxSpanSecRaw < 0) 0 else maxSpanSecRaw
             val maxGapSec = if (maxGapSecRaw < 0) 0 else maxGapSecRaw
-            val mergedSpanMs = kotlin.math.max(0L, cur.endTime - prev.startTime)
-            val mergedGapMs = kotlin.math.max(0L, cur.startTime - prev.endTime)
+            val mergedSpanMs = kotlin.math.max(
+                0L,
+                kotlin.math.max(prev.endTime, cur.endTime) - kotlin.math.min(prev.startTime, cur.startTime),
+            )
+            val mergedGapMs = if (cur.startTime >= prev.endTime) cur.startTime - prev.endTime else 0L
             val spanExceeded = maxSpanSec > 0 && mergedSpanMs > maxSpanSec.toLong() * 1000L
             val gapExceeded = maxGapSec > 0 && mergedGapMs > maxGapSec.toLong() * 1000L
             if (spanExceeded || gapExceeded) {
@@ -3238,7 +3258,7 @@ object SegmentSummaryManager {
                     .append("两段各自的 overall_summary：\n")
                     .append("A: ").append(extractOverallSummary(prevOutput)).append('\n')
                     .append("B: ").append(extractOverallSummary(curOutputText)).append('\n')
-                val gapMin = kotlin.math.max(0L, (cur.startTime - prev.endTime)) / 60000L
+                val gapMin = if (cur.startTime >= prev.endTime) (cur.startTime - prev.endTime) / 60000L else 0L
                 sb.append("两段时间间隔约：").append(gapMin).append(" 分钟\n")
                     .append("合并判定策略（放宽）：\n")
                     .append("- 若两段主要应用相同，或同属'视频观看/文章阅读/信息流浏览/社交浏览/购物浏览/办公操作'等同类行为，即使内容不同也视为同一事件；\n")
@@ -3253,7 +3273,7 @@ object SegmentSummaryManager {
                     .append("Each range overall_summary:\n")
                     .append("A: ").append(extractOverallSummary(prevOutput)).append('\n')
                     .append("B: ").append(extractOverallSummary(curOutputText)).append('\n')
-                val gapMin = kotlin.math.max(0L, (cur.startTime - prev.endTime)) / 60000L
+                val gapMin = if (cur.startTime >= prev.endTime) (cur.startTime - prev.endTime) / 60000L else 0L
                 sb.append("Approximate gap between ranges: ").append(gapMin).append(" minutes\n")
                     .append("Merge decision guidelines (relaxed):\n")
                     .append("- If the main app is the same, or both are of the same activity type (video watching/article reading/feed browsing/social browsing/shopping/working), treat as the same event even when content differs.\n")
@@ -3538,8 +3558,10 @@ object SegmentSummaryManager {
                 }
             }
         }
+        val mergedWindowStart = kotlin.math.min(prev.startTime, cur.startTime)
+        val mergedWindowEnd = kotlin.math.max(prev.endTime, cur.endTime)
         // 更新当前段时间窗口到合并范围
-        SegmentDatabaseHelper.updateSegmentWindow(ctx, cur.id, prev.startTime, cur.endTime)
+        SegmentDatabaseHelper.updateSegmentWindow(ctx, cur.id, mergedWindowStart, mergedWindowEnd)
         // 合并后必须写回 samples：否则删除 prev 后，其样本将永久丢失（导致图片标签/描述/引用图片缺失）。
         var mergedSamplesForUi: List<SegmentDatabaseHelper.Sample> = mergedUniqueSamples
         try {
@@ -3596,11 +3618,11 @@ object SegmentSummaryManager {
             try { FileLogger.i(TAG, "merge: deleted previous segment id=${prev.id}") } catch (_: Exception) {}
         } catch (_: Exception) {}
         // 递归向前继续尝试合并
-        try { FileLogger.i(TAG, "merge: continue backward compare from new start=${fmt(prev.startTime)}") } catch (_: Exception) {}
+        try { FileLogger.i(TAG, "merge: continue backward compare from new start=${fmt(mergedWindowStart)}") } catch (_: Exception) {}
         SegmentDatabaseHelper.setMergeAttempted(ctx, cur.id, true)
         tryCompareAndMergeBackward(
             ctx,
-            cur.copy(startTime = prev.startTime),
+            cur.copy(startTime = mergedWindowStart, endTime = mergedWindowEnd),
             mergedSamplesForUi,
             mergedOutputTextForSave,
             mergedStructuredWithImages,
@@ -3648,9 +3670,9 @@ object SegmentSummaryManager {
                         val rr = SegmentDatabaseHelper.getResultForSegment(ctx, s.id)
                         _hasUsableSegmentResult(rr.first, rr.second)
                     } else false
-                    if (ok) s else SegmentDatabaseHelper.getPreviousCompletedSegmentWithResult(ctx, cur.startTime)
+                    if (ok) s else getOverlapOrPreviousCompletedSegmentWithResult(ctx, cur)
                 } else {
-                    SegmentDatabaseHelper.getPreviousCompletedSegmentWithResult(ctx, cur.startTime)
+                    getOverlapOrPreviousCompletedSegmentWithResult(ctx, cur)
                 }
             }
             if (prev == null) {
@@ -3691,8 +3713,11 @@ object SegmentSummaryManager {
                 } catch (_: Exception) { 3600 }
                 val maxSpanSec = if (maxSpanSecRaw < 0) 0 else maxSpanSecRaw
                 val maxGapSec = if (maxGapSecRaw < 0) 0 else maxGapSecRaw
-                val mergedSpanMs = kotlin.math.max(0L, cur.endTime - prev.startTime)
-                val mergedGapMs = kotlin.math.max(0L, cur.startTime - prev.endTime)
+                val mergedSpanMs = kotlin.math.max(
+                    0L,
+                    kotlin.math.max(prev.endTime, cur.endTime) - kotlin.math.min(prev.startTime, cur.startTime),
+                )
+                val mergedGapMs = if (cur.startTime >= prev.endTime) cur.startTime - prev.endTime else 0L
                 val spanExceeded = maxSpanSec > 0 && mergedSpanMs > maxSpanSec.toLong() * 1000L
                 val gapExceeded = maxGapSec > 0 && mergedGapMs > maxGapSec.toLong() * 1000L
                 if (spanExceeded || gapExceeded) {
@@ -3804,7 +3829,7 @@ object SegmentSummaryManager {
                         .append("两段各自的 overall_summary：\n")
                         .append("A: ").append(extractOverallSummary(prevOutput)).append('\n')
                         .append("B: ").append(extractOverallSummary(curOutputText)).append('\n')
-                    val gapMin = kotlin.math.max(0L, (cur.startTime - prev.endTime)) / 60000L
+                    val gapMin = if (cur.startTime >= prev.endTime) (cur.startTime - prev.endTime) / 60000L else 0L
                     sb.append("两段时间间隔约：").append(gapMin).append(" 分钟\n")
                         .append("合并判定策略（放宽）：\n")
                         .append("- 若两段主要应用相同，或同属'视频观看/文章阅读/信息流浏览/社交浏览/购物浏览/办公操作'等同类行为，即使内容不同也视为同一事件；\n")
@@ -3819,7 +3844,7 @@ object SegmentSummaryManager {
                         .append("Each range overall_summary:\n")
                         .append("A: ").append(extractOverallSummary(prevOutput)).append('\n')
                         .append("B: ").append(extractOverallSummary(curOutputText)).append('\n')
-                    val gapMin = kotlin.math.max(0L, (cur.startTime - prev.endTime)) / 60000L
+                    val gapMin = if (cur.startTime >= prev.endTime) (cur.startTime - prev.endTime) / 60000L else 0L
                     sb.append("Approximate gap between ranges: ").append(gapMin).append(" minutes\n")
                         .append("Merge decision guidelines (relaxed):\n")
                         .append("- If the main app is the same, or both are of the same activity type (video watching/article reading/feed browsing/social browsing/shopping/working), treat as the same event even when content differs.\n")
@@ -4109,7 +4134,9 @@ object SegmentSummaryManager {
                 }
             }
 
-            SegmentDatabaseHelper.updateSegmentWindow(ctx, cur.id, prev.startTime, cur.endTime)
+            val mergedWindowStart = kotlin.math.min(prev.startTime, cur.startTime)
+            val mergedWindowEnd = kotlin.math.max(prev.endTime, cur.endTime)
+            SegmentDatabaseHelper.updateSegmentWindow(ctx, cur.id, mergedWindowStart, mergedWindowEnd)
             var mergedSamplesForUi: List<SegmentDatabaseHelper.Sample> = mergedUniqueSamples
             try {
                 val curAfter = SegmentDatabaseHelper.getSegmentById(ctx, cur.id)
@@ -4169,7 +4196,7 @@ object SegmentSummaryManager {
             )
             return tryCompareAndMergeBackwardStrict(
                 ctx,
-                cur.copy(startTime = prev.startTime),
+                cur.copy(startTime = mergedWindowStart, endTime = mergedWindowEnd),
                 mergedSamplesForUi,
                 mergedOutputTextForSave,
                 mergedStructuredWithImages,
@@ -5097,7 +5124,11 @@ object SegmentSummaryManager {
         }
 
         sb.append(titleLabel).append('\n')
-            .append(timeRangeLabel).append(fmt(a.startTime)).append(" - ").append(fmt(b.endTime)).append('\n')
+            .append(timeRangeLabel)
+            .append(fmt(kotlin.math.min(a.startTime, b.startTime)))
+            .append(" - ")
+            .append(fmt(kotlin.math.max(a.endTime, b.endTime)))
+            .append('\n')
             .append(header).append('\n')
         run {
             val provided = samples.size
@@ -5271,6 +5302,13 @@ object SegmentSummaryManager {
     data class DynamicRebuildWindow(
         val startTime: Long,
         val endTime: Long,
+        val existingSegmentId: Long = 0L,
+    )
+
+    data class DynamicWindowPlanResult(
+        val windows: List<DynamicRebuildWindow>,
+        val skippedCovered: Int,
+        val mergedShortGaps: Int,
     )
 
     class DynamicRebuildStepException(
@@ -5307,15 +5345,247 @@ object SegmentSummaryManager {
         return works
     }
 
-    fun buildMissingBackfillWorklist(ctx: Context, durationSec: Int): List<DynamicRebuildWindow> {
-        val allWindows = buildFullRebuildWorklist(ctx, durationSec)
-        if (allWindows.isEmpty()) return emptyList()
+    fun planNonOverlappingWindows(
+        shotTimes: List<Long>,
+        existingWindows: List<ExistingDynamicWindow>,
+        durationMs: Long,
+        nowMillis: Long,
+        dayEndMillis: Long? = null,
+    ): DynamicWindowPlanResult {
+        val safeDurationMs = durationMs.coerceAtLeast(60_000L)
+        val shots = shotTimes.asSequence()
+            .filter { it > 0L }
+            .distinct()
+            .sorted()
+            .toList()
+        if (shots.isEmpty()) {
+            return DynamicWindowPlanResult(emptyList(), skippedCovered = 0, mergedShortGaps = 0)
+        }
+        val existing = existingWindows
+            .filter { it.startTime < it.endTime }
+            .sortedWith(compareBy<ExistingDynamicWindow> { it.startTime }.thenBy { it.endTime })
+        val out = ArrayList<DynamicRebuildWindow>()
+        var skippedCovered = 0
+        var mergedShortGaps = 0
+        var i = 0
+        while (i < shots.size) {
+            var start = shots[i]
+            if (dayEndMillis != null && start > dayEndMillis) break
 
+            var moved = true
+            while (moved) {
+                moved = false
+                val covering = existing.firstOrNull { it.startTime <= start && it.endTime > start }
+                if (covering != null) {
+                    skippedCovered++
+                    while (i < shots.size && shots[i] < covering.endTime) i++
+                    if (i >= shots.size) return DynamicWindowPlanResult(out, skippedCovered, mergedShortGaps)
+                    start = shots[i]
+                    if (dayEndMillis != null && start > dayEndMillis) {
+                        return DynamicWindowPlanResult(out, skippedCovered, mergedShortGaps)
+                    }
+                    moved = true
+                }
+            }
+
+            var end = start + safeDurationMs
+            if (end > nowMillis) break
+            val nextOverlap = existing.firstOrNull { it.startTime < end && it.endTime > start }
+            if (nextOverlap != null) {
+                if (nextOverlap.startTime > start && nextOverlap.startTime - start >= safeDurationMs) {
+                    end = start + safeDurationMs
+                } else {
+                    mergedShortGaps++
+                    while (i < shots.size && shots[i] < nextOverlap.endTime) i++
+                    continue
+                }
+            }
+
+            if (end <= nowMillis) {
+                out.add(DynamicRebuildWindow(startTime = start, endTime = end))
+            }
+            var next = i + 1
+            while (next < shots.size && shots[next] < end) next++
+            i = if (next <= i) i + 1 else next
+        }
+        return DynamicWindowPlanResult(out, skippedCovered, mergedShortGaps)
+    }
+
+    private fun loadExistingRootWindows(
+        ctx: Context,
+        startMillis: Long,
+        endMillis: Long,
+        excludeSegmentId: Long? = null,
+    ): List<ExistingDynamicWindow> {
+        return try {
+            SegmentDatabaseHelper.listRootSegmentsOverlappingWindow(
+                context = ctx,
+                startMillis = startMillis,
+                endMillis = endMillis,
+                excludeSegmentId = excludeSegmentId,
+                requireResult = false,
+            ).map {
+                ExistingDynamicWindow(
+                    startTime = it.startTime,
+                    endTime = it.endTime,
+                    segmentId = it.id,
+                )
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun firstSafeWindowFromShots(
+        ctx: Context,
+        shots: List<SegmentDatabaseHelper.ShotInfo>,
+        startIndex: Int,
+        durationMs: Long,
+        nowMillis: Long,
+        dayEndMillis: Long? = null,
+    ): DynamicRebuildWindow? {
+        if (startIndex < 0 || startIndex >= shots.size) return null
+        val firstShot = shots[startIndex].captureTime
+        val scanEnd = (dayEndMillis ?: nowMillis) + durationMs
+        val existing = loadExistingRootWindows(ctx, kotlin.math.max(0L, firstShot - durationMs), scanEnd)
+        val plan = planNonOverlappingWindows(
+            shotTimes = shots.drop(startIndex).map { it.captureTime },
+            existingWindows = existing,
+            durationMs = durationMs,
+            nowMillis = nowMillis,
+            dayEndMillis = dayEndMillis,
+        )
+        return plan.windows.firstOrNull()
+    }
+
+    private fun ensureNoRootOverlapBeforeCreate(
+        ctx: Context,
+        startMillis: Long,
+        endMillis: Long,
+        source: String,
+    ): Boolean {
+        val hasOverlap = try {
+            SegmentDatabaseHelper.hasRootSegmentOverlap(ctx, startMillis, endMillis)
+        } catch (_: Exception) {
+            false
+        }
+        if (hasOverlap) {
+            try {
+                FileLogger.i(
+                    TAG,
+                    "$source：跳过创建交错窗口 ${fmt(startMillis)} - ${fmt(endMillis)}",
+                )
+            } catch (_: Exception) {}
+        }
+        return !hasOverlap
+    }
+
+    private fun getOverlapOrPreviousCompletedSegmentWithResult(
+        ctx: Context,
+        cur: SegmentDatabaseHelper.Segment,
+    ): SegmentDatabaseHelper.Segment? {
+        val overlap = try {
+            SegmentDatabaseHelper.listRootSegmentsOverlappingWindow(
+                context = ctx,
+                startMillis = cur.startTime,
+                endMillis = cur.endTime,
+                excludeSegmentId = cur.id,
+                requireResult = true,
+            ).firstOrNull()
+        } catch (_: Exception) {
+            null
+        }
+        if (overlap != null) return overlap
+        return try {
+            SegmentDatabaseHelper.getPreviousCompletedSegmentWithResult(ctx, cur.startTime)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun buildMissingBackfillWorklist(ctx: Context, durationSec: Int): List<DynamicRebuildWindow> {
+        val safeDurationSec = durationSec.coerceAtLeast(60)
+        val durationMs = safeDurationSec * 1000L
+        val shots = SegmentDatabaseHelper.listAllShotsAscending(ctx)
+        if (shots.isEmpty()) return emptyList()
         val now = System.currentTimeMillis()
-        val missing = ArrayList<DynamicRebuildWindow>()
+        val scanStart = shots.first().captureTime
+        val scanEnd = kotlin.math.min(now, shots.last().captureTime + durationMs)
+        val scanStartForExisting = kotlin.math.max(0L, scanStart - durationMs)
+        val existingWithResults = try {
+            SegmentDatabaseHelper.listRootSegmentsOverlappingWindow(
+                context = ctx,
+                startMillis = scanStartForExisting,
+                endMillis = scanEnd + durationMs,
+                requireResult = true,
+            ).map {
+                ExistingDynamicWindow(
+                    startTime = it.startTime,
+                    endTime = it.endTime,
+                    segmentId = it.id,
+                )
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+        val plan = planNonOverlappingWindows(
+            shotTimes = shots.map { it.captureTime },
+            existingWindows = existingWithResults,
+            durationMs = durationMs,
+            nowMillis = now,
+        )
+        val missing = ArrayList<DynamicRebuildWindow>(plan.windows.size + 16)
         val dayStats = LinkedHashMap<String, Int>()
-        for (window in allWindows) {
+        val queuedKeys = HashSet<String>()
+        val existingWithoutResults = try {
+            SegmentDatabaseHelper.listSegmentsNeedingSummary(
+                ctx,
+                limit = Int.MAX_VALUE,
+                sinceMillis = scanStartForExisting,
+                endMillis = scanEnd + durationMs,
+            )
+        } catch (_: Exception) {
+            emptyList()
+        }
+        for (seg in existingWithoutResults) {
+            if (seg.startTime >= seg.endTime || seg.endTime > now) continue
+            val key = "${seg.startTime}|${seg.endTime}"
+            if (!queuedKeys.add(key)) continue
+            missing.add(
+                DynamicRebuildWindow(
+                    startTime = seg.startTime,
+                    endTime = seg.endTime,
+                    existingSegmentId = seg.id,
+                )
+            )
+            val dayKey = dateKeyFromMillis(seg.startTime)
+            dayStats[dayKey] = (dayStats[dayKey] ?: 0) + 1
+        }
+        for (window in plan.windows) {
             if (window.endTime > now) continue
+            val exactWithoutResult = existingWithoutResults.firstOrNull {
+                it.startTime == window.startTime && it.endTime == window.endTime
+            }
+            if (exactWithoutResult != null) {
+                val key = "${exactWithoutResult.startTime}|${exactWithoutResult.endTime}"
+                if (queuedKeys.add(key)) {
+                    missing.add(
+                        DynamicRebuildWindow(
+                            startTime = exactWithoutResult.startTime,
+                            endTime = exactWithoutResult.endTime,
+                            existingSegmentId = exactWithoutResult.id,
+                        )
+                    )
+                    val dayKey = dateKeyFromMillis(exactWithoutResult.startTime)
+                    dayStats[dayKey] = (dayStats[dayKey] ?: 0) + 1
+                }
+                continue
+            }
+            if (existingWithoutResults.any {
+                    it.startTime < window.endTime && it.endTime > window.startTime
+                }) {
+                continue
+            }
             val covered = try {
                 SegmentDatabaseHelper.hasUsableResultCoveringWindow(
                     ctx,
@@ -5326,6 +5596,8 @@ object SegmentSummaryManager {
                 false
             }
             if (covered) continue
+            val key = "${window.startTime}|${window.endTime}"
+            if (!queuedKeys.add(key)) continue
             missing.add(window)
             val dayKey = dateKeyFromMillis(window.startTime)
             dayStats[dayKey] = (dayStats[dayKey] ?: 0) + 1
@@ -5335,11 +5607,11 @@ object SegmentSummaryManager {
             try {
                 FileLogger.i(
                     TAG,
-                    "backfillMissing: scanned=${allWindows.size} missing=${missing.size} days=${dayStats.size} preview=$preview",
+                    "backfillMissing: shots=${shots.size} planned=${plan.windows.size} missing=${missing.size} skippedCovered=${plan.skippedCovered} mergedShortGaps=${plan.mergedShortGaps} days=${dayStats.size} preview=$preview",
                 )
             } catch (_: Exception) {}
         } else {
-            try { FileLogger.i(TAG, "backfillMissing: scanned=${allWindows.size} missing=0") } catch (_: Exception) {}
+            try { FileLogger.i(TAG, "backfillMissing: shots=${shots.size} planned=${plan.windows.size} missing=0 skippedCovered=${plan.skippedCovered} mergedShortGaps=${plan.mergedShortGaps}") } catch (_: Exception) {}
         }
         return missing
     }
@@ -5369,20 +5641,35 @@ object SegmentSummaryManager {
             if (existingSegmentId > 0L) {
                 val existing = SegmentDatabaseHelper.getSegmentById(appCtx, existingSegmentId)
                 if (existing != null) {
-                    val existingResult = SegmentDatabaseHelper.getResultForSegment(appCtx, existing.id)
-                    if (_hasUsableSegmentResult(existingResult.first, existingResult.second)) {
-                        seg = existing
-                        summaryReady = true
-                        outputText = existingResult.first
-                        structuredJson = existingResult.second
+                    if (existing.startTime != windowStart || existing.endTime != windowEnd) {
                         stageReporter?.invoke(
-                            "window_reuse_existing",
-                            "复用已有结果",
-                            "已复用段落 #${existing.id} 的现有结果",
+                            "window_existing_mismatch",
+                            "忽略旧续跑段落",
+                            "续跑段落 #${existing.id} 与当前时间窗不一致，改为按当前窗口处理",
                             existing.id,
                         )
                     } else {
-                        cleanupRebuildSegment(appCtx, existing.id)
+                        val existingResult = SegmentDatabaseHelper.getResultForSegment(appCtx, existing.id)
+                        if (_hasUsableSegmentResult(existingResult.first, existingResult.second)) {
+                            seg = existing
+                            summaryReady = true
+                            outputText = existingResult.first
+                            structuredJson = existingResult.second
+                            stageReporter?.invoke(
+                                "window_reuse_existing",
+                                "复用已有结果",
+                                "已复用段落 #${existing.id} 的现有结果",
+                                existing.id,
+                            )
+                        } else {
+                            seg = existing
+                            stageReporter?.invoke(
+                                "window_reuse_no_summary",
+                                "复用待总结动态",
+                                "段落 #${existing.id} 已存在但缺少总结，继续生成 AI 总结",
+                                existing.id,
+                            )
+                        }
                     }
                 }
             }
@@ -5403,6 +5690,14 @@ object SegmentSummaryManager {
                             "发现完全匹配时间窗的已有结果，直接复用",
                             exactSeg.id,
                         )
+                    } else if (exactSeg != null) {
+                        seg = exactSeg
+                        stageReporter?.invoke(
+                            "window_reuse_exact_no_summary",
+                            "复用待总结窗口",
+                            "发现完全匹配时间窗的段落 #${exactSeg.id}，继续生成 AI 总结",
+                            exactSeg.id,
+                        )
                     } else {
                         cleanupRebuildSegment(appCtx, exactId)
                     }
@@ -5410,6 +5705,15 @@ object SegmentSummaryManager {
             }
 
             if (seg == null) {
+                if (!ensureNoRootOverlapBeforeCreate(appCtx, windowStart, windowEnd, "rebuildWindowStrict")) {
+                    stageReporter?.invoke(
+                        "window_skip_overlap",
+                        "跳过交错窗口",
+                        "当前时间窗已被其它顶层动态覆盖或交错，已跳过创建",
+                        0L,
+                    )
+                    return 0L
+                }
                 stageReporter?.invoke(
                     "window_create_segment",
                     "创建动态事件",
@@ -5452,19 +5756,22 @@ object SegmentSummaryManager {
             )
             var samples = SegmentDatabaseHelper.getSamplesForSegment(appCtx, seg.id)
             if (samples.isEmpty()) {
+                val effectiveDurationSec =
+                    (((windowEnd - windowStart) / 1000L).toInt()).coerceAtLeast(1)
+                val effectiveSampleIntervalSec = sampleIntervalSec.coerceAtLeast(5)
                 val buildSeg = if (
                     seg.startTime == windowStart &&
                     seg.endTime == windowEnd &&
-                    seg.durationSec == durationSec.coerceAtLeast(60) &&
-                    seg.sampleIntervalSec == sampleIntervalSec.coerceAtLeast(5)
+                    seg.durationSec == effectiveDurationSec &&
+                    seg.sampleIntervalSec == effectiveSampleIntervalSec
                 ) {
                     seg
                 } else {
                     seg.copy(
                         startTime = windowStart,
                         endTime = windowEnd,
-                        durationSec = durationSec.coerceAtLeast(60),
-                        sampleIntervalSec = sampleIntervalSec.coerceAtLeast(5),
+                        durationSec = effectiveDurationSec,
+                        sampleIntervalSec = effectiveSampleIntervalSec,
                     )
                 }
                 samples = buildSamplesForSegment(appCtx, buildSeg)
@@ -5562,6 +5869,42 @@ object SegmentSummaryManager {
         val sj = structuredJson?.trim().orEmpty()
         return (ot.isNotEmpty() && !ot.equals("null", ignoreCase = true)) ||
             (sj.isNotEmpty() && !sj.equals("null", ignoreCase = true))
+    }
+
+    fun normalizeExistingRootOverlaps(
+        ctx: Context,
+        startMillis: Long? = null,
+        endMillis: Long? = null,
+        limitClusters: Int = 20,
+    ): Int {
+        val clusters = try {
+            SegmentDatabaseHelper.listRootOverlapClusters(
+                context = ctx,
+                startMillis = startMillis,
+                endMillis = endMillis,
+                limitClusters = limitClusters,
+            )
+        } catch (_: Exception) {
+            emptyList()
+        }
+        var normalized = 0
+        for (cluster in clusters) {
+            try {
+                val keepId = SegmentDatabaseHelper.mergeRootOverlapClusterStructurally(ctx, cluster)
+                if (keepId > 0L) {
+                    normalized++
+                    try {
+                        FileLogger.i(
+                            TAG,
+                            "normalizeOverlap: keep=$keepId segments=${cluster.segments.size} range=${fmt(cluster.startTime)}-${fmt(cluster.endTime)}",
+                        )
+                    } catch (_: Exception) {}
+                }
+            } catch (e: Exception) {
+                try { FileLogger.w(TAG, "normalizeOverlap failed: ${e.message}") } catch (_: Exception) {}
+            }
+        }
+        return normalized
     }
 
     /**
