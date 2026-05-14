@@ -29,9 +29,67 @@ String _filterReasoningChunkForUi(String raw) {
 }
 
 extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
-  Future<void> _sendMessage() async {
+  Future<void> _retryMessageAt(int index) async {
     if (_sending) return;
-    final text = _inputController.text.trim();
+    if (index < 0 || index >= _messages.length) return;
+
+    int userIndex = -1;
+    final AIMessage selected = _messages[index];
+    if (selected.role == 'user') {
+      userIndex = index;
+    } else {
+      for (int i = index - 1; i >= 0; i--) {
+        if (_messages[i].role == 'user') {
+          userIndex = i;
+          break;
+        }
+      }
+    }
+    if (userIndex < 0 || userIndex >= _messages.length) return;
+    final String text = _messages[userIndex].content.trim();
+    if (text.isEmpty) return;
+    final String conversationCid = (_activeConversationCid ?? '').trim().isEmpty
+        ? (await _settings.getActiveConversationCid()).trim()
+        : (_activeConversationCid ?? '').trim();
+    final int cutoffCreatedAt =
+        _messages[userIndex].createdAt.millisecondsSinceEpoch;
+    final List<AIMessage> trimmedMessages = List<AIMessage>.from(
+      _messages.take(userIndex),
+    );
+
+    _setState(() {
+      _messages = trimmedMessages;
+      _thinkingBlocksByIndex.removeWhere((key, _) => key >= userIndex);
+      _contentSegmentsByIndex.removeWhere((key, _) => key >= userIndex);
+      _nextContentStartsNewSegmentByIndex.removeWhere(
+        (key, _) => key >= userIndex,
+      );
+      _reasoningByIndex.removeWhere((key, _) => key >= userIndex);
+      _gatewayLogsByIndex.removeWhere((key, _) => key >= userIndex);
+      _gatewayLogFilePathByIndex.removeWhere((key, _) => key >= userIndex);
+      _reasoningDurationByIndex.removeWhere((key, _) => key >= userIndex);
+    });
+    if (conversationCid.isNotEmpty && cutoffCreatedAt > 0) {
+      _chatHistoryWriteEpoch++;
+      _chat.blockConversationPersistenceBefore(
+        cid: conversationCid,
+        createdAtMs: cutoffCreatedAt,
+      );
+      await _settings.truncateConversationAfterCreatedAt(
+        conversationCid,
+        cutoffCreatedAt,
+      );
+      await _settings.saveChatHistoryByCid(conversationCid, trimmedMessages);
+    }
+    await _sendMessage(overrideText: text);
+  }
+
+  Future<void> _sendMessage({String? overrideText}) async {
+    if (_sending) return;
+    final String? override = overrideText?.trim();
+    final text = (override != null && override.isNotEmpty)
+        ? override
+        : _inputController.text.trim();
     if (text.isEmpty) {
       UINotifier.error(
         context,
@@ -60,11 +118,16 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
       }
 
       // 先本地追加用户消息，提升即时反馈
+      final DateTime userCreatedAt = DateTime.now();
       setStateIfActive(() {
         _messages = List<AIMessage>.from(_messages)
-          ..add(AIMessage(role: 'user', content: text));
+          ..add(
+            AIMessage(role: 'user', content: text, createdAt: userCreatedAt),
+          );
       });
-      _inputController.clear();
+      if (override == null || override.isEmpty) {
+        _inputController.clear();
+      }
       _scheduleAutoScroll();
 
       if (_streamEnabled) {
@@ -86,17 +149,12 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
           _reasoningDurationByIndex.remove(assistantIdx);
 
           final _ThinkingBlock first = _ThinkingBlock(createdAt: createdAt);
-          if (_showAgentProgressLogs) {
-            first.events.add(
-              _ThinkingEvent(
-                type: _ThinkingEventType.intent,
-                title: _isZhLocale() ? '分析查询意图' : 'Analyze intent',
-                icon: Icons.search_outlined,
-                active: true,
-              ),
-            );
-          }
           _thinkingBlocksByIndex[assistantIdx] = <_ThinkingBlock>[first];
+          _setTransientThinkingStep(
+            assistantIdx,
+            title: _isZhLocale() ? '正在准备请求' : 'Preparing request',
+            icon: Icons.autorenew_rounded,
+          );
           _contentSegmentsByIndex[assistantIdx] = <String>[];
           _nextContentStartsNewSegmentByIndex[assistantIdx] = true;
         });
@@ -139,6 +197,13 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
             _isZhLocale() ? '阶段 1/4：意图分析' : 'Phase 1/4: intent analysis',
             bullet: false,
           );
+          setStateIfActive(() {
+            _setTransientThinkingStep(
+              assistantIdx,
+              title: _isZhLocale() ? '正在分析问题' : 'Analyzing request',
+              icon: Icons.search_outlined,
+            );
+          });
 
           IntentResult? intent;
           String userQuestionForFinal = text;
@@ -264,6 +329,13 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
                     ? '调用意图分析模型…${preview.isEmpty ? '' : ' input="' + preview + '"'}'
                     : 'Calling intent model…${preview.isEmpty ? '' : ' input=\"' + preview + '\"'}',
               );
+              setStateIfActive(() {
+                _setTransientThinkingStep(
+                  assistantIdx,
+                  title: _isZhLocale() ? '正在调用意图分析模型' : 'Calling intent model',
+                  icon: Icons.manage_search_rounded,
+                );
+              });
               final Stopwatch swIntent = Stopwatch()..start();
               intent = await IntentAnalysisService.instance.analyze(
                 analyzeInput,
@@ -365,22 +437,14 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
                   ? '意图已确认：${resolvedIntent.intentSummary}（不预设时间窗，由模型按需检索）'
                   : 'Intent confirmed: ${resolvedIntent.intentSummary} (no preset time window; model retrieves as needed)',
             );
-            if (_showAgentProgressLogs) {
-              setStateIfActive(() {
-                final List<_ThinkingBlock>? blocks =
-                    _thinkingBlocksByIndex[assistantIdx];
-                if (blocks == null || blocks.isEmpty) return;
-                final _ThinkingBlock b = blocks.last;
-                _upsertEvent(
-                  b,
-                  type: _ThinkingEventType.intent,
-                  title: _isZhLocale() ? '分析查询意图' : 'Analyze intent',
-                  icon: Icons.search_outlined,
-                  active: false,
-                  subtitle: _formatIntentSubtitle(resolvedIntent),
-                );
-              });
-            }
+            setStateIfActive(() {
+              _setTransientThinkingStep(
+                assistantIdx,
+                title: _isZhLocale() ? '正在更新对话标题' : 'Updating chat title',
+                subtitle: _formatIntentSubtitle(resolvedIntent),
+                icon: Icons.drive_file_rename_outline_rounded,
+              );
+            });
             _renameActiveConversationTo(
               resolvedIntent.intentSummary,
               conversationCid: requestCid,
@@ -389,6 +453,13 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
               _isZhLocale() ? '阶段 3/4：生成回答' : 'Phase 3/4: generating answer',
               bullet: false,
             );
+            setStateIfActive(() {
+              _setTransientThinkingStep(
+                assistantIdx,
+                title: _isZhLocale() ? '正在生成回答' : 'Generating answer',
+                icon: Icons.auto_awesome_outlined,
+              );
+            });
             _replaceAssistantContentOnNextToken = true; // 首个 token 到来时清空阶段状态
             session = await _chat.sendMessageStreamedV2WithDisplayOverride(
               text,
@@ -400,7 +471,9 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
               tools: AIChatService.defaultChatTools(),
               toolChoice: 'auto',
               conversationCid: requestCid,
+              uiUserCreatedAtMs: userCreatedAt.millisecondsSinceEpoch,
               uiAssistantCreatedAtMs: createdAt.millisecondsSinceEpoch,
+              reasoningLevel: _reasoningLevel,
             );
           }
 
@@ -462,9 +535,7 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
                       : _filterReasoningChunkForUi(evt.data);
                   if (idx != null && reasoningDelta.trim().isNotEmpty) {
                     _setState(() {
-                      _thinkingText += reasoningDelta;
-                      _reasoningByIndex[idx] =
-                          (_reasoningByIndex[idx] ?? '') + reasoningDelta;
+                      _appendReasoningDeltaToTimeline(idx, reasoningDelta);
                     });
                     _scheduleAutoScroll();
                     _scheduleReasoningPreviewScroll();
@@ -495,6 +566,13 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
                       role: 'assistant',
                       content: base + incoming,
                       createdAt: target.createdAt, // 保留初始创建时间以准确计算思考耗时
+                      reasoningContent: target.reasoningContent,
+                      reasoningDuration: target.reasoningDuration,
+                      uiThinkingJson: target.uiThinkingJson,
+                      usagePromptTokens: target.usagePromptTokens,
+                      usageCompletionTokens: target.usageCompletionTokens,
+                      usageTotalTokens: target.usageTotalTokens,
+                      responseDuration: target.responseDuration,
                     );
                     final newList = List<AIMessage>.from(_messages);
                     newList[targetIdx] = updated;
@@ -582,9 +660,20 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
                   role: 'assistant',
                   content: completed.content,
                   createdAt: target.createdAt,
-                  reasoningContent: target.reasoningContent,
-                  reasoningDuration: target.reasoningDuration,
+                  reasoningContent:
+                      completed.reasoningContent ?? target.reasoningContent,
+                  reasoningDuration:
+                      completed.reasoningDuration ?? target.reasoningDuration,
                   uiThinkingJson: target.uiThinkingJson,
+                  usagePromptTokens:
+                      completed.usagePromptTokens ?? target.usagePromptTokens,
+                  usageCompletionTokens:
+                      completed.usageCompletionTokens ??
+                      target.usageCompletionTokens,
+                  usageTotalTokens:
+                      completed.usageTotalTokens ?? target.usageTotalTokens,
+                  responseDuration:
+                      completed.responseDuration ?? target.responseDuration,
                 );
                 final newList = List<AIMessage>.from(_messages);
                 newList[targetIdx] = updated;
@@ -617,15 +706,42 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
                 }
                 final AIMessage target = _messages[targetIdx];
                 if (target.role != 'assistant') return;
-                if (target.content == completed.content) return;
+                final bool metadataChanged =
+                    (completed.reasoningContent ?? target.reasoningContent) !=
+                        target.reasoningContent ||
+                    (completed.reasoningDuration ?? target.reasoningDuration) !=
+                        target.reasoningDuration ||
+                    (completed.usagePromptTokens ?? target.usagePromptTokens) !=
+                        target.usagePromptTokens ||
+                    (completed.usageCompletionTokens ??
+                            target.usageCompletionTokens) !=
+                        target.usageCompletionTokens ||
+                    (completed.usageTotalTokens ?? target.usageTotalTokens) !=
+                        target.usageTotalTokens ||
+                    (completed.responseDuration ?? target.responseDuration) !=
+                        target.responseDuration;
+                if (target.content == completed.content && !metadataChanged) {
+                  return;
+                }
 
                 final updated = AIMessage(
                   role: 'assistant',
                   content: completed.content,
                   createdAt: target.createdAt,
-                  reasoningContent: target.reasoningContent,
-                  reasoningDuration: target.reasoningDuration,
+                  reasoningContent:
+                      completed.reasoningContent ?? target.reasoningContent,
+                  reasoningDuration:
+                      completed.reasoningDuration ?? target.reasoningDuration,
                   uiThinkingJson: target.uiThinkingJson,
+                  usagePromptTokens:
+                      completed.usagePromptTokens ?? target.usagePromptTokens,
+                  usageCompletionTokens:
+                      completed.usageCompletionTokens ??
+                      target.usageCompletionTokens,
+                  usageTotalTokens:
+                      completed.usageTotalTokens ?? target.usageTotalTokens,
+                  responseDuration:
+                      completed.responseDuration ?? target.responseDuration,
                 );
                 final newList = List<AIMessage>.from(_messages);
                 newList[targetIdx] = updated;
@@ -702,10 +818,6 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
             final idx = _currentAssistantIndex;
             if (idx != null && idx >= 0 && idx < _messages.length) {
               _finishActiveThinkingBlock(idx);
-              // Safety net: in case we never observed a "finish" moment (e.g. stream ended early).
-              _reasoningDurationByIndex[idx] ??= DateTime.now().difference(
-                _messages[idx].createdAt,
-              );
             }
             _currentAssistantIndex = null;
           });
@@ -739,6 +851,7 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
       } else {
         // 非流式：仍按阶段流程，最后一次性替换为最终答案
         final int assistantIdx = _messages.length;
+        final DateTime assistantCreatedAt = DateTime.now();
         setStateIfActive(() {
           _thinkingText = '';
           _reasoningByIndex[assistantIdx] = '';
@@ -748,9 +861,22 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
               AIMessage(
                 role: 'assistant',
                 content: '',
-                createdAt: DateTime.now(),
+                createdAt: assistantCreatedAt,
               ),
             );
+          _currentAssistantIndex = assistantIdx;
+          _inStreaming = true;
+          final _ThinkingBlock first = _ThinkingBlock(
+            createdAt: assistantCreatedAt,
+          );
+          _thinkingBlocksByIndex[assistantIdx] = <_ThinkingBlock>[first];
+          _setTransientThinkingStep(
+            assistantIdx,
+            title: _isZhLocale() ? '正在准备请求' : 'Preparing request',
+            icon: Icons.autorenew_rounded,
+          );
+          _contentSegmentsByIndex[assistantIdx] = <String>[];
+          _nextContentStartsNewSegmentByIndex[assistantIdx] = true;
         });
         _appendAgentLog(
           _isZhLocale() ? '开始处理本次请求' : 'Start handling request',
@@ -762,6 +888,13 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
           assistantIndex: assistantIdx,
           bullet: false,
         );
+        setStateIfActive(() {
+          _setTransientThinkingStep(
+            assistantIdx,
+            title: _isZhLocale() ? '正在分析问题' : 'Analyzing request',
+            icon: Icons.search_outlined,
+          );
+        });
 
         try {
           await FlutterLogger.nativeInfo(
@@ -895,6 +1028,13 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
                     : 'Calling intent model…${preview.isEmpty ? '' : ' input=\"' + preview + '\"'}',
                 assistantIndex: assistantIdx,
               );
+              setStateIfActive(() {
+                _setTransientThinkingStep(
+                  assistantIdx,
+                  title: _isZhLocale() ? '正在调用意图分析模型' : 'Calling intent model',
+                  icon: Icons.manage_search_rounded,
+                );
+              });
               final Stopwatch swIntent = Stopwatch()..start();
               intent = await IntentAnalysisService.instance.analyze(
                 analyzeInput,
@@ -963,6 +1103,9 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
             setStateIfActive(() {
               final lastIdx = _messages.length - 1;
               final last = _messages[lastIdx];
+              _finishActiveThinkingBlock(assistantIdx);
+              _inStreaming = false;
+              _currentAssistantIndex = null;
               _messages[lastIdx] = AIMessage(
                 role: 'assistant',
                 content: localAssistantText,
@@ -1002,6 +1145,14 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
                 : 'Intent confirmed: ${resolvedIntent.intentSummary} (no preset time window; model retrieves as needed)',
             assistantIndex: assistantIdx,
           );
+          setStateIfActive(() {
+            _setTransientThinkingStep(
+              assistantIdx,
+              title: _isZhLocale() ? '正在更新对话标题' : 'Updating chat title',
+              subtitle: _formatIntentSubtitle(resolvedIntent),
+              icon: Icons.drive_file_rename_outline_rounded,
+            );
+          });
           _renameActiveConversationTo(
             resolvedIntent.intentSummary,
             conversationCid: requestCid,
@@ -1011,6 +1162,13 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
             assistantIndex: assistantIdx,
             bullet: false,
           );
+          setStateIfActive(() {
+            _setTransientThinkingStep(
+              assistantIdx,
+              title: _isZhLocale() ? '正在生成回答' : 'Generating answer',
+              icon: Icons.auto_awesome_outlined,
+            );
+          });
           final Stopwatch swAnswer = Stopwatch()..start();
           final assistant = await _chat.sendMessageWithDisplayOverride(
             text,
@@ -1021,18 +1179,30 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
             tools: AIChatService.defaultChatTools(),
             toolChoice: 'auto',
             conversationCid: requestCid,
+            uiUserCreatedAtMs: userCreatedAt.millisecondsSinceEpoch,
+            uiAssistantCreatedAtMs: assistantCreatedAt.millisecondsSinceEpoch,
+            reasoningLevel: _reasoningLevel,
             emitEvent: (evt) {
               if (!mounted) return;
               if (_activeSendEpoch != sendEpoch) return;
+              if (evt.kind == 'ui') {
+                final Map<String, dynamic>? payload = _tryParseJsonMap(
+                  evt.data,
+                );
+                if (payload == null) return;
+                final String t = (payload['type'] as String?)?.trim() ?? '';
+                if (t == 'gateway_log') return;
+                setStateIfActive(() => _handleAiUiEvent(assistantIdx, payload));
+                _scheduleAutoScroll();
+                return;
+              }
               if (evt.kind != 'reasoning') return;
               final String reasoningDelta = _showAgentProgressLogs
                   ? evt.data
                   : _filterReasoningChunkForUi(evt.data);
               if (reasoningDelta.trim().isEmpty) return;
               setStateIfActive(() {
-                _thinkingText += reasoningDelta;
-                _reasoningByIndex[assistantIdx] =
-                    (_reasoningByIndex[assistantIdx] ?? '') + reasoningDelta;
+                _appendReasoningDeltaToTimeline(assistantIdx, reasoningDelta);
               });
               _scheduleAutoScroll();
               _scheduleReasoningPreviewScroll();
@@ -1048,10 +1218,20 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
           if (!mounted || _activeSendEpoch != sendEpoch) return;
           setStateIfActive(() {
             final lastIdx = _messages.length - 1;
+            _finishActiveThinkingBlock(assistantIdx);
+            _inStreaming = false;
+            _currentAssistantIndex = null;
             _messages[lastIdx] = AIMessage(
               role: 'assistant',
               content: assistant.content,
               createdAt: _messages[lastIdx].createdAt,
+              reasoningContent: assistant.reasoningContent,
+              reasoningDuration: assistant.reasoningDuration,
+              uiThinkingJson: assistant.uiThinkingJson,
+              usagePromptTokens: assistant.usagePromptTokens,
+              usageCompletionTokens: assistant.usageCompletionTokens,
+              usageTotalTokens: assistant.usageTotalTokens,
+              responseDuration: assistant.responseDuration,
             );
           });
           _scheduleAutoScroll();
@@ -1073,6 +1253,9 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
           if (!mounted || _activeSendEpoch != sendEpoch) return;
           setStateIfActive(() {
             final lastIdx = _messages.length - 1;
+            _finishActiveThinkingBlock(assistantIdx);
+            _inStreaming = false;
+            _currentAssistantIndex = null;
             _messages[lastIdx] = AIMessage(
               role: 'error',
               content: e.toString(),

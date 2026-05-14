@@ -7,7 +7,6 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
@@ -93,7 +92,7 @@ class _ClarifyState {
   final List<_ProbeCandidate> candidates = <_ProbeCandidate>[];
 }
 
-enum _ThinkingEventType { status, intent, tools }
+enum _ThinkingEventType { status, intent, reasoning, tools }
 
 class _ThinkingToolChip {
   _ThinkingToolChip({
@@ -104,6 +103,8 @@ class _ThinkingToolChip {
     this.appPackageNames = const <String>[],
     this.active = true,
     this.resultSummary,
+    this.durationMs,
+    this.detailRef,
   });
 
   final String callId;
@@ -113,6 +114,8 @@ class _ThinkingToolChip {
   List<String> appPackageNames;
   bool active;
   String? resultSummary;
+  int? durationMs;
+  String? detailRef;
 }
 
 class _ThinkingEvent {
@@ -122,7 +125,10 @@ class _ThinkingEvent {
     this.subtitle,
     this.icon,
     this.active = false,
+    this.transient = false,
     this.tools = const <_ThinkingToolChip>[],
+    this.reasoningStart,
+    this.reasoningLength,
   });
 
   final _ThinkingEventType type;
@@ -130,7 +136,10 @@ class _ThinkingEvent {
   String? subtitle;
   IconData? icon;
   bool active; // shimmer when active=true
+  bool transient; // 只用于当前请求的临时加载提示，不持久化
   final List<_ThinkingToolChip> tools;
+  int? reasoningStart;
+  int? reasoningLength;
 }
 
 class _ThinkingBlock {
@@ -271,7 +280,7 @@ class _AISettingsPageState extends State<AISettingsPage>
   bool _promptExpanded = false;
 
   // ——— AI 交互样式与流式状态（仅影响本页 UI，不改动全局样式） ———
-  bool _deepThinking = false; // "深度思考"开关（先做样式，后续可接推理参数）
+  AIReasoningLevel _reasoningLevel = AIReasoningLevel.auto;
   bool _webSearch = false; // "联网搜索"开关（先做样式，后续可接搜索参数）
   bool _inStreaming = false; // 当前是否处于助手流式回复中（驱动"思考中"可视化）
   // 实时"思考过程"内容（仅当前流式过程显示）
@@ -691,45 +700,6 @@ class _AISettingsPageState extends State<AISettingsPage>
       _currentAssistantIndex = null;
     }
     _inFlightConversationCid = null;
-  }
-
-  _ThinkingEvent? _findEvent(
-    _ThinkingBlock block,
-    _ThinkingEventType type,
-    String title,
-  ) {
-    for (final e in block.events) {
-      if (e.type == type && e.title == title) return e;
-    }
-    return null;
-  }
-
-  _ThinkingEvent _upsertEvent(
-    _ThinkingBlock block, {
-    required _ThinkingEventType type,
-    required String title,
-    IconData? icon,
-    bool active = false,
-    String? subtitle,
-    List<_ThinkingToolChip>? tools,
-  }) {
-    final _ThinkingEvent? existing = _findEvent(block, type, title);
-    if (existing != null) {
-      existing.icon = icon ?? existing.icon;
-      existing.active = active;
-      existing.subtitle = subtitle;
-      return existing;
-    }
-    final _ThinkingEvent created = _ThinkingEvent(
-      type: type,
-      title: title,
-      subtitle: subtitle,
-      icon: icon,
-      active: active,
-      tools: tools ?? const <_ThinkingToolChip>[],
-    );
-    block.events.add(created);
-    return created;
   }
 
   _ThinkingBlock _ensureThinkingBlock(int assistantIdx) {

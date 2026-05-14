@@ -83,6 +83,8 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
 
         final bool isAssistant = !isUser && !isError;
         if (isAssistant) {
+          final String? messageReasoningContent =
+              _reasoningByIndex[index] ?? m.reasoningContent;
           final List<_ThinkingBlock> blocks = _blocksForMessageIndex(index);
           final List<String> segs = _contentSegmentsForMessageIndex(index);
           final int n = (blocks.length > segs.length)
@@ -101,34 +103,57 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
                   b.isLoading &&
                   (_reasoningByIndex[index] ?? '').trim().isNotEmpty;
               final bool showCompletedFallbackReasoning =
-                  _showAgentProgressLogs &&
                   i == 0 &&
                   !b.isLoading &&
-                  m.content.trim().isEmpty &&
-                  (m.reasoningContent ?? '').trim().isNotEmpty;
-              final bool showFallbackReasoning =
-                  showStreamingFallbackReasoning ||
-                  showCompletedFallbackReasoning;
-              final String? fallbackReasoning = showFallbackReasoning
-                  ? (_reasoningByIndex[index] ?? m.reasoningContent)
-                  : null;
-              children.add(
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppTheme.spacing2),
-                  child: _ThinkingTimelineCard(
-                    key: ValueKey(
-                      'think:${m.createdAt.millisecondsSinceEpoch}:$i',
-                    ),
-                    createdAt: b.createdAt,
-                    finishedAt: b.finishedAt,
-                    events: b.events,
-                    fallbackReasoning: fallbackReasoning,
-                    autoCloseOnFinish:
-                        !(m.content.trim().isEmpty &&
-                            (fallbackReasoning ?? '').trim().isNotEmpty),
-                  ),
-                ),
+                  (m.reasoningContent ?? '').trim().isNotEmpty &&
+                  !_looksLikeOnlyInternalReasoningProgress(
+                    m.reasoningContent ?? '',
+                  );
+              final bool hasReasoningEvents = b.events.any(
+                (e) =>
+                    e.type == _ThinkingEventType.reasoning &&
+                    (e.reasoningStart ?? -1) >= 0 &&
+                    (e.reasoningLength ?? 0) > 0,
               );
+              final bool showFallbackReasoning =
+                  !hasReasoningEvents &&
+                  (showStreamingFallbackReasoning ||
+                      showCompletedFallbackReasoning);
+              final String? fallbackReasoning = showFallbackReasoning
+                  ? messageReasoningContent
+                  : null;
+              final bool hasDisplayContent = _thinkingBlockHasDisplayContent(
+                b,
+                reasoningContent: messageReasoningContent ?? '',
+                fallbackReasoning: fallbackReasoning,
+                includeTransient: b.isLoading,
+              );
+              if (hasDisplayContent) {
+                children.add(
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppTheme.spacing2),
+                    child: _ThinkingTimelineCard(
+                      key: ValueKey(
+                        'think:${m.createdAt.millisecondsSinceEpoch}:$i',
+                      ),
+                      conversationId: (_activeConversationCid ?? '').trim(),
+                      assistantCreatedAt: m.createdAt.millisecondsSinceEpoch,
+                      createdAt: b.createdAt,
+                      finishedAt: b.finishedAt,
+                      events: b.events,
+                      reasoningContent: messageReasoningContent,
+                      fallbackReasoning: fallbackReasoning,
+                      autoCloseOnFinish:
+                          !(m.content.trim().isEmpty &&
+                              ((fallbackReasoning ?? '').trim().isNotEmpty ||
+                                  (hasReasoningEvents &&
+                                      (messageReasoningContent ?? '')
+                                          .trim()
+                                          .isNotEmpty))),
+                    ),
+                  ),
+                );
+              }
             }
             if (i < segs.length) {
               final String seg = segs[i];
@@ -180,83 +205,7 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
               ),
               Padding(
                 padding: EdgeInsets.zero,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      onPressed: () async {
-                        try {
-                          await Clipboard.setData(
-                            ClipboardData(
-                              text: _buildMessageCopyText(m, index),
-                            ),
-                          );
-                          if (mounted)
-                            UINotifier.success(
-                              context,
-                              AppLocalizations.of(context).copySuccess,
-                            );
-                        } catch (_) {}
-                      },
-                      constraints: const BoxConstraints.tightFor(
-                        width: 24,
-                        height: 24,
-                      ),
-                      padding: const EdgeInsets.all(0),
-                      visualDensity: const VisualDensity(
-                        horizontal: -4,
-                        vertical: -4,
-                      ),
-                      splashRadius: 16,
-                      iconSize: 16,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurfaceVariant.withOpacity(0.8),
-                      icon: const Icon(Icons.copy_rounded),
-                      tooltip: AppLocalizations.of(context).actionCopy,
-                    ),
-                    const SizedBox(width: 4),
-                    if (m.role == 'assistant')
-                      IconButton(
-                        onPressed: () async {
-                          try {
-                            await _showGatewayLogsSheet(index);
-                          } catch (e, st) {
-                            try {
-                              await FlutterLogger.nativeWarn(
-                                'UI',
-                                'open gateway logs failed: $e\n$st',
-                              );
-                            } catch (_) {}
-                            if (!mounted) return;
-                            UINotifier.error(
-                              context,
-                              _isZhLocale()
-                                  ? ('打开日志失败：' + e.toString())
-                                  : ('Failed to open logs: ' + e.toString()),
-                            );
-                          }
-                        },
-                        constraints: const BoxConstraints.tightFor(
-                          width: 24,
-                          height: 24,
-                        ),
-                        padding: const EdgeInsets.all(0),
-                        visualDensity: const VisualDensity(
-                          horizontal: -4,
-                          vertical: -4,
-                        ),
-                        splashRadius: 16,
-                        iconSize: 16,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurfaceVariant.withOpacity(0.8),
-                        icon: const Icon(Icons.receipt_long_rounded),
-                        tooltip: _isZhLocale() ? 'AI 日志' : 'Logs',
-                      ),
-                    if (m.role == 'assistant') const SizedBox(width: 4),
-                  ],
-                ),
+                child: _buildMessageFooter(m, index, isAssistant: true),
               ),
             ],
           );
@@ -530,47 +479,7 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
               alignment: align,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 520),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // 复制（Material Icon）
-                    IconButton(
-                      onPressed: () async {
-                        try {
-                          await Clipboard.setData(
-                            ClipboardData(
-                              text: _buildMessageCopyText(m, index),
-                            ),
-                          );
-                          if (mounted)
-                            UINotifier.success(
-                              context,
-                              AppLocalizations.of(context).copySuccess,
-                            );
-                        } catch (_) {}
-                      },
-                      constraints: const BoxConstraints.tightFor(
-                        width: 24,
-                        height: 24,
-                      ),
-                      padding: const EdgeInsets.all(0),
-                      visualDensity: const VisualDensity(
-                        horizontal: -4,
-                        vertical: -4,
-                      ),
-                      splashRadius: 16,
-                      iconSize: 16,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurfaceVariant.withOpacity(0.8),
-                      icon: const Icon(Icons.copy_rounded),
-                      tooltip: AppLocalizations.of(context).actionCopy,
-                    ),
-                    const SizedBox(width: 4),
-                    // 重新生成（仅对助手消息提供）
-                    // 移除"重试/重新生成"功能
-                  ],
-                ),
+                child: _buildMessageFooter(m, index, isAssistant: isAssistant),
               ),
             ),
           ],
@@ -612,6 +521,174 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
               ),
             ),
           ),
+      ],
+    );
+  }
+
+  bool _looksLikeOnlyInternalReasoningProgress(String text) {
+    final List<String> lines = text
+        .replaceAll('\r\n', '\n')
+        .split('\n')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList(growable: false);
+    if (lines.isEmpty) return true;
+    return lines.every(_isInternalReasoningProgressLine);
+  }
+
+  String _fmtStatInt(int value) => NumberFormat.compact().format(value);
+
+  String _fmtDurationShort(Duration duration) {
+    final int ms = duration.inMilliseconds;
+    if (ms <= 0) return '';
+    if (ms < 1000) return '${ms}ms';
+    final double seconds = ms / 1000.0;
+    if (seconds < 60) return '${seconds.toStringAsFixed(1)}s';
+    final int minutes = seconds ~/ 60;
+    final double rest = seconds - minutes * 60;
+    return '${minutes}m ${rest.toStringAsFixed(0)}s';
+  }
+
+  Widget _buildStatsItem(IconData icon, String text) {
+    final theme = Theme.of(context);
+    final Color color = theme.colorScheme.onSurfaceVariant.withOpacity(0.68);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12, color: color),
+        const SizedBox(width: 2),
+        Text(
+          text,
+          style: theme.textTheme.labelSmall?.copyWith(color: color, height: 1),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMessageNerdLine(AIMessage message) {
+    final int? prompt = message.usagePromptTokens;
+    final int? completion = message.usageCompletionTokens;
+    final Duration? duration = message.responseDuration;
+    final List<Widget> items = <Widget>[];
+    if (prompt != null) {
+      items.add(
+        _buildStatsItem(Icons.upload_rounded, '${_fmtStatInt(prompt)} tokens'),
+      );
+    }
+    if (completion != null) {
+      items.add(
+        _buildStatsItem(
+          Icons.download_rounded,
+          '${_fmtStatInt(completion)} tokens',
+        ),
+      );
+    }
+    if (completion != null && duration != null && duration.inMilliseconds > 0) {
+      final double tps = completion / duration.inMilliseconds * 1000.0;
+      items.add(
+        _buildStatsItem(Icons.bolt_rounded, '${tps.toStringAsFixed(1)} tok/s'),
+      );
+    }
+    if (duration != null && duration.inMilliseconds > 0) {
+      final String text = _fmtDurationShort(duration);
+      if (text.isNotEmpty) {
+        items.add(_buildStatsItem(Icons.schedule_rounded, text));
+      }
+    }
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, right: 4, top: 2),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 2,
+        alignment: WrapAlignment.start,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: items,
+      ),
+    );
+  }
+
+  Widget _buildFooterIconButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback? onPressed,
+  }) {
+    return IconButton(
+      onPressed: onPressed,
+      constraints: const BoxConstraints.tightFor(width: 24, height: 24),
+      padding: const EdgeInsets.all(0),
+      visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+      splashRadius: 16,
+      iconSize: 16,
+      color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.8),
+      icon: Icon(icon),
+      tooltip: tooltip,
+    );
+  }
+
+  Widget _buildMessageFooter(
+    AIMessage message,
+    int index, {
+    required bool isAssistant,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildFooterIconButton(
+              icon: Icons.copy_rounded,
+              tooltip: AppLocalizations.of(context).actionCopy,
+              onPressed: () async {
+                try {
+                  await Clipboard.setData(
+                    ClipboardData(text: _buildMessageCopyText(message, index)),
+                  );
+                  if (mounted) {
+                    UINotifier.success(
+                      context,
+                      AppLocalizations.of(context).copySuccess,
+                    );
+                  }
+                } catch (_) {}
+              },
+            ),
+            const SizedBox(width: 4),
+            _buildFooterIconButton(
+              icon: Icons.refresh_rounded,
+              tooltip: _isZhLocale() ? '重试' : 'Retry',
+              onPressed: _sending ? null : () => _retryMessageAt(index),
+            ),
+            if (isAssistant) ...[
+              const SizedBox(width: 4),
+              _buildFooterIconButton(
+                icon: Icons.receipt_long_rounded,
+                tooltip: _isZhLocale() ? 'AI 日志' : 'Logs',
+                onPressed: () async {
+                  try {
+                    await _showGatewayLogsSheet(index);
+                  } catch (e, st) {
+                    try {
+                      await FlutterLogger.nativeWarn(
+                        'UI',
+                        'open gateway logs failed: $e\n$st',
+                      );
+                    } catch (_) {}
+                    if (!mounted) return;
+                    UINotifier.error(
+                      context,
+                      _isZhLocale()
+                          ? ('打开日志失败：' + e.toString())
+                          : ('Failed to open logs: ' + e.toString()),
+                    );
+                  }
+                },
+              ),
+            ],
+          ],
+        ),
+        if (isAssistant) _buildMessageNerdLine(message),
       ],
     );
   }
@@ -696,20 +773,10 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
           children: [
             Row(
               children: [
-                ClipRect(
-                  child: SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: SvgPicture.asset(
-                      'assets/icons/think.svg',
-                      fit: BoxFit.cover,
-                      alignment: Alignment.center,
-                      colorFilter: ColorFilter.mode(
-                        theme.colorScheme.onSurfaceVariant,
-                        BlendMode.srcIn,
-                      ),
-                    ),
-                  ),
+                Icon(
+                  Icons.tips_and_updates_outlined,
+                  size: 16,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
                 const SizedBox(width: 6),
                 Row(
@@ -874,6 +941,9 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
   // 新的底部输入栏（现代化圆角胶囊样式，带流光边框效果和展开按钮）
   Widget _buildComposerBar() {
     final theme = Theme.of(context);
+    final Color reasoningAccent = _reasoningLevel.isEnabled
+        ? theme.colorScheme.primary
+        : theme.colorScheme.outlineVariant;
     String _middleEllipsis(String s, int maxChars) {
       if (s.length <= maxChars) return s;
       if (maxChars <= 3) return s.substring(0, maxChars);
@@ -912,14 +982,61 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // 左侧个人助手状态提示
+          // 左侧思考等级入口
           Tooltip(
-            message: AppLocalizations.of(context).aiSelfModeEnabledToast,
+            message: _reasoningLevelLabel(_reasoningLevel),
             preferBelow: false,
-            child: SizedBox(
-              width: 32,
-              height: 32,
-              child: Center(child: _buildMagicIcon(size: 18, withGlow: true)),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: _reasoningLevel.isEnabled
+                    ? LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          theme.colorScheme.primaryContainer,
+                          theme.colorScheme.primaryContainer.withOpacity(0.78),
+                        ],
+                      )
+                    : null,
+                color: _reasoningLevel.isEnabled
+                    ? null
+                    : theme.colorScheme.surfaceVariant,
+                boxShadow: [
+                  BoxShadow(
+                    color:
+                        (_reasoningLevel.isEnabled
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.shadow)
+                            .withOpacity(
+                              _reasoningLevel.isEnabled ? 0.18 : 0.06,
+                            ),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+                border: Border.all(
+                  color: reasoningAccent.withOpacity(
+                    _reasoningLevel.isEnabled ? 0.32 : 0.8,
+                  ),
+                ),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: _showReasoningLevelSheet,
+                  child: Center(
+                    child: Icon(
+                      _reasoningLevelIcon(_reasoningLevel),
+                      size: 20,
+                      color: reasoningAccent,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
           const SizedBox(width: AppTheme.spacing1),
@@ -1012,6 +1129,180 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
     );
 
     return _ShimmerBorder(active: _inStreaming || _sending, child: barInner);
+  }
+
+  String _reasoningLevelLabel(AIReasoningLevel level) {
+    final bool zh = _isZhLocale();
+    switch (level) {
+      case AIReasoningLevel.off:
+        return zh ? '思考：关闭' : 'Reasoning: Off';
+      case AIReasoningLevel.auto:
+        return zh ? '思考：自动' : 'Reasoning: Auto';
+      case AIReasoningLevel.low:
+        return zh ? '思考：低' : 'Reasoning: Low';
+      case AIReasoningLevel.medium:
+        return zh ? '思考：中等' : 'Reasoning: Medium';
+      case AIReasoningLevel.high:
+        return zh ? '思考：高' : 'Reasoning: High';
+      case AIReasoningLevel.xhigh:
+        return zh ? '思考：超高' : 'Reasoning: XHigh';
+    }
+  }
+
+  IconData _reasoningLevelIcon(AIReasoningLevel level) {
+    switch (level) {
+      case AIReasoningLevel.off:
+        return Icons.lightbulb_outline_rounded;
+      case AIReasoningLevel.auto:
+        return Icons.auto_awesome_rounded;
+      case AIReasoningLevel.low:
+        return Icons.lightbulb_outline_rounded;
+      case AIReasoningLevel.medium:
+        return Icons.tips_and_updates_rounded;
+      case AIReasoningLevel.high:
+        return Icons.psychology_alt_rounded;
+      case AIReasoningLevel.xhigh:
+        return Icons.psychology_rounded;
+    }
+  }
+
+  Future<void> _showReasoningLevelSheet() async {
+    final theme = Theme.of(context);
+    AIReasoningLevel selected = _reasoningLevel;
+    double sliderValue = selected.index.toDouble();
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            Future<void> updateLevel(AIReasoningLevel level) async {
+              setSheetState(() {
+                selected = level;
+                sliderValue = level.index.toDouble();
+              });
+              _setState(() {
+                _reasoningLevel = level;
+              });
+              await _settings.setChatReasoningLevel(level);
+            }
+
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _isZhLocale() ? '思考等级' : 'Reasoning level',
+                      style: theme.textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _isZhLocale()
+                          ? '调整模型推理强度；自动会交给模型或服务端决定。'
+                          : 'Adjust model reasoning effort. Auto lets the model or provider decide.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 18),
+                    Icon(
+                      _reasoningLevelIcon(selected),
+                      size: 34,
+                      color: selected.isEnabled
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _reasoningLevelLabel(selected),
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 14),
+                    Slider(
+                      value: sliderValue,
+                      min: 0,
+                      max: (AIReasoningLevel.values.length - 1).toDouble(),
+                      divisions: AIReasoningLevel.values.length - 1,
+                      onChanged: (value) {
+                        setSheetState(() => sliderValue = value);
+                      },
+                      onChangeEnd: (value) {
+                        final int index = value.round().clamp(
+                          0,
+                          AIReasoningLevel.values.length - 1,
+                        );
+                        updateLevel(AIReasoningLevel.values[index]);
+                      },
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: AIReasoningLevel.values
+                          .map((level) {
+                            final bool active = level == selected;
+                            return Expanded(
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: () => updateLevel(level),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 2,
+                                    vertical: 8,
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      AnimatedContainer(
+                                        duration: const Duration(
+                                          milliseconds: 160,
+                                        ),
+                                        width: active ? 22 : 16,
+                                        height: active ? 6 : 4,
+                                        decoration: BoxDecoration(
+                                          color: active
+                                              ? theme.colorScheme.primary
+                                              : theme
+                                                    .colorScheme
+                                                    .outlineVariant,
+                                          borderRadius: BorderRadius.circular(
+                                            99,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        _reasoningLevelLabel(level)
+                                            .split(_isZhLocale() ? '：' : ': ')
+                                            .last,
+                                        textAlign: TextAlign.center,
+                                        style: theme.textTheme.labelSmall
+                                            ?.copyWith(
+                                              color: active
+                                                  ? theme.colorScheme.primary
+                                                  : theme
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          })
+                          .toList(growable: false),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   // 统一的小型选项芯片

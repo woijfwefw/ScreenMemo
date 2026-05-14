@@ -39,7 +39,7 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
 
     bool hasAnyEvents = false;
     for (final b in blocks0) {
-      if (b.events.isNotEmpty) {
+      if (b.events.any((e) => !e.transient)) {
         hasAnyEvents = true;
         break;
       }
@@ -51,6 +51,7 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
       final bool isLoading = b.finishedAt == null;
       final List<Map<String, dynamic>> events = <Map<String, dynamic>>[];
       for (final e in b.events) {
+        if (e.transient) continue;
         final String iconKey = (_thinkingIconKey(e.icon) ?? '').trim();
         final List<Map<String, dynamic>> tools = <Map<String, dynamic>>[];
         for (final c in e.tools) {
@@ -64,6 +65,10 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
             if (isLoading) 'active': c.active,
             if (c.resultSummary != null && c.resultSummary!.trim().isNotEmpty)
               'result_summary': c.resultSummary,
+            if (c.durationMs != null && c.durationMs! > 0)
+              'duration_ms': c.durationMs,
+            if (c.detailRef != null && c.detailRef!.trim().isNotEmpty)
+              'detail_ref': c.detailRef,
           };
           tools.add(chip);
         }
@@ -76,6 +81,14 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
           if (iconKey.isNotEmpty) 'icon': iconKey,
           if (isLoading && e.active) 'active': true,
           if (tools.isNotEmpty) 'tools': tools,
+          if (e.type == _ThinkingEventType.reasoning &&
+              (e.reasoningStart ?? -1) >= 0 &&
+              (e.reasoningLength ?? 0) > 0)
+            'reasoning_start': e.reasoningStart,
+          if (e.type == _ThinkingEventType.reasoning &&
+              (e.reasoningStart ?? -1) >= 0 &&
+              (e.reasoningLength ?? 0) > 0)
+            'reasoning_len': e.reasoningLength,
         };
         events.add(ev);
       }
@@ -167,6 +180,7 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
         final String typeStr = (eMap['type'] ?? '').toString().trim();
         final _ThinkingEventType type = switch (typeStr) {
           'intent' => _ThinkingEventType.intent,
+          'reasoning' => _ThinkingEventType.reasoning,
           'tools' => _ThinkingEventType.tools,
           _ => _ThinkingEventType.status,
         };
@@ -206,6 +220,10 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
           final String summaryRaw = (cm['result_summary'] ?? '')
               .toString()
               .trim();
+          final int durationMs = asInt(cm['duration_ms']);
+          final String detailRefRaw = (cm['detail_ref'] ?? '')
+              .toString()
+              .trim();
           final List<String> appNames = parseStringList(cm['app_names']);
           final List<String> appPkgs = parseStringList(cm['app_package_names']);
           tools.add(
@@ -217,6 +235,8 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
               appPackageNames: appPkgs,
               active: asBool(cm['active']),
               resultSummary: summaryRaw.isEmpty ? null : summaryRaw,
+              durationMs: durationMs > 0 ? durationMs : null,
+              detailRef: detailRefRaw.isEmpty ? null : detailRefRaw,
             ),
           );
         }
@@ -229,6 +249,8 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
             icon: _thinkingIconFromKey(iconKey),
             active: asBool(eMap['active']),
             tools: tools,
+            reasoningStart: asInt(eMap['reasoning_start']),
+            reasoningLength: asInt(eMap['reasoning_len']),
           ),
         );
       }
@@ -238,6 +260,51 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
       }
     }
     return out;
+  }
+
+  bool _thinkingEventHasDisplayContent(
+    _ThinkingEvent event, {
+    required String reasoningContent,
+    bool includeTransient = false,
+  }) {
+    switch (event.type) {
+      case _ThinkingEventType.reasoning:
+        final int start = event.reasoningStart ?? -1;
+        final int len = event.reasoningLength ?? 0;
+        if (start < 0 || len <= 0 || start >= reasoningContent.length) {
+          return false;
+        }
+        final int end = (start + len)
+            .clamp(start, reasoningContent.length)
+            .toInt();
+        return reasoningContent.substring(start, end).trim().isNotEmpty;
+      case _ThinkingEventType.tools:
+        return event.tools.isNotEmpty;
+      case _ThinkingEventType.intent:
+      case _ThinkingEventType.status:
+        if (event.transient && !includeTransient) return false;
+        return event.title.trim().isNotEmpty ||
+            (event.subtitle ?? '').trim().isNotEmpty;
+    }
+  }
+
+  bool _thinkingBlockHasDisplayContent(
+    _ThinkingBlock block, {
+    required String reasoningContent,
+    String? fallbackReasoning,
+    bool includeTransient = false,
+  }) {
+    if ((fallbackReasoning ?? '').trim().isNotEmpty) return true;
+    for (final event in block.events) {
+      if (_thinkingEventHasDisplayContent(
+        event,
+        reasoningContent: reasoningContent,
+        includeTransient: includeTransient,
+      )) {
+        return true;
+      }
+    }
+    return false;
   }
 
   List<AIMessage> _mergeReasoningForPersistence(List<AIMessage> input) {
@@ -270,6 +337,10 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
         reasoningContent: mergedR,
         reasoningDuration: mergedD,
         uiThinkingJson: mergedUi,
+        usagePromptTokens: m.usagePromptTokens,
+        usageCompletionTokens: m.usageCompletionTokens,
+        usageTotalTokens: m.usageTotalTokens,
+        responseDuration: m.responseDuration,
       );
     }
     return out;
@@ -1562,20 +1633,21 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
     final List<_ThinkingBlock>? existing = _thinkingBlocksByIndex[messageIndex];
     if (existing != null && existing.isNotEmpty) return existing;
 
-    // When restoring history, keep the UI consistent with the live rendering:
-    // - We do NOT expand legacy reasoning logs into many event rows.
-    // - We still show a thinking card with the recorded duration (if available).
+    // 恢复历史时保持与实时渲染一致：
+    // - 不把旧版 reasoning 日志展开成多行事件。
+    // - 只有耗时、没有可见 reasoning/工具内容时，这段时间只是等待时间，
+    //   不应该生成一个可展开但内容为空的思考卡片。
     final String legacyReasoning = (_reasoningByIndex[messageIndex] ?? '')
         .trim();
+    if (legacyReasoning.isEmpty) {
+      return const <_ThinkingBlock>[];
+    }
+
     final Duration? dur =
         _reasoningDurationByIndex[messageIndex] ??
         ((messageIndex >= 0 && messageIndex < _messages.length)
             ? _messages[messageIndex].reasoningDuration
             : null);
-    if (legacyReasoning.isEmpty && (dur == null || dur.inMilliseconds <= 0)) {
-      return const <_ThinkingBlock>[];
-    }
-
     final DateTime createdAt =
         (messageIndex >= 0 && messageIndex < _messages.length)
         ? _messages[messageIndex].createdAt
@@ -1641,6 +1713,9 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
     if (b.events.isEmpty) return '';
     final sb = StringBuffer();
     for (final e in b.events) {
+      if (e.type == _ThinkingEventType.reasoning) {
+        continue;
+      }
       final String title = e.title.trim();
       final String sub = (e.subtitle ?? '').trim();
       if (title.isNotEmpty) sb.writeln(title);

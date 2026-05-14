@@ -167,19 +167,32 @@ String _toolChipTextForDisplay(BuildContext context, _ThinkingToolChip chip) {
   return summary.isEmpty ? normalizedLabel : '$normalizedLabel · $summary';
 }
 
+String _formatToolDurationMs(int? durationMs) {
+  final int ms = durationMs ?? 0;
+  if (ms <= 0) return '';
+  if (ms < 1000) return '${ms}ms';
+  return '${(ms / 1000.0).toStringAsFixed(1)}s';
+}
+
 class _ThinkingTimelineCard extends StatefulWidget {
   const _ThinkingTimelineCard({
     super.key,
+    required this.conversationId,
+    required this.assistantCreatedAt,
     required this.createdAt,
     required this.finishedAt,
     required this.events,
+    this.reasoningContent,
     this.fallbackReasoning,
     this.autoCloseOnFinish = true,
   });
 
+  final String conversationId;
+  final int assistantCreatedAt;
   final DateTime createdAt;
   final DateTime? finishedAt;
   final List<_ThinkingEvent> events;
+  final String? reasoningContent;
   final String? fallbackReasoning;
   final bool autoCloseOnFinish;
 
@@ -191,6 +204,7 @@ class _ThinkingTimelineCard extends StatefulWidget {
 
 class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
   bool _expanded = true;
+  bool _showAllSteps = false;
   Timer? _elapsedTimer;
   final ScrollController _fallbackScrollController = ScrollController();
   Map<String, Uint8List?> _appIconByPackage = <String, Uint8List?>{};
@@ -284,6 +298,7 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
     final l10n = AppLocalizations.of(context);
     final Color titleColor = _thinkingTextColor;
     final Color subtle = _thinkingTextColor;
+    final Color panelBg = _thinkingPanelColor(theme);
     final String titleText = widget.isLoading
         ? l10n.thinkingInProgress
         : l10n.deepThinkingLabel;
@@ -293,85 +308,219 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
       widget.createdAt,
     );
 
+    return Material(
+      color: panelBg,
+      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.55),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _Shimmer(
+                        active: widget.isLoading,
+                        baseColor: titleColor,
+                        child: Text(
+                          titleText,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: titleColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _formatDuration(elapsed),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: subtle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(
+                      _expanded
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      size: 18,
+                      color: titleColor,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (_expanded)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (widget.events.isNotEmpty) _buildEventTimeline(context),
+                    if (fallback.isNotEmpty) ...[
+                      if (widget.events.isNotEmpty)
+                        const SizedBox(height: AppTheme.spacing2),
+                      _buildFallbackReasoning(context, fallback, subtle),
+                    ],
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _thinkingPanelColor(ThemeData theme) {
+    final double alpha = theme.brightness == Brightness.dark ? 0.26 : 0.50;
+    return theme.colorScheme.tertiaryContainer.withValues(alpha: alpha);
+  }
+
+  Widget _buildFallbackReasoning(
+    BuildContext context,
+    String fallback,
+    Color textColor,
+  ) {
+    final theme = Theme.of(context);
+    final TextStyle? bodyStyle = theme.textTheme.bodySmall?.copyWith(
+      color: textColor,
+      height: 1.25,
+    );
+    final TextStyle? headingStyle = bodyStyle?.copyWith(
+      fontWeight: FontWeight.w700,
+    );
+    final cfg = MarkdownMathConfig(
+      inlineTextStyle: bodyStyle,
+      blockTextStyle: bodyStyle,
+    );
+    final String mdData = preprocessForChatMarkdown(fallback);
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 220),
+      child: Scrollbar(
+        controller: _fallbackScrollController,
+        child: SingleChildScrollView(
+          controller: _fallbackScrollController,
+          physics: const ClampingScrollPhysics(),
+          child: MarkdownBody(
+            selectable: true,
+            data: mdData,
+            builders: cfg.builders,
+            blockSyntaxes: cfg.blockSyntaxes,
+            inlineSyntaxes: cfg.inlineSyntaxes,
+            styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+              p: bodyStyle,
+              listBullet: bodyStyle,
+              code: bodyStyle?.copyWith(
+                fontFamily: 'monospace',
+                backgroundColor: theme.colorScheme.surface.withValues(
+                  alpha: 0.18,
+                ),
+              ),
+              h1: headingStyle,
+              h2: headingStyle,
+              h3: headingStyle,
+              h4: headingStyle,
+              h5: headingStyle,
+              h6: headingStyle,
+              blockquote: bodyStyle,
+              blockquotePadding: const EdgeInsets.all(8),
+              blockquoteDecoration: BoxDecoration(
+                color: theme.colorScheme.surface.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+              ),
+              codeblockPadding: const EdgeInsets.all(8),
+              codeblockDecoration: BoxDecoration(
+                color: theme.colorScheme.surface.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+              ),
+              blockSpacing: 6,
+              listIndent: 18,
+            ),
+            onTapLink: (text, href, title) async {
+              if (href == null) return;
+              final uri = Uri.tryParse(href);
+              if (uri == null) return;
+              try {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              } catch (_) {}
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEventTimeline(BuildContext context) {
+    const int collapsedVisibleCount = 2;
+    final theme = Theme.of(context);
+    final bool canCollapse = widget.events.length > collapsedVisibleCount;
+    final List<_ThinkingEvent> visibleEvents = canCollapse && !_showAllSteps
+        ? widget.events.sublist(widget.events.length - collapsedVisibleCount)
+        : widget.events;
+    final int hiddenCount = widget.events.length - visibleEvents.length;
+    final String toggleText = _isZhLocaleUi(context)
+        ? (_showAllSteps ? '收起步骤' : '显示 $hiddenCount 个较早步骤')
+        : (_showAllSteps
+              ? 'Collapse steps'
+              : 'Show $hiddenCount earlier steps');
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        GestureDetector(
-          onTap: () => setState(() => _expanded = !_expanded),
-          child: Row(
-            children: [
-              Expanded(
-                child: _Shimmer(
-                  active: widget.isLoading,
-                  baseColor: titleColor,
-                  child: Text(
-                    titleText,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: titleColor,
+        if (canCollapse)
+          InkWell(
+            onTap: () => setState(() => _showAllSteps = !_showAllSteps),
+            borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 24,
+                    child: Icon(
+                      _showAllSteps
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      size: 16,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    toggleText,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.primary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Text(
-                _formatDuration(elapsed),
-                style: theme.textTheme.labelSmall?.copyWith(color: subtle),
-              ),
-              const SizedBox(width: 6),
-              Icon(
-                _expanded
-                    ? Icons.keyboard_arrow_up_rounded
-                    : Icons.keyboard_arrow_down_rounded,
-                size: 18,
-                color: titleColor,
-              ),
-            ],
+            ),
           ),
-        ),
-        if (_expanded) ...[
-          const SizedBox(height: AppTheme.spacing2),
-          if (widget.events.isNotEmpty)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (int i = 0; i < widget.events.length; i++)
-                  _buildEventRow(
-                    context,
-                    widget.events[i],
-                    isLast: i == widget.events.length - 1,
-                  ),
-              ],
-            ),
-          if (fallback.isNotEmpty) ...[
-            if (widget.events.isNotEmpty)
-              const SizedBox(height: AppTheme.spacing2),
-            Container(
-              width: double.infinity,
-              constraints: const BoxConstraints(maxHeight: 220),
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface.withOpacity(0.04),
-                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (int i = 0; i < visibleEvents.length; i++)
+              _buildEventRow(
+                context,
+                visibleEvents[i],
+                isLast: i == visibleEvents.length - 1,
               ),
-              child: Scrollbar(
-                controller: _fallbackScrollController,
-                child: SingleChildScrollView(
-                  controller: _fallbackScrollController,
-                  physics: const ClampingScrollPhysics(),
-                  child: SelectableText(
-                    fallback,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: subtle,
-                      fontFamily: 'monospace',
-                      height: 1.20,
-                    ),
-                  ),
-                ),
-              ),
-            ),
           ],
-        ],
+        ),
       ],
     );
   }
@@ -401,25 +550,39 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
     final Color titleColor = _thinkingTextColor;
     final Color subtitleColor = _thinkingTextColor;
 
-    Widget title = Text(
-      e.title,
-      style: theme.textTheme.bodySmall?.copyWith(
-        color: titleColor,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-    // Only shimmer while the block is still loading; stale persisted `active`
-    // flags (e.g. after background completion) should not keep shimmering.
-    title = _Shimmer(
-      active: widget.isLoading && e.active,
-      baseColor: titleColor,
-      child: title,
-    );
+    if (e.type == _ThinkingEventType.reasoning) {
+      final String text = _reasoningSlice(e).trim();
+      if (text.isEmpty) return const SizedBox.shrink();
+      return Padding(
+        padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
+        child: _buildFallbackReasoning(context, text, titleColor),
+      );
+    }
 
-    final List<Widget> right = <Widget>[title];
+    final List<Widget> children = <Widget>[];
+    final bool hideEventTitle =
+        e.type == _ThinkingEventType.tools && e.tools.isNotEmpty;
+    if (!hideEventTitle) {
+      Widget title = Text(
+        e.title,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: titleColor,
+          fontWeight: FontWeight.w600,
+        ),
+      );
+      // Only shimmer while the block is still loading; stale persisted `active`
+      // flags (e.g. after background completion) should not keep shimmering.
+      title = _Shimmer(
+        active: widget.isLoading && e.active,
+        baseColor: titleColor,
+        child: title,
+      );
+      children.add(title);
+    }
+
     final String sub = (e.subtitle ?? '').trim();
-    if (sub.isNotEmpty) {
-      right.add(
+    if (sub.isNotEmpty && !hideEventTitle) {
+      children.add(
         Padding(
           padding: const EdgeInsets.only(top: 2),
           child: Text(
@@ -434,8 +597,8 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
     }
 
     if (e.type == _ThinkingEventType.tools && e.tools.isNotEmpty) {
-      right.add(const SizedBox(height: 8));
-      right.add(
+      if (children.isNotEmpty) children.add(const SizedBox(height: 8));
+      children.add(
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -455,9 +618,20 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
       padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: right,
+        children: children,
       ),
     );
+  }
+
+  String _reasoningSlice(_ThinkingEvent e) {
+    final String full = widget.reasoningContent ?? '';
+    final int start = (e.reasoningStart ?? -1);
+    final int len = (e.reasoningLength ?? 0);
+    if (full.isEmpty || start < 0 || len <= 0 || start >= full.length) {
+      return '';
+    }
+    final int end = (start + len).clamp(start, full.length).toInt();
+    return full.substring(start, end);
   }
 
   IconData _toolIconFor(String toolName) {
@@ -490,7 +664,7 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
         (isSearch
                 ? theme.colorScheme.primaryContainer
                 : theme.colorScheme.secondaryContainer)
-            .withOpacity(0.65);
+            .withValues(alpha: 0.65);
     final Color fg = isSearch
         ? theme.colorScheme.onPrimaryContainer
         : theme.colorScheme.onSecondaryContainer;
@@ -507,38 +681,82 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
     );
     final bool shimmerActive = widget.isLoading && chip.active;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: bg,
+    final String durationLabel = _formatToolDurationMs(chip.durationMs);
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+      child: InkWell(
         borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-      ),
-      // NOTE: Shimmer uses a ShaderMask which tints all descendants.
-      // Keep app icons in their original colors during tool execution by
-      // shimmering only the label text.
-      child: Row(
-        mainAxisSize: MainAxisSize.max,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(padding: const EdgeInsets.only(top: 1), child: leading),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _Shimmer(
-              active: shimmerActive,
-              baseColor: fg,
-              child: Text(
-                label,
-                softWrap: true,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: fg,
-                  fontWeight: FontWeight.w600,
+        onTap: () => _showToolCallDetailSheet(context, chip),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          // NOTE: Shimmer uses a ShaderMask which tints all descendants.
+          // Keep app icons in their original colors during tool execution by
+          // shimmering only the label text.
+          child: Row(
+            mainAxisSize: MainAxisSize.max,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(padding: const EdgeInsets.only(top: 1), child: leading),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _Shimmer(
+                  active: shimmerActive,
+                  baseColor: fg,
+                  child: Text(
+                    label,
+                    softWrap: true,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: fg,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
-            ),
+              if (durationLabel.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Text(
+                  durationLabel,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: fg.withValues(alpha: 0.8),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+              const SizedBox(width: 4),
+              Icon(
+                Icons.open_in_new_rounded,
+                size: 14,
+                color: fg.withValues(alpha: 0.75),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
+    );
+  }
+
+  Future<void> _showToolCallDetailSheet(
+    BuildContext context,
+    _ThinkingToolChip chip,
+  ) async {
+    final String cid = widget.conversationId.trim();
+    final int assistantCreatedAt = widget.assistantCreatedAt;
+    Future<Map<String, dynamic>?>? future;
+    if (cid.isNotEmpty && assistantCreatedAt > 0 && chip.callId.isNotEmpty) {
+      future = ScreenshotDatabase.instance.getAiToolCallDetail(
+        conversationId: cid,
+        assistantCreatedAt: assistantCreatedAt,
+        callId: chip.callId,
+      );
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return _ToolCallDetailSheet(chip: chip, detailFuture: future);
+      },
     );
   }
 
@@ -562,7 +780,7 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
     final List<String> keys = byName.isNotEmpty ? byName : byPkg;
     final bool showAppIcons = isSearch && keys.isNotEmpty;
     if (!showAppIcons) {
-      return Icon(fallbackIcon, size: 16, color: fg.withOpacity(0.95));
+      return Icon(fallbackIcon, size: 16, color: fg.withValues(alpha: 0.95));
     }
 
     const int maxIcons = 3;
@@ -638,7 +856,11 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
   }) {
     final Widget child = bytes != null
         ? Image.memory(bytes, width: size, height: size, fit: BoxFit.contain)
-        : Icon(Icons.android, size: size * 0.75, color: fg.withOpacity(0.9));
+        : Icon(
+            Icons.android,
+            size: size * 0.75,
+            color: fg.withValues(alpha: 0.9),
+          );
 
     // Display the icon as-is; do not add a background behind it.
     return SizedBox(
@@ -659,16 +881,360 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withOpacity(0.85),
+        color: theme.colorScheme.surface.withValues(alpha: 0.85),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
         '+$extraCount',
         style: theme.textTheme.labelSmall?.copyWith(
-          color: fg.withOpacity(0.9),
+          color: fg.withValues(alpha: 0.9),
           fontWeight: FontWeight.w700,
           fontSize: 9,
         ),
+      ),
+    );
+  }
+}
+
+class _ToolCallDetailSheet extends StatefulWidget {
+  const _ToolCallDetailSheet({required this.chip, required this.detailFuture});
+
+  final _ThinkingToolChip chip;
+  final Future<Map<String, dynamic>?>? detailFuture;
+
+  @override
+  State<_ToolCallDetailSheet> createState() => _ToolCallDetailSheetState();
+}
+
+class _ToolCallDetailSheetState extends State<_ToolCallDetailSheet> {
+  final Set<String> _expandedSections = <String>{};
+
+  String _loc(String zh, String en) => _isZhLocaleUi(context) ? zh : en;
+
+  String _prettyJson(String raw) {
+    final String t = raw.trim();
+    if (t.isEmpty) return '';
+    try {
+      return const JsonEncoder.withIndent('  ').convert(jsonDecode(t));
+    } catch (_) {
+      return t;
+    }
+  }
+
+  Future<void> _copy(String text) async {
+    final String t = text.trim();
+    if (t.isEmpty) return;
+    try {
+      await Clipboard.setData(ClipboardData(text: t));
+      if (!mounted) return;
+      UINotifier.success(context, AppLocalizations.of(context).copySuccess);
+    } catch (_) {
+      if (!mounted) return;
+      UINotifier.error(context, AppLocalizations.of(context).copyFailed);
+    }
+  }
+
+  String _detailValue(Map<String, dynamic>? detail, String key) {
+    final Object? raw = detail?[key];
+    return raw?.toString().trim() ?? '';
+  }
+
+  int? _detailInt(Map<String, dynamic>? detail, String key) {
+    final Object? raw = detail?[key];
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    return int.tryParse(raw?.toString() ?? '');
+  }
+
+  String _fallbackSummary() {
+    final String summary = (widget.chip.resultSummary ?? '').trim();
+    if (summary.isNotEmpty) return summary;
+    return _loc('暂无完整详情', 'No full details yet');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Future<Map<String, dynamic>?>? future = widget.detailFuture;
+    return UISheetSurface(
+      child: SafeArea(
+        top: false,
+        child: FractionallySizedBox(
+          heightFactor: 0.86,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Center(child: UISheetHandle()),
+                const SizedBox(height: 12),
+                _buildHeader(context),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: future == null
+                      ? _buildDetailBody(context, null)
+                      : FutureBuilder<Map<String, dynamic>?>(
+                          future: future,
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState !=
+                                ConnectionState.done) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+                            return _buildDetailBody(context, snapshot.data);
+                          },
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    final theme = Theme.of(context);
+    final String duration = _formatToolDurationMs(widget.chip.durationMs);
+    final String status = widget.chip.active
+        ? _loc('运行中', 'Running')
+        : _loc('已完成', 'Finished');
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.secondaryContainer,
+            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          ),
+          child: Icon(
+            Icons.build_circle_outlined,
+            size: 20,
+            color: theme.colorScheme.onSecondaryContainer,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.chip.label.trim().isEmpty
+                    ? widget.chip.toolName
+                    : widget.chip.label,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                [
+                  widget.chip.toolName,
+                  status,
+                  if (duration.isNotEmpty) duration,
+                ].join(' · '),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          tooltip: _loc('复制摘要', 'Copy summary'),
+          onPressed: () => _copy(_fallbackSummary()),
+          icon: const Icon(Icons.copy_rounded),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDetailBody(BuildContext context, Map<String, dynamic>? detail) {
+    final String args = _prettyJson(_detailValue(detail, 'arguments_json'));
+    final String resultJson = _prettyJson(_detailValue(detail, 'result_json'));
+    final String resultText = _detailValue(detail, 'result_text');
+    final String summary = _detailValue(detail, 'result_summary').isNotEmpty
+        ? _detailValue(detail, 'result_summary')
+        : _fallbackSummary();
+    final int? durationMs =
+        _detailInt(detail, 'duration_ms') ?? widget.chip.durationMs;
+
+    return ListView(
+      children: [
+        _buildMetaRow(
+          context,
+          label: _loc('调用 ID', 'Call ID'),
+          value: widget.chip.callId,
+        ),
+        if ((widget.chip.detailRef ?? '').trim().isNotEmpty)
+          _buildMetaRow(
+            context,
+            label: _loc('详情引用', 'Detail ref'),
+            value: widget.chip.detailRef!.trim(),
+          ),
+        if (durationMs != null && durationMs > 0)
+          _buildMetaRow(
+            context,
+            label: _loc('耗时', 'Duration'),
+            value: _formatToolDurationMs(durationMs),
+          ),
+        const SizedBox(height: 12),
+        _buildTextSection(
+          context,
+          id: 'summary',
+          title: _loc('结果摘要', 'Result summary'),
+          text: summary,
+          initiallyExpanded: true,
+        ),
+        if (args.isNotEmpty)
+          _buildTextSection(
+            context,
+            id: 'arguments',
+            title: _loc('参数', 'Arguments'),
+            text: args,
+            monospace: true,
+            initiallyExpanded: true,
+          ),
+        if (resultJson.isNotEmpty)
+          _buildTextSection(
+            context,
+            id: 'result_json',
+            title: _loc('结果 JSON', 'Result JSON'),
+            text: resultJson,
+            monospace: true,
+          )
+        else if (resultText.isNotEmpty)
+          _buildTextSection(
+            context,
+            id: 'result_text',
+            title: _loc('结果文本', 'Result text'),
+            text: resultText,
+            monospace: true,
+          )
+        else
+          _buildTextSection(
+            context,
+            id: 'empty',
+            title: _loc('完整结果', 'Full result'),
+            text: _loc(
+              '暂无完整结果，可能是旧历史消息或工具仍在运行。',
+              'Full result is not available yet. This may be an older message or a running tool.',
+            ),
+            initiallyExpanded: true,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildMetaRow(
+    BuildContext context, {
+    required String label,
+    required String value,
+  }) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 92,
+            child: Text(
+              label,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Expanded(
+            child: SelectableText(value, style: theme.textTheme.bodySmall),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTextSection(
+    BuildContext context, {
+    required String id,
+    required String title,
+    required String text,
+    bool monospace = false,
+    bool initiallyExpanded = false,
+  }) {
+    final theme = Theme.of(context);
+    final String content = text.trim();
+    final bool long = content.length > 8000;
+    final bool expanded = initiallyExpanded || _expandedSections.contains(id);
+    final String shown = long && !expanded
+        ? '${content.substring(0, 8000)}\n\n...'
+        : content;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.45,
+        ),
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 8, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (long)
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        if (_expandedSections.contains(id)) {
+                          _expandedSections.remove(id);
+                        } else {
+                          _expandedSections.add(id);
+                        }
+                      });
+                    },
+                    child: Text(
+                      expanded
+                          ? _loc('收起', 'Collapse')
+                          : _loc('展开全文', 'Show full'),
+                    ),
+                  ),
+                IconButton(
+                  tooltip: _loc('复制', 'Copy'),
+                  onPressed: () => _copy(content),
+                  icon: const Icon(Icons.copy_rounded, size: 18),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: SelectableText(
+              shown,
+              style:
+                  (monospace
+                          ? theme.textTheme.bodySmall?.copyWith(
+                              fontFamily: 'monospace',
+                              height: 1.25,
+                            )
+                          : theme.textTheme.bodySmall)
+                      ?.copyWith(color: theme.colorScheme.onSurface),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -195,6 +195,8 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
       final Future<String> fModel = _settings.getModel();
       final Future<bool> fRenderImagesDuringStreaming = _settings
           .getRenderImagesDuringStreaming();
+      final Future<AIReasoningLevel> fReasoningLevel = _settings
+          .getChatReasoningLevel();
 
       // 收集其余预取结果
       final String chatCid = (await fChatCid).trim();
@@ -240,6 +242,12 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
           if (r.isNotEmpty) score += 100000 + r.length;
           final String ui = (m.uiThinkingJson ?? '').trim();
           if (ui.isNotEmpty) score += 1000 + ui.length;
+          if (m.usagePromptTokens != null ||
+              m.usageCompletionTokens != null ||
+              m.usageTotalTokens != null) {
+            score += 100;
+          }
+          if (m.responseDuration != null) score += 10;
           final int d = m.reasoningDuration?.inMilliseconds ?? 0;
           if (d > 0) score += 1;
           return score;
@@ -300,6 +308,10 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
                   reasoningContent: t.reasoningContent,
                   reasoningDuration: t.reasoningDuration,
                   uiThinkingJson: t.uiThinkingJson,
+                  usagePromptTokens: t.usagePromptTokens,
+                  usageCompletionTokens: t.usageCompletionTokens,
+                  usageTotalTokens: t.usageTotalTokens,
+                  responseDuration: t.responseDuration,
                 );
           merged.add(patched);
         }
@@ -343,6 +355,7 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
       );
       final bool streamEnabled = await fStreamEnabled;
       final bool renderImgs = await fRenderImagesDuringStreaming;
+      final AIReasoningLevel reasoningLevel = await fReasoningLevel;
       _uiPerf.log(
         'loadAll.history.done',
         detail:
@@ -415,6 +428,7 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
           ..addAll(rd);
         _streamEnabled = streamEnabled;
         _renderImagesDuringStreaming = renderImgs;
+        _reasoningLevel = reasoningLevel;
         _loading = false;
       });
       _uiPerf.log(
@@ -1245,6 +1259,82 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
     _markInFlightHistoryDirty();
   }
 
+  void _setTransientThinkingStep(
+    int assistantIdx, {
+    required String title,
+    IconData? icon,
+    String? subtitle,
+  }) {
+    if (assistantIdx < 0 || assistantIdx >= _messages.length) return;
+    final String t = title.trim();
+    if (t.isEmpty) return;
+    final _ThinkingBlock block = _ensureThinkingBlock(assistantIdx);
+    for (final event in block.events) {
+      if (event.transient) {
+        event.title = t;
+        event.subtitle = (subtitle ?? '').trim().isEmpty
+            ? null
+            : subtitle!.trim();
+        event.icon = icon ?? event.icon;
+        event.active = true;
+        return;
+      }
+    }
+    block.events.add(
+      _ThinkingEvent(
+        type: _ThinkingEventType.status,
+        title: t,
+        subtitle: (subtitle ?? '').trim().isEmpty ? null : subtitle!.trim(),
+        icon: icon ?? Icons.autorenew_rounded,
+        active: true,
+        transient: true,
+      ),
+    );
+  }
+
+  void _clearTransientThinkingSteps(int assistantIdx) {
+    final List<_ThinkingBlock>? blocks = _thinkingBlocksByIndex[assistantIdx];
+    if (blocks == null || blocks.isEmpty) return;
+    for (final block in blocks) {
+      block.events.removeWhere((event) => event.transient);
+    }
+  }
+
+  void _appendReasoningDeltaToTimeline(int assistantIdx, String delta) {
+    if (assistantIdx < 0 || assistantIdx >= _messages.length) return;
+    if (delta.isEmpty) return;
+
+    final String prev = _reasoningByIndex[assistantIdx] ?? '';
+    final int start = prev.length;
+    final String next = prev + delta;
+    _thinkingText += delta;
+    _reasoningByIndex[assistantIdx] = next;
+
+    final _ThinkingBlock block = _ensureThinkingBlock(assistantIdx);
+    _clearTransientThinkingSteps(assistantIdx);
+    final _ThinkingEvent? lastEvent = block.events.isEmpty
+        ? null
+        : block.events.last;
+    if (lastEvent != null &&
+        lastEvent.type == _ThinkingEventType.reasoning &&
+        (lastEvent.reasoningStart ?? -1) >= 0) {
+      final int oldLen = lastEvent.reasoningLength ?? 0;
+      lastEvent.reasoningLength = oldLen + delta.length;
+      lastEvent.active = true;
+      return;
+    }
+
+    block.events.add(
+      _ThinkingEvent(
+        type: _ThinkingEventType.reasoning,
+        title: _isZhLocale() ? '思考' : 'Reasoning',
+        active: true,
+        reasoningStart: start,
+        reasoningLength: delta.length,
+      ),
+    );
+  }
+
   void _clearGatewayLogsForAssistant(int assistantIndex) {
     _setState(() {
       _gatewayLogsByIndex.remove(assistantIndex);
@@ -1520,6 +1610,7 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
 
     if (type == 'tool_batch_begin') {
       final List<dynamic> tools = (payload['tools'] as List?) ?? const [];
+      _clearTransientThinkingSteps(assistantIdx);
       // Tool UI events can arrive after we've already streamed some visible
       // content for the same assistant turn (e.g. the model emits a preamble
       // before declaring tool_calls). In that case we want tools to appear
@@ -1530,13 +1621,19 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
       // will also start a new content segment after this block.
       final _ThinkingBlock block = _ensureThinkingBlock(assistantIdx);
       final String title = _isZhLocale() ? '工具调用' : 'Tools';
-      final _ThinkingEvent toolsEvent = _upsertEvent(
-        block,
-        type: _ThinkingEventType.tools,
-        title: title,
-        icon: Icons.auto_awesome_outlined,
-        tools: <_ThinkingToolChip>[],
-      );
+      final _ThinkingEvent toolsEvent =
+          block.events.isNotEmpty &&
+              block.events.last.type == _ThinkingEventType.tools
+          ? block.events.last
+          : _ThinkingEvent(
+              type: _ThinkingEventType.tools,
+              title: title,
+              icon: Icons.auto_awesome_outlined,
+              tools: <_ThinkingToolChip>[],
+            );
+      if (block.events.isEmpty || block.events.last != toolsEvent) {
+        block.events.add(toolsEvent);
+      }
 
       final Set<String> seenInBatch = <String>{};
       for (final t in tools) {
@@ -1545,6 +1642,7 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
         final String callId = (m['call_id'] as String?)?.trim() ?? '';
         final String toolName = (m['tool_name'] as String?)?.trim() ?? '';
         final String label = (m['label'] as String?)?.trim() ?? toolName.trim();
+        final String detailRef = (m['detail_ref'] as String?)?.trim() ?? '';
 
         List<String> parseStringList(dynamic raw) {
           if (raw is List) {
@@ -1576,6 +1674,8 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
         if (existing != null) {
           existing.active = true;
           existing.resultSummary = null;
+          existing.durationMs = null;
+          if (detailRef.isNotEmpty) existing.detailRef = detailRef;
           if (appNames.isNotEmpty) existing.appNames = appNames;
           if (appPkgs.isNotEmpty) existing.appPackageNames = appPkgs;
         } else {
@@ -1587,6 +1687,7 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
               appNames: appNames,
               appPackageNames: appPkgs,
               active: true,
+              detailRef: detailRef.isEmpty ? null : detailRef,
             ),
           );
         }
@@ -1604,6 +1705,10 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
       if (callId.isEmpty) return;
       final String resultSummary =
           (payload['result_summary'] as String?)?.trim() ?? '';
+      final int durationMs = (payload['duration_ms'] is num)
+          ? (payload['duration_ms'] as num).toInt()
+          : int.tryParse((payload['duration_ms'] ?? '').toString()) ?? 0;
+      final String detailRef = (payload['detail_ref'] as String?)?.trim() ?? '';
 
       final List<_ThinkingBlock> blocks =
           _thinkingBlocksByIndex[assistantIdx] ?? const <_ThinkingBlock>[];
@@ -1615,6 +1720,8 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
             if (chip.callId != callId) continue;
             chip.active = false;
             if (resultSummary.isNotEmpty) chip.resultSummary = resultSummary;
+            if (durationMs > 0) chip.durationMs = durationMs;
+            if (detailRef.isNotEmpty) chip.detailRef = detailRef;
             return;
           }
         }
@@ -1628,6 +1735,18 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
     if (blocks == null || blocks.isEmpty) return;
     final _ThinkingBlock last = blocks.last;
     last.finishedAt ??= DateTime.now();
+    final String reasoningContent = _reasoningByIndex[assistantIdx] ?? '';
+    _clearTransientThinkingSteps(assistantIdx);
+    if (last.events.isEmpty) {
+      blocks.remove(last);
+      return;
+    }
+    if (!_thinkingBlockHasDisplayContent(
+      last,
+      reasoningContent: reasoningContent,
+    )) {
+      return;
+    }
 
     // Persist a stable "thinking duration" for this assistant message.
     // We only record it once (the first time we finish a thinking block),
