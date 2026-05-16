@@ -776,4 +776,36 @@ void main() {
     );
     expect(find.byType(Shimmer), findsOneWidget);
   });
+
+  testWidgets('generated-image-loading skeleton fills available row width', (
+    WidgetTester tester,
+  ) async {
+    final MarkdownMathConfig config = MarkdownMathConfig();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 360,
+            child: MarkdownBody(
+              data: preprocessForChatMarkdown(
+                '[generated-image-loading: call_1_1]',
+              ),
+              builders: config.builders,
+              blockSyntaxes: config.blockSyntaxes,
+              inlineSyntaxes: config.inlineSyntaxes,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final Finder placeholder = find.byWidgetPredicate(
+      (Widget widget) =>
+          widget is SizedBox && widget.width == 360 && widget.height == 220,
+    );
+
+    expect(placeholder, findsOneWidget);
+    expect(tester.getSize(placeholder), const Size(360, 220));
+  });
 }

@@ -1317,21 +1317,35 @@ class _GeneratedImageBlockBuilder extends _GeneratedImageBuilder {
 
 Widget _buildGeneratedImagePlaceholder(BuildContext context, Widget child) {
   final ThemeData theme = Theme.of(context);
+  final BorderRadius borderRadius = BorderRadius.circular(AppTheme.radiusLg);
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: 6),
-    child: DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.18),
-          width: 1,
-        ),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-        child: SizedBox(width: 220, height: 220, child: child),
-      ),
+    child: LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final bool hasRowWidth =
+            constraints.hasBoundedWidth &&
+            constraints.maxWidth.isFinite &&
+            constraints.maxWidth > 0;
+        final double width = hasRowWidth ? constraints.maxWidth : 220;
+
+        return SizedBox(
+          width: width,
+          height: 220,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.5,
+              ),
+              borderRadius: borderRadius,
+              border: Border.all(
+                color: theme.colorScheme.outline.withValues(alpha: 0.18),
+                width: 1,
+              ),
+            ),
+            child: ClipRRect(borderRadius: borderRadius, child: child),
+          ),
+        );
+      },
     ),
   );
 }
