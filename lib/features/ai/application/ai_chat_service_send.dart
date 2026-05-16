@@ -154,6 +154,8 @@ class _ToolUiThinkingPersister {
         usagePromptTokens: base.usagePromptTokens,
         usageCompletionTokens: base.usageCompletionTokens,
         usageTotalTokens: base.usageTotalTokens,
+        usageCacheHitTokens: base.usageCacheHitTokens,
+        usageCacheMissTokens: base.usageCacheMissTokens,
         responseDuration: base.responseDuration,
       );
       await settings.saveChatHistoryByCid(cidTrim, out);
@@ -320,6 +322,8 @@ extension AIChatServiceSendExt on AIChatService {
       usagePromptTokens: result.usagePromptTokens,
       usageCompletionTokens: result.usageCompletionTokens,
       usageTotalTokens: result.usageTotalTokens,
+      usageCacheHitTokens: result.usageCacheHitTokens,
+      usageCacheMissTokens: result.usageCacheMissTokens,
       responseDuration: responseDuration,
     );
   }
@@ -570,6 +574,8 @@ extension AIChatServiceSendExt on AIChatService {
     int? usagePromptTokens,
     int? usageCompletionTokens,
     int? usageTotalTokens,
+    int? usageCacheHitTokens,
+    int? usageCacheMissTokens,
     required bool strictFullAttempted,
     required bool fallbackTriggered,
   }) {
@@ -594,12 +600,20 @@ extension AIChatServiceSendExt on AIChatService {
     if (usageTotalTokens != null) {
       payload['usage_total_tokens'] = usageTotalTokens;
     }
+    if (usageCacheHitTokens != null) {
+      payload['usage_cache_hit_tokens'] = usageCacheHitTokens;
+    }
+    if (usageCacheMissTokens != null) {
+      payload['usage_cache_miss_tokens'] = usageCacheMissTokens;
+    }
     payload['strict_full_attempted'] = strictFullAttempted;
     payload['fallback_triggered'] = fallbackTriggered;
     payload['source'] =
         (usagePromptTokens != null ||
             usageCompletionTokens != null ||
-            usageTotalTokens != null)
+            usageTotalTokens != null ||
+            usageCacheHitTokens != null ||
+            usageCacheMissTokens != null)
         ? 'usage'
         : 'estimate';
     if (!payload.containsKey('completion_estimate')) {
@@ -646,6 +660,8 @@ extension AIChatServiceSendExt on AIChatService {
       usagePromptTokens: result.usagePromptTokens,
       usageCompletionTokens: result.usageCompletionTokens,
       usageTotalTokens: result.usageTotalTokens,
+      usageCacheHitTokens: result.usageCacheHitTokens,
+      usageCacheMissTokens: result.usageCacheMissTokens,
       strictFullAttempted: strictFullAttempted,
       fallbackTriggered: fallbackTriggered,
     );
@@ -681,12 +697,25 @@ extension AIChatServiceSendExt on AIChatService {
           usagePromptTokens: result.usagePromptTokens,
           usageCompletionTokens: result.usageCompletionTokens,
           usageTotalTokens: result.usageTotalTokens,
+          usageCacheHitTokens: result.usageCacheHitTokens,
+          usageCacheMissTokens: result.usageCacheMissTokens,
           isToolLoop: isToolLoop,
           includeHistory: includeHistory,
           toolsCount: toolsCount,
           strictFullAttempted: strictFullAttempted,
           fallbackTriggered: fallbackTriggered,
           breakdownJson: mergedBreakdown,
+        );
+      } catch (_) {}
+      try {
+        final String source = result.hasUsage ? 'usage' : 'estimate';
+        await FlutterLogger.nativeDebug(
+          'AITrace',
+          [
+            'USAGE_RECORD cid=$resolvedCid source=$source isToolLoop=${isToolLoop ? 1 : 0}',
+            'model=$model promptEstBefore=$promptEstBefore promptEstSent=$promptEstSent',
+            'usagePrompt=${result.usagePromptTokens ?? '-'} usageCompletion=${result.usageCompletionTokens ?? '-'} usageTotal=${result.usageTotalTokens ?? '-'} cacheHit=${result.usageCacheHitTokens ?? '-'} cacheMiss=${result.usageCacheMissTokens ?? '-'} tools=$toolsCount strictFull=${strictFullAttempted ? 1 : 0} fallback=${fallbackTriggered ? 1 : 0}',
+          ].join('\n'),
         );
       } catch (_) {}
       try {
@@ -2676,6 +2705,15 @@ extension AIChatServiceSendExt on AIChatService {
       }
 
       if (context == 'chat' && persistHistory) {
+        try {
+          await FlutterLogger.nativeDebug(
+            'AITrace',
+            [
+              'MODEL_CALL_PRE cid=$cid stage=$trimStage stream=${preferStreaming ? 1 : 0} isToolLoop=${isToolLoop ? 1 : 0}',
+              'messages=${messages.length} tools=${toolsForCall.length} beforeEst=$beforeEst strictFull=${strictFullAttempted ? 1 : 0}',
+            ].join('\n'),
+          );
+        } catch (_) {}
         messages = _enforceToolLoopPromptBudget(
           messages,
           pinnedUser: pinnedUserMessage,
@@ -2696,6 +2734,16 @@ extension AIChatServiceSendExt on AIChatService {
           PromptBudget.approxTokensForMessagesJson(messages);
 
       final bool fallbackNow = fallbackTriggered || sentEst < beforeEst;
+
+      try {
+        await FlutterLogger.nativeDebug(
+          'AITrace',
+          [
+            'MODEL_CALL_READY cid=$cid stage=$trimStage stream=${preferStreaming ? 1 : 0} isToolLoop=${isToolLoop ? 1 : 0}',
+            'messages=${messages.length} tools=${toolsForCall.length} beforeEst=$beforeEst sentEst=$sentEst strictFull=${strictFullAttempted ? 1 : 0} fallback=${fallbackNow ? 1 : 0}',
+          ].join('\n'),
+        );
+      } catch (_) {}
 
       if (emitEvent != null && preferStreaming) {
         final AIGatewayStreamingSession session = _gateway.startStreaming(
@@ -3301,6 +3349,8 @@ extension AIChatServiceSendExt on AIChatService {
           usagePromptTokens: result.usagePromptTokens,
           usageCompletionTokens: result.usageCompletionTokens,
           usageTotalTokens: result.usageTotalTokens,
+          usageCacheHitTokens: result.usageCacheHitTokens,
+          usageCacheMissTokens: result.usageCacheMissTokens,
         );
         _emitProgress(
           emitEvent,

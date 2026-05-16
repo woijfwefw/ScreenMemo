@@ -34,6 +34,8 @@ class AIGatewayResult {
     this.usagePromptTokens,
     this.usageCompletionTokens,
     this.usageTotalTokens,
+    this.usageCacheHitTokens,
+    this.usageCacheMissTokens,
   });
 
   final String content;
@@ -44,6 +46,15 @@ class AIGatewayResult {
   final int? usagePromptTokens;
   final int? usageCompletionTokens;
   final int? usageTotalTokens;
+  final int? usageCacheHitTokens;
+  final int? usageCacheMissTokens;
+
+  bool get hasUsage =>
+      usagePromptTokens != null ||
+      usageCompletionTokens != null ||
+      usageTotalTokens != null ||
+      usageCacheHitTokens != null ||
+      usageCacheMissTokens != null;
 }
 
 /// OpenAI function-calling tool call (Chat Completions compatible)
@@ -296,6 +307,8 @@ class AIRequestGateway {
             usagePromptTokens: aggregate.usage?.promptTokens,
             usageCompletionTokens: aggregate.usage?.completionTokens,
             usageTotalTokens: aggregate.usage?.totalTokens,
+            usageCacheHitTokens: aggregate.usage?.cacheHitTokens,
+            usageCacheMissTokens: aggregate.usage?.cacheMissTokens,
           );
         } catch (e) {
           lastError = e is Exception ? e : Exception(e.toString());
@@ -380,6 +393,8 @@ class AIRequestGateway {
           usagePromptTokens: aggregate.usage?.promptTokens,
           usageCompletionTokens: aggregate.usage?.completionTokens,
           usageTotalTokens: aggregate.usage?.totalTokens,
+          usageCacheHitTokens: aggregate.usage?.cacheHitTokens,
+          usageCacheMissTokens: aggregate.usage?.cacheMissTokens,
         );
       } catch (e) {
         lastError = e is Exception ? e : Exception(e.toString());
@@ -454,6 +469,8 @@ class AIRequestGateway {
               usagePromptTokens: aggregate.usage?.promptTokens,
               usageCompletionTokens: aggregate.usage?.completionTokens,
               usageTotalTokens: aggregate.usage?.totalTokens,
+              usageCacheHitTokens: aggregate.usage?.cacheHitTokens,
+              usageCacheMissTokens: aggregate.usage?.cacheMissTokens,
             );
           } catch (retryErr) {
             lastError = retryErr is Exception
@@ -512,6 +529,8 @@ class AIRequestGateway {
                 usagePromptTokens: aggregate.usage?.promptTokens,
                 usageCompletionTokens: aggregate.usage?.completionTokens,
                 usageTotalTokens: aggregate.usage?.totalTokens,
+                usageCacheHitTokens: aggregate.usage?.cacheHitTokens,
+                usageCacheMissTokens: aggregate.usage?.cacheMissTokens,
               );
             } catch (retryErr) {
               lastError = retryErr is Exception
@@ -608,6 +627,8 @@ class AIRequestGateway {
                 usagePromptTokens: aggregate.usage?.promptTokens,
                 usageCompletionTokens: aggregate.usage?.completionTokens,
                 usageTotalTokens: aggregate.usage?.totalTokens,
+                usageCacheHitTokens: aggregate.usage?.cacheHitTokens,
+                usageCacheMissTokens: aggregate.usage?.cacheMissTokens,
               ),
             );
           }
@@ -689,6 +710,8 @@ class AIRequestGateway {
                   usagePromptTokens: aggregate.usage?.promptTokens,
                   usageCompletionTokens: aggregate.usage?.completionTokens,
                   usageTotalTokens: aggregate.usage?.totalTokens,
+                  usageCacheHitTokens: aggregate.usage?.cacheHitTokens,
+                  usageCacheMissTokens: aggregate.usage?.cacheMissTokens,
                 ),
               );
             }
@@ -1032,6 +1055,74 @@ class AIRequestGateway {
       level: reasoningLevel,
     );
     return payload;
+  }
+
+  Future<void> _logPreparedRequestSummary({
+    required String traceId,
+    required AIEndpoint endpoint,
+    required _PreparedRequest prepared,
+    required String logContext,
+    required String apiType,
+    required bool stream,
+  }) async {
+    try {
+      final dynamic decoded = jsonDecode(prepared.body);
+      if (decoded is! Map) return;
+      final Map<String, dynamic> payload = Map<String, dynamic>.from(decoded);
+      final dynamic rawMessages = payload['messages'] ?? payload['input'];
+      int messageCount = 0;
+      int assistantToolMessages = 0;
+      int assistantToolMessagesWithReasoning = 0;
+      int toolMessages = 0;
+      if (rawMessages is List) {
+        messageCount = rawMessages.length;
+        for (final dynamic raw in rawMessages) {
+          if (raw is! Map) continue;
+          final Map<String, dynamic> message = Map<String, dynamic>.from(raw);
+          final String role = (message['role'] as String? ?? '').trim();
+          if (role == 'tool' || message['type'] == 'function_call_output') {
+            toolMessages += 1;
+          }
+          final dynamic toolCalls =
+              message['tool_calls'] ?? message['toolCalls'];
+          if (role == 'assistant' &&
+              toolCalls is List &&
+              toolCalls.isNotEmpty) {
+            assistantToolMessages += 1;
+            if (message.containsKey('reasoning_content') ||
+                message.containsKey('reasoningContent')) {
+              assistantToolMessagesWithReasoning += 1;
+            }
+          }
+          if (message['type'] == 'function_call') {
+            assistantToolMessages += 1;
+          }
+        }
+      }
+      final dynamic toolsRaw = payload['tools'];
+      final int toolsCount = toolsRaw is List ? toolsRaw.length : 0;
+      final String reasoningKeys = <String>[
+        if (payload.containsKey('reasoning_effort')) 'reasoning_effort',
+        if (payload.containsKey('reasoning')) 'reasoning',
+        if (payload.containsKey('thinking')) 'thinking',
+        if (payload.containsKey('enable_thinking')) 'enable_thinking',
+        if (payload.containsKey('thinking_budget')) 'thinking_budget',
+      ].join(',');
+      final bool includeUsage =
+          ((payload['stream_options'] is Map) &&
+              ((payload['stream_options'] as Map)['include_usage'] == true)) ||
+          ((payload['streamOptions'] is Map) &&
+              ((payload['streamOptions'] as Map)['includeUsage'] == true));
+      await FlutterLogger.nativeDebug(
+        'AITrace',
+        [
+          'REQ_SUMMARY $traceId',
+          'ctx=$logContext api=$apiType stream=${stream ? 1 : 0}',
+          'provider=${endpoint.providerName ?? '-'}(${endpoint.providerId ?? '-'}) type=${endpoint.providerType ?? '-'} model=${endpoint.model}',
+          'messages=$messageCount assistantToolMessages=$assistantToolMessages assistantToolReasoning=$assistantToolMessagesWithReasoning toolMessages=$toolMessages tools=$toolsCount includeUsage=${includeUsage ? 1 : 0} reasoningKeys=${reasoningKeys.isEmpty ? '-' : reasoningKeys}',
+        ].join('\n'),
+      );
+    } catch (_) {}
   }
 
   void _fixDeepSeekToolReasoningContent({
@@ -1649,8 +1740,23 @@ class AIRequestGateway {
       if (usage.totalTokens != null) {
         parts.add('totalTokens=${usage.totalTokens}');
       }
+      if (usage.cacheHitTokens != null) {
+        parts.add('cacheHitTokens=${usage.cacheHitTokens}');
+      }
+      if (usage.cacheMissTokens != null) {
+        parts.add('cacheMissTokens=${usage.cacheMissTokens}');
+      }
       return parts.join(' ');
     }
+
+    await _logPreparedRequestSummary(
+      traceId: traceId,
+      endpoint: endpoint,
+      prepared: prepared,
+      logContext: (logContext ?? '').trim(),
+      apiType: apiType,
+      stream: false,
+    );
 
     emitUiLog(
       'REQ POST ${prepared.uri} stream=0 google=${prepared.isGoogle ? 1 : 0} bodyLen=${prepared.body.length}',
@@ -1777,6 +1883,19 @@ class AIRequestGateway {
     emitUiLog(
       'PARSED openai contentLen=${sanitized.length} toolCalls=${parsed.toolCalls.length} reasoningLen=${(parsed.reasoning ?? '').length}${usage.isEmpty ? '' : ' $usage'}',
     );
+    if (usage.isEmpty) {
+      try {
+        await FlutterLogger.nativeWarn(
+          'AITrace',
+          [
+            'USAGE_MISSING $traceId',
+            '${response.statusCode} ${prepared.uri}',
+            'ctx=${(logContext ?? '').trim()} api=$apiType stream=0 tookMs=${sw.elapsedMilliseconds}',
+            'model=${endpoint.model} contentLen=${sanitized.length} toolCalls=${parsed.toolCalls.length} reasoningLen=${(parsed.reasoning ?? '').length}',
+          ].join('\n'),
+        );
+      } catch (_) {}
+    }
     if (usage.isNotEmpty) {
       try {
         final String respUsageText = [
@@ -1862,6 +1981,12 @@ class AIRequestGateway {
       }
       if (usage.totalTokens != null) {
         parts.add('totalTokens=${usage.totalTokens}');
+      }
+      if (usage.cacheHitTokens != null) {
+        parts.add('cacheHitTokens=${usage.cacheHitTokens}');
+      }
+      if (usage.cacheMissTokens != null) {
+        parts.add('cacheMissTokens=${usage.cacheMissTokens}');
       }
       return parts.join(' ');
     }
@@ -2013,6 +2138,14 @@ class AIRequestGateway {
         : endpoint.providerId.toString();
 
     try {
+      await _logPreparedRequestSummary(
+        traceId: traceId,
+        endpoint: endpoint,
+        prepared: prepared,
+        logContext: (logContext ?? '').trim(),
+        apiType: apiType,
+        stream: true,
+      );
       final http.Request request = http.Request('POST', prepared.uri)
         ..headers.addAll(prepared.headers)
         ..body = prepared.body;
@@ -2631,6 +2764,23 @@ class AIRequestGateway {
         'PARSED stream contentLen=${cleanedContent.length} reasoningLen=${reasoningText.length} toolCalls=${toolCalls.length}${ttftMs == null ? '' : ' ttftMs=$ttftMs'}${usage.isEmpty ? '' : ' $usage'}',
       );
 
+      if (usage.isEmpty) {
+        try {
+          await FlutterLogger.nativeWarn(
+            'AITrace',
+            [
+              'USAGE_MISSING $traceId',
+              'ctx=${(logContext ?? '').trim()} api=$apiType stream=1 tookMs=${sw.elapsedMilliseconds}',
+              if (providerName.isNotEmpty || providerType.isNotEmpty)
+                'provider=${providerName.isEmpty ? '-' : providerName}'
+                    '${providerIdText.isEmpty ? '' : '($providerIdText)'}'
+                    ' type=${providerType.isEmpty ? '-' : providerType}',
+              'model=${endpoint.model} contentLen=${cleanedContent.length} reasoningLen=${reasoningText.length} toolCalls=${toolCalls.length}${ttftMs == null ? '' : ' ttftMs=$ttftMs'}',
+            ].join('\n'),
+          );
+        } catch (_) {}
+      }
+
       try {
         final String summary = [
           'STREAM_DONE $traceId',
@@ -3007,14 +3157,22 @@ class _UsageSnapshot {
     this.promptTokens,
     this.completionTokens,
     this.totalTokens,
+    this.cacheHitTokens,
+    this.cacheMissTokens,
   });
 
   final int? promptTokens;
   final int? completionTokens;
   final int? totalTokens;
+  final int? cacheHitTokens;
+  final int? cacheMissTokens;
 
   bool get isEmpty =>
-      promptTokens == null && completionTokens == null && totalTokens == null;
+      promptTokens == null &&
+      completionTokens == null &&
+      totalTokens == null &&
+      cacheHitTokens == null &&
+      cacheMissTokens == null;
 }
 
 class _PreparedRequest {
@@ -3143,6 +3301,43 @@ _UsageSnapshot? _usageFromObject(Object? raw) {
     return null;
   }
 
+  final int? cacheHit =
+      firstOf(<String>[
+        'prompt_cache_hit_tokens',
+        'promptCacheHitTokens',
+        'cache_hit_tokens',
+        'cacheHitTokens',
+        'cached_tokens',
+        'cachedTokens',
+        'cache_read_input_tokens',
+        'cacheReadInputTokens',
+      ]) ??
+      fromNested('prompt_tokens_details', <String>[
+        'cached_tokens',
+        'cache_hit_tokens',
+      ]) ??
+      fromNested('promptTokensDetails', <String>[
+        'cachedTokens',
+        'cacheHitTokens',
+      ]) ??
+      fromNested('input_tokens_details', <String>[
+        'cached_tokens',
+        'cache_hit_tokens',
+      ]) ??
+      fromNested('inputTokensDetails', <String>[
+        'cachedTokens',
+        'cacheHitTokens',
+      ]);
+
+  final int? cacheMiss = firstOf(<String>[
+    'prompt_cache_miss_tokens',
+    'promptCacheMissTokens',
+    'cache_miss_tokens',
+    'cacheMissTokens',
+    'cache_write_input_tokens',
+    'cacheWriteInputTokens',
+  ]);
+
   final int? prompt =
       firstOf(<String>[
         'prompt_tokens',
@@ -3177,6 +3372,8 @@ _UsageSnapshot? _usageFromObject(Object? raw) {
     promptTokens: prompt,
     completionTokens: completion,
     totalTokens: total,
+    cacheHitTokens: cacheHit,
+    cacheMissTokens: cacheMiss,
   );
   return snapshot.isEmpty ? null : snapshot;
 }

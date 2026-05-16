@@ -568,6 +568,8 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
   Widget _buildMessageNerdLine(AIMessage message) {
     final int? prompt = message.usagePromptTokens;
     final int? completion = message.usageCompletionTokens;
+    final int? cacheHit = message.usageCacheHitTokens;
+    final int? cacheMiss = message.usageCacheMissTokens;
     final Duration? duration = message.responseDuration;
     final List<Widget> items = <Widget>[];
     if (prompt != null) {
@@ -580,6 +582,19 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
         _buildStatsItem(
           Icons.download_rounded,
           '${_fmtStatInt(completion)} tokens',
+        ),
+      );
+    }
+    if (cacheHit != null) {
+      items.add(
+        _buildStatsItem(Icons.memory_rounded, '${_fmtStatInt(cacheHit)} cache'),
+      );
+    }
+    if (cacheMiss != null) {
+      items.add(
+        _buildStatsItem(
+          Icons.memory_outlined,
+          '${_fmtStatInt(cacheMiss)} miss',
         ),
       );
     }

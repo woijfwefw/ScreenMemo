@@ -119,6 +119,8 @@ class PromptUsageEvent {
     required this.usagePromptTokens,
     required this.usageCompletionTokens,
     required this.usageTotalTokens,
+    required this.usageCacheHitTokens,
+    required this.usageCacheMissTokens,
     required this.usageSource,
     required this.isToolLoop,
     required this.includeHistory,
@@ -137,6 +139,8 @@ class PromptUsageEvent {
   final int? usagePromptTokens;
   final int? usageCompletionTokens;
   final int? usageTotalTokens;
+  final int? usageCacheHitTokens;
+  final int? usageCacheMissTokens;
   final String usageSource;
   final bool isToolLoop;
   final bool includeHistory;
@@ -149,7 +153,9 @@ class PromptUsageEvent {
   bool get hasUsage =>
       usagePromptTokens != null ||
       usageCompletionTokens != null ||
-      usageTotalTokens != null;
+      usageTotalTokens != null ||
+      usageCacheHitTokens != null ||
+      usageCacheMissTokens != null;
 
   int get resolvedPromptTokens =>
       usagePromptTokens ?? promptEstSent ?? promptEstBefore ?? 0;
@@ -178,6 +184,8 @@ class PromptUsageTotals {
     required this.promptTokens,
     required this.completionTokens,
     required this.totalTokens,
+    required this.cacheHitTokens,
+    required this.cacheMissTokens,
   });
 
   final int eventsCount;
@@ -185,6 +193,8 @@ class PromptUsageTotals {
   final int promptTokens;
   final int completionTokens;
   final int totalTokens;
+  final int cacheHitTokens;
+  final int cacheMissTokens;
 
   double get usageCoverage =>
       eventsCount <= 0 ? 0 : (usageBackedCount / eventsCount);
@@ -286,6 +296,7 @@ class ChatContextService {
             'conversation_id': resolvedCid,
             'role': role,
             'content': content,
+            'reasoning_content': message.reasoningContent,
             'api_content_json': apiContentJson,
             'tool_calls_json': toolCallsJson,
             'tool_call_id': (message.toolCallId ?? '').trim().isEmpty
@@ -334,6 +345,7 @@ class ChatContextService {
             'role',
             'content',
             'api_content_json',
+            'reasoning_content',
             'tool_calls_json',
             'tool_call_id',
             'created_at',
@@ -352,6 +364,10 @@ class ChatContextService {
           final String role = (row['role'] as String?)?.trim() ?? '';
           if (role.isEmpty) continue;
           final String content = (row['content'] as String?) ?? '';
+          final String? reasoningContent =
+              (row['reasoning_content'] as String?)?.trim().isNotEmpty == true
+              ? (row['reasoning_content'] as String?)!.trim()
+              : null;
 
           Object? apiContent;
           final String apiRaw = (row['api_content_json'] as String?) ?? '';
@@ -387,6 +403,7 @@ class ChatContextService {
           final AIMessage msg = AIMessage(
             role: role,
             content: content,
+            reasoningContent: reasoningContent,
             apiContent: apiContent,
             toolCalls: toolCalls,
             toolCallId: toolCallId,
@@ -496,6 +513,8 @@ class ChatContextService {
     int? usagePromptTokens,
     int? usageCompletionTokens,
     int? usageTotalTokens,
+    int? usageCacheHitTokens,
+    int? usageCacheMissTokens,
     required bool isToolLoop,
     required bool includeHistory,
     required int toolsCount,
@@ -508,10 +527,24 @@ class ChatContextService {
     if (resolvedCid.isEmpty) return;
     try {
       final storage = await _db.database;
+      try {
+        await _db.ensureAiChatSchemaForRuntime();
+      } catch (_) {}
       final bool hasUsage =
           usagePromptTokens != null ||
           usageCompletionTokens != null ||
-          usageTotalTokens != null;
+          usageTotalTokens != null ||
+          usageCacheHitTokens != null ||
+          usageCacheMissTokens != null;
+      try {
+        await FlutterLogger.nativeDebug(
+          'AITrace',
+          [
+            'USAGE_EVENT_INSERT cid=$resolvedCid source=${hasUsage ? 'usage' : 'estimate'} isToolLoop=${isToolLoop ? 1 : 0}',
+            'model=${(model ?? '').trim()} promptEstBefore=${promptEstBefore ?? '-'} promptEstSent=${promptEstSent ?? '-'} usagePrompt=${usagePromptTokens ?? '-'} usageCompletion=${usageCompletionTokens ?? '-'} usageTotal=${usageTotalTokens ?? '-'} cacheHit=${usageCacheHitTokens ?? '-'} cacheMiss=${usageCacheMissTokens ?? '-'} tools=$toolsCount strictFull=${strictFullAttempted ? 1 : 0} fallback=${fallbackTriggered ? 1 : 0}',
+          ].join('\n'),
+        );
+      } catch (_) {}
       await storage.insert('ai_prompt_usage_events', <String, Object?>{
         'conversation_id': resolvedCid,
         'model': (model ?? '').trim().isEmpty ? null : model!.trim(),
@@ -520,6 +553,8 @@ class ChatContextService {
         'usage_prompt_tokens': usagePromptTokens,
         'usage_completion_tokens': usageCompletionTokens,
         'usage_total_tokens': usageTotalTokens,
+        'usage_cache_hit_tokens': usageCacheHitTokens,
+        'usage_cache_miss_tokens': usageCacheMissTokens,
         'usage_source': hasUsage ? 'usage' : 'estimate',
         'is_tool_loop': isToolLoop ? 1 : 0,
         'include_history': includeHistory ? 1 : 0,
@@ -555,6 +590,8 @@ class ChatContextService {
           'usage_prompt_tokens',
           'usage_completion_tokens',
           'usage_total_tokens',
+          'usage_cache_hit_tokens',
+          'usage_cache_miss_tokens',
           'usage_source',
           'is_tool_loop',
           'include_history',
@@ -601,6 +638,12 @@ class ChatContextService {
               usageTotalTokens: row['usage_total_tokens'] == null
                   ? null
                   : _toInt(row['usage_total_tokens']),
+              usageCacheHitTokens: row['usage_cache_hit_tokens'] == null
+                  ? null
+                  : _toInt(row['usage_cache_hit_tokens']),
+              usageCacheMissTokens: row['usage_cache_miss_tokens'] == null
+                  ? null
+                  : _toInt(row['usage_cache_miss_tokens']),
               usageSource: (row['usage_source'] as String?)?.trim() ?? '',
               isToolLoop: _toInt(row['is_tool_loop']) != 0,
               includeHistory: _toInt(row['include_history']) != 0,
@@ -633,6 +676,8 @@ class ChatContextService {
           'usage_prompt_tokens',
           'usage_completion_tokens',
           'usage_total_tokens',
+          'usage_cache_hit_tokens',
+          'usage_cache_miss_tokens',
           'breakdown_json',
         ],
         where: 'conversation_id = ?',
@@ -645,12 +690,16 @@ class ChatContextService {
           promptTokens: 0,
           completionTokens: 0,
           totalTokens: 0,
+          cacheHitTokens: 0,
+          cacheMissTokens: 0,
         );
       }
       int usageBacked = 0;
       int prompt = 0;
       int completion = 0;
       int total = 0;
+      int cacheHit = 0;
+      int cacheMiss = 0;
       for (final Map<String, Object?> row in rows) {
         final int? usagePrompt = row['usage_prompt_tokens'] == null
             ? null
@@ -661,9 +710,17 @@ class ChatContextService {
         final int? usageTotal = row['usage_total_tokens'] == null
             ? null
             : _toInt(row['usage_total_tokens']);
+        final int? usageCacheHit = row['usage_cache_hit_tokens'] == null
+            ? null
+            : _toInt(row['usage_cache_hit_tokens']);
+        final int? usageCacheMiss = row['usage_cache_miss_tokens'] == null
+            ? null
+            : _toInt(row['usage_cache_miss_tokens']);
         if (usagePrompt != null ||
             usageCompletion != null ||
-            usageTotal != null) {
+            usageTotal != null ||
+            usageCacheHit != null ||
+            usageCacheMiss != null) {
           usageBacked += 1;
         }
 
@@ -704,6 +761,8 @@ class ChatContextService {
         prompt += promptResolved;
         completion += completionResolved;
         total += totalResolved;
+        cacheHit += usageCacheHit ?? 0;
+        cacheMiss += usageCacheMiss ?? 0;
       }
       return PromptUsageTotals(
         eventsCount: rows.length,
@@ -711,6 +770,8 @@ class ChatContextService {
         promptTokens: prompt,
         completionTokens: completion,
         totalTokens: total,
+        cacheHitTokens: cacheHit,
+        cacheMissTokens: cacheMiss,
       );
     } catch (_) {
       return const PromptUsageTotals(
@@ -719,6 +780,8 @@ class ChatContextService {
         promptTokens: 0,
         completionTokens: 0,
         totalTokens: 0,
+        cacheHitTokens: 0,
+        cacheMissTokens: 0,
       );
     }
   }

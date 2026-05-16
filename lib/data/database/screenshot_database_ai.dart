@@ -521,6 +521,8 @@ extension ScreenshotDatabaseAI on ScreenshotDatabase {
         usage_prompt_tokens INTEGER,
         usage_completion_tokens INTEGER,
         usage_total_tokens INTEGER,
+        usage_cache_hit_tokens INTEGER,
+        usage_cache_miss_tokens INTEGER,
         response_duration_ms INTEGER,
         created_at INTEGER DEFAULT (strftime('%s','now') * 1000)
       )
@@ -581,6 +583,7 @@ extension ScreenshotDatabaseAI on ScreenshotDatabase {
         conversation_id TEXT NOT NULL,
         role TEXT NOT NULL,
         content TEXT,
+        reasoning_content TEXT,
         api_content_json TEXT,
         tool_calls_json TEXT,
         tool_call_id TEXT,
@@ -603,6 +606,8 @@ extension ScreenshotDatabaseAI on ScreenshotDatabase {
         usage_prompt_tokens INTEGER,
         usage_completion_tokens INTEGER,
         usage_total_tokens INTEGER,
+        usage_cache_hit_tokens INTEGER,
+        usage_cache_miss_tokens INTEGER,
         usage_source TEXT,
         is_tool_loop INTEGER NOT NULL DEFAULT 0,
         include_history INTEGER NOT NULL DEFAULT 1,
@@ -1474,8 +1479,48 @@ ORDER BY day ASC
     } catch (_) {}
     try {
       await db.execute(
+        'ALTER TABLE ai_messages ADD COLUMN usage_cache_hit_tokens INTEGER',
+      );
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE ai_messages ADD COLUMN usage_cache_miss_tokens INTEGER',
+      );
+    } catch (_) {}
+    try {
+      await db.execute(
         'ALTER TABLE ai_messages ADD COLUMN response_duration_ms INTEGER',
       );
+    } catch (_) {}
+  }
+
+  Future<void> _ensureAiMessagesRawReasoningColumn(DatabaseExecutor db) async {
+    try {
+      await db.execute(
+        'ALTER TABLE ai_messages_raw ADD COLUMN reasoning_content TEXT',
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _ensureAiPromptUsageCacheColumns(DatabaseExecutor db) async {
+    try {
+      await db.execute(
+        'ALTER TABLE ai_prompt_usage_events ADD COLUMN usage_cache_hit_tokens INTEGER',
+      );
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE ai_prompt_usage_events ADD COLUMN usage_cache_miss_tokens INTEGER',
+      );
+    } catch (_) {}
+  }
+
+  Future<void> ensureAiChatSchemaForRuntime() async {
+    try {
+      final db = await database;
+      await _ensureAiMessageUsageColumns(db);
+      await _ensureAiMessagesRawReasoningColumn(db);
+      await _ensureAiPromptUsageCacheColumns(db);
     } catch (_) {}
   }
 
@@ -1623,6 +1668,8 @@ ORDER BY day ASC
     int? usagePromptTokens,
     int? usageCompletionTokens,
     int? usageTotalTokens,
+    int? usageCacheHitTokens,
+    int? usageCacheMissTokens,
     int? responseDurationMs,
   }) async {
     try {
@@ -1649,6 +1696,10 @@ ORDER BY day ASC
         if (usageCompletionTokens != null)
           'usage_completion_tokens': usageCompletionTokens,
         if (usageTotalTokens != null) 'usage_total_tokens': usageTotalTokens,
+        if (usageCacheHitTokens != null)
+          'usage_cache_hit_tokens': usageCacheHitTokens,
+        if (usageCacheMissTokens != null)
+          'usage_cache_miss_tokens': usageCacheMissTokens,
         if (responseDurationMs != null)
           'response_duration_ms': responseDurationMs,
         if (createdAt != null) 'created_at': createdAt,

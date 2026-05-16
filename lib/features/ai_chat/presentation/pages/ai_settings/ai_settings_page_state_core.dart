@@ -311,6 +311,8 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
                   usagePromptTokens: t.usagePromptTokens,
                   usageCompletionTokens: t.usageCompletionTokens,
                   usageTotalTokens: t.usageTotalTokens,
+                  usageCacheHitTokens: t.usageCacheHitTokens,
+                  usageCacheMissTokens: t.usageCacheMissTokens,
                   responseDuration: t.responseDuration,
                 );
           merged.add(patched);
@@ -1858,6 +1860,8 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
       usagePromptTokens: current.usagePromptTokens,
       usageCompletionTokens: current.usageCompletionTokens,
       usageTotalTokens: current.usageTotalTokens,
+      usageCacheHitTokens: current.usageCacheHitTokens,
+      usageCacheMissTokens: current.usageCacheMissTokens,
       responseDuration: current.responseDuration,
     );
     final List<AIMessage> nextMessages = List<AIMessage>.from(_messages);
@@ -1921,6 +1925,8 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
       usagePromptTokens: current.usagePromptTokens,
       usageCompletionTokens: current.usageCompletionTokens,
       usageTotalTokens: current.usageTotalTokens,
+      usageCacheHitTokens: current.usageCacheHitTokens,
+      usageCacheMissTokens: current.usageCacheMissTokens,
       responseDuration: current.responseDuration,
     );
     final List<AIMessage> nextMessages = List<AIMessage>.from(_messages);

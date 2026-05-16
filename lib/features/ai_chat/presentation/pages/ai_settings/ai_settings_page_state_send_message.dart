@@ -584,6 +584,8 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
                       usagePromptTokens: target.usagePromptTokens,
                       usageCompletionTokens: target.usageCompletionTokens,
                       usageTotalTokens: target.usageTotalTokens,
+                      usageCacheHitTokens: target.usageCacheHitTokens,
+                      usageCacheMissTokens: target.usageCacheMissTokens,
                       responseDuration: target.responseDuration,
                     );
                     final newList = List<AIMessage>.from(_messages);
@@ -684,6 +686,12 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
                       target.usageCompletionTokens,
                   usageTotalTokens:
                       completed.usageTotalTokens ?? target.usageTotalTokens,
+                  usageCacheHitTokens:
+                      completed.usageCacheHitTokens ??
+                      target.usageCacheHitTokens,
+                  usageCacheMissTokens:
+                      completed.usageCacheMissTokens ??
+                      target.usageCacheMissTokens,
                   responseDuration:
                       completed.responseDuration ?? target.responseDuration,
                 );
@@ -730,6 +738,12 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
                         target.usageCompletionTokens ||
                     (completed.usageTotalTokens ?? target.usageTotalTokens) !=
                         target.usageTotalTokens ||
+                    (completed.usageCacheHitTokens ??
+                            target.usageCacheHitTokens) !=
+                        target.usageCacheHitTokens ||
+                    (completed.usageCacheMissTokens ??
+                            target.usageCacheMissTokens) !=
+                        target.usageCacheMissTokens ||
                     (completed.responseDuration ?? target.responseDuration) !=
                         target.responseDuration;
                 if (target.content == completed.content && !metadataChanged) {
@@ -752,6 +766,12 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
                       target.usageCompletionTokens,
                   usageTotalTokens:
                       completed.usageTotalTokens ?? target.usageTotalTokens,
+                  usageCacheHitTokens:
+                      completed.usageCacheHitTokens ??
+                      target.usageCacheHitTokens,
+                  usageCacheMissTokens:
+                      completed.usageCacheMissTokens ??
+                      target.usageCacheMissTokens,
                   responseDuration:
                       completed.responseDuration ?? target.responseDuration,
                 );
@@ -1251,6 +1271,8 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
               usagePromptTokens: assistant.usagePromptTokens,
               usageCompletionTokens: assistant.usageCompletionTokens,
               usageTotalTokens: assistant.usageTotalTokens,
+              usageCacheHitTokens: assistant.usageCacheHitTokens,
+              usageCacheMissTokens: assistant.usageCacheMissTokens,
               responseDuration: assistant.responseDuration,
             );
           });

@@ -118,7 +118,7 @@ class ScreenshotDatabase {
         final path = join(databasesDir.path, 'screenshot_memo.db');
         final db = await openDatabase(
           path,
-          version: 51,
+          version: 52,
           onConfigure: (db) async {
             try {
               await db.execute('PRAGMA journal_mode=WAL');
@@ -156,7 +156,7 @@ class ScreenshotDatabase {
 
         final db = await openDatabase(
           path,
-          version: 51,
+          version: 52,
           onConfigure: (db) async {
             // 启用 WAL 提升并发写入与长事务期间读取能力
             try {
@@ -189,7 +189,7 @@ class ScreenshotDatabase {
 
         final db = await openDatabase(
           path,
-          version: 51,
+          version: 52,
           onConfigure: (db) async {
             try {
               await db.execute('PRAGMA journal_mode=WAL');
@@ -216,7 +216,7 @@ class ScreenshotDatabase {
 
       final db = await openDatabase(
         path,
-        version: 51,
+        version: 52,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       );
@@ -789,6 +789,11 @@ class ScreenshotDatabase {
     if (oldVersion < 51) {
       await _createAiGeneratedImagesTable(db);
     }
+    if (oldVersion < 52) {
+      await _ensureAiMessageUsageColumns(db);
+      await _ensureAiMessagesRawReasoningColumn(db);
+      await _ensureAiPromptUsageCacheColumns(db);
+    }
     if (oldVersion < 2) {
       await _createAiTables(db);
     } else if (oldVersion < 4) {
@@ -1068,12 +1073,18 @@ class ScreenshotDatabase {
             conversation_id TEXT NOT NULL,
             role TEXT NOT NULL,
             content TEXT,
+            reasoning_content TEXT,
             api_content_json TEXT,
             tool_calls_json TEXT,
             tool_call_id TEXT,
             created_at INTEGER DEFAULT (strftime('%s','now') * 1000)
           )
         ''');
+      } catch (_) {}
+      try {
+        await db.execute(
+          'ALTER TABLE ai_messages_raw ADD COLUMN reasoning_content TEXT',
+        );
       } catch (_) {}
       try {
         await db.execute(
@@ -1091,6 +1102,8 @@ class ScreenshotDatabase {
             usage_prompt_tokens INTEGER,
             usage_completion_tokens INTEGER,
             usage_total_tokens INTEGER,
+            usage_cache_hit_tokens INTEGER,
+            usage_cache_miss_tokens INTEGER,
             usage_source TEXT,
             is_tool_loop INTEGER NOT NULL DEFAULT 0,
             include_history INTEGER NOT NULL DEFAULT 1,
@@ -1107,6 +1120,7 @@ class ScreenshotDatabase {
           'CREATE INDEX IF NOT EXISTS idx_ai_prompt_usage_events_conv ON ai_prompt_usage_events(conversation_id, id)',
         );
       } catch (_) {}
+      await _ensureAiPromptUsageCacheColumns(db);
     }
 
     // v30: Persist per-segment AI request/response traces (debugging).

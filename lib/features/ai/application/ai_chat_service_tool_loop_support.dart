@@ -22,6 +22,11 @@ extension AIChatServiceToolLoopSupportExt on AIChatService {
       toolCalls: parsed.calls,
       reasoning: result.reasoning,
       reasoningDuration: result.reasoningDuration,
+      usagePromptTokens: result.usagePromptTokens,
+      usageCompletionTokens: result.usageCompletionTokens,
+      usageTotalTokens: result.usageTotalTokens,
+      usageCacheHitTokens: result.usageCacheHitTokens,
+      usageCacheMissTokens: result.usageCacheMissTokens,
     );
   }
 

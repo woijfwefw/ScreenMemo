@@ -58,6 +58,8 @@ void main() {
               'prompt_tokens': 10,
               'completion_tokens': 2,
               'total_tokens': 12,
+              'prompt_cache_hit_tokens': 4,
+              'prompt_cache_miss_tokens': 6,
             },
           }),
         );
@@ -105,6 +107,8 @@ void main() {
     await server.close(force: true);
 
     expect(result.content, 'ok');
+    expect(result.usageCacheHitTokens, 4);
+    expect(result.usageCacheMissTokens, 6);
 
     final Map<String, dynamic> payload = captured!;
     expect(payload['thinking'], <String, dynamic>{'type': 'enabled'});

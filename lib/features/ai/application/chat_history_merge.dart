@@ -242,6 +242,10 @@ List<AIMessage> mergeCompletedTurnIntoHistory({
         assistantFinal.usageCompletionTokens ?? base.usageCompletionTokens;
     final int? usageTotal =
         assistantFinal.usageTotalTokens ?? base.usageTotalTokens;
+    final int? usageCacheHit =
+        assistantFinal.usageCacheHitTokens ?? base.usageCacheHitTokens;
+    final int? usageCacheMiss =
+        assistantFinal.usageCacheMissTokens ?? base.usageCacheMissTokens;
     final Duration? responseDuration =
         assistantFinal.responseDuration ?? base.responseDuration;
 
@@ -261,6 +265,8 @@ List<AIMessage> mergeCompletedTurnIntoHistory({
       usagePromptTokens: usagePrompt,
       usageCompletionTokens: usageCompletion,
       usageTotalTokens: usageTotal,
+      usageCacheHitTokens: usageCacheHit,
+      usageCacheMissTokens: usageCacheMiss,
       responseDuration: responseDuration,
     );
   }

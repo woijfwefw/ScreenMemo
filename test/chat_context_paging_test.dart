@@ -45,6 +45,7 @@ Future<void> _insertRawMessages(String cid, int count) async {
       'conversation_id': cid,
       'role': (i % 2 == 0) ? 'user' : 'assistant',
       'content': 'r$i',
+      if (i == 1) 'reasoning_content': 'reasoning-r1',
       'created_at': now + i,
     });
   }
@@ -98,6 +99,7 @@ void main() {
 
       expect(strict.length, greaterThan(1200));
       expect(strict.first.content, 'r0');
+      expect(strict[1].reasoningContent, 'reasoning-r1');
       expect(strict.last.content, 'r1304');
     } finally {
       try {

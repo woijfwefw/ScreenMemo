@@ -568,6 +568,18 @@ extension _ChatContextPanelWidgetsPart on _ChatContextPanelState {
                 ChatContextSheet._loc(context, '总计', 'Total'),
                 nf.format(totals.totalTokens),
               ),
+              if (totals.cacheHitTokens > 0)
+                _metricChip(
+                  context,
+                  ChatContextSheet._loc(context, '缓存命中', 'Cache hit'),
+                  nf.format(totals.cacheHitTokens),
+                ),
+              if (totals.cacheMissTokens > 0)
+                _metricChip(
+                  context,
+                  ChatContextSheet._loc(context, '缓存未命中', 'Cache miss'),
+                  nf.format(totals.cacheMissTokens),
+                ),
               _metricChip(
                 context,
                 ChatContextSheet._loc(context, '调用数', 'Calls'),
@@ -633,11 +645,20 @@ extension _ChatContextPanelWidgetsPart on _ChatContextPanelState {
               final String model = event.model.trim().isEmpty
                   ? '-'
                   : event.model.trim();
-              final String line =
-                  '${ChatContextSheet._fmtTs(event.createdAtMs)} · $model · '
-                  'prompt=${nf.format(event.resolvedPromptTokens)} · '
-                  '$source · '
-                  'tools=${event.toolsCount}';
+              final String cacheText = <String>[
+                if (event.usageCacheHitTokens != null)
+                  'cache=${nf.format(event.usageCacheHitTokens)}',
+                if (event.usageCacheMissTokens != null)
+                  'miss=${nf.format(event.usageCacheMissTokens)}',
+              ].join(' · ');
+              final String line = <String>[
+                ChatContextSheet._fmtTs(event.createdAtMs),
+                model,
+                'prompt=${nf.format(event.resolvedPromptTokens)}',
+                if (cacheText.isNotEmpty) cacheText,
+                source,
+                'tools=${event.toolsCount}',
+              ].join(' · ');
               return Padding(
                 padding: const EdgeInsets.only(bottom: AppTheme.spacing2),
                 child: Container(

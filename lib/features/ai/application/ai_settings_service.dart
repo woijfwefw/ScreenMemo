@@ -1070,6 +1070,8 @@ class AISettingsService {
         usagePromptTokens: e['usage_prompt_tokens'] as int?,
         usageCompletionTokens: e['usage_completion_tokens'] as int?,
         usageTotalTokens: e['usage_total_tokens'] as int?,
+        usageCacheHitTokens: e['usage_cache_hit_tokens'] as int?,
+        usageCacheMissTokens: e['usage_cache_miss_tokens'] as int?,
         responseDuration: ((e['response_duration_ms'] as int?) != null)
             ? Duration(milliseconds: (e['response_duration_ms'] as int))
             : null,
@@ -1096,6 +1098,9 @@ class AISettingsService {
         : messages;
     try {
       final storage = await db.database;
+      try {
+        await db.ensureAiChatSchemaForRuntime();
+      } catch (_) {}
       final now = DateTime.now().millisecondsSinceEpoch;
       await storage.transaction((txn) async {
         // 确保会话条目存在（若无则占位创建）
@@ -1129,6 +1134,10 @@ class AISettingsService {
               'usage_completion_tokens': m.usageCompletionTokens,
             if (m.usageTotalTokens != null)
               'usage_total_tokens': m.usageTotalTokens,
+            if (m.usageCacheHitTokens != null)
+              'usage_cache_hit_tokens': m.usageCacheHitTokens,
+            if (m.usageCacheMissTokens != null)
+              'usage_cache_miss_tokens': m.usageCacheMissTokens,
             if (m.responseDuration != null)
               'response_duration_ms': m.responseDuration!.inMilliseconds,
             'created_at': m.createdAt.millisecondsSinceEpoch,
@@ -1262,6 +1271,8 @@ class AIMessage {
   final int? usagePromptTokens;
   final int? usageCompletionTokens;
   final int? usageTotalTokens;
+  final int? usageCacheHitTokens;
+  final int? usageCacheMissTokens;
   final Duration? responseDuration;
   // —— 以下字段仅用于上行请求（不参与本地持久化）——
   // 多模态/结构化 content：如 [{type:'text',text:'..'},{type:'image_url',image_url:{url:'data:...'}}]
@@ -1280,6 +1291,8 @@ class AIMessage {
     this.usagePromptTokens,
     this.usageCompletionTokens,
     this.usageTotalTokens,
+    this.usageCacheHitTokens,
+    this.usageCacheMissTokens,
     this.responseDuration,
     this.apiContent,
     this.toolCalls,
@@ -1329,6 +1342,8 @@ class AIMessage {
     int? usagePromptTokens,
     int? usageCompletionTokens,
     int? usageTotalTokens,
+    int? usageCacheHitTokens,
+    int? usageCacheMissTokens,
     Duration? responseDuration,
     Object? apiContent,
     List<Map<String, dynamic>>? toolCalls,
@@ -1345,6 +1360,8 @@ class AIMessage {
       usageCompletionTokens:
           usageCompletionTokens ?? this.usageCompletionTokens,
       usageTotalTokens: usageTotalTokens ?? this.usageTotalTokens,
+      usageCacheHitTokens: usageCacheHitTokens ?? this.usageCacheHitTokens,
+      usageCacheMissTokens: usageCacheMissTokens ?? this.usageCacheMissTokens,
       responseDuration: responseDuration ?? this.responseDuration,
       apiContent: apiContent ?? this.apiContent,
       toolCalls: toolCalls ?? this.toolCalls,

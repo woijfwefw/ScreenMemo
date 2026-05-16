@@ -40,6 +40,8 @@ void main() {
         usagePromptTokens: null,
         usageCompletionTokens: null,
         usageTotalTokens: null,
+        usageCacheHitTokens: null,
+        usageCacheMissTokens: null,
         isToolLoop: false,
         includeHistory: true,
         toolsCount: 0,
@@ -57,6 +59,8 @@ void main() {
         usagePromptTokens: 200,
         usageCompletionTokens: 80,
         usageTotalTokens: 280,
+        usageCacheHitTokens: 120,
+        usageCacheMissTokens: 80,
         isToolLoop: true,
         includeHistory: true,
         toolsCount: 2,
@@ -71,6 +75,8 @@ void main() {
       expect(events.first.model, 'gpt-test');
       expect(events.first.isToolLoop, isTrue);
       expect(events.first.hasUsage, isTrue);
+      expect(events.first.usageCacheHitTokens, 120);
+      expect(events.first.usageCacheMissTokens, 80);
 
       final PromptUsageTotals totals = await ChatContextService.instance
           .getConversationPromptUsageTotals(cid: 'usage-cid');
@@ -79,6 +85,8 @@ void main() {
       expect(totals.promptTokens, 300); // 100(est) + 200(usage)
       expect(totals.completionTokens, 92); // 12(est) + 80(usage)
       expect(totals.totalTokens, 392); // 112(est) + 280(usage)
+      expect(totals.cacheHitTokens, 120);
+      expect(totals.cacheMissTokens, 80);
     } finally {
       try {
         await ScreenshotDatabase.instance.disposeDesktop();

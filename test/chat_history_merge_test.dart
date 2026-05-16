@@ -47,6 +47,8 @@ void main() {
         content: 'Final answer',
         reasoningContent: 'model reasoning',
         reasoningDuration: const Duration(milliseconds: 3000),
+        usageCacheHitTokens: 4310,
+        usageCacheMissTokens: 54,
       );
 
       final merged = mergeCompletedTurnIntoHistory(
@@ -61,6 +63,8 @@ void main() {
       expect(merged[0].createdAt, userAt);
       expect(merged[1].role, 'assistant');
       expect(merged[1].content, 'Final answer');
+      expect(merged[1].usageCacheHitTokens, 4310);
+      expect(merged[1].usageCacheMissTokens, 54);
       // Keep assistant createdAt from placeholder so bubble timestamp remains stable.
       expect(merged[1].createdAt, assistantAt);
       expect((merged[1].uiThinkingJson ?? '').isNotEmpty, true);

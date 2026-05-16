@@ -340,6 +340,8 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
         usagePromptTokens: m.usagePromptTokens,
         usageCompletionTokens: m.usageCompletionTokens,
         usageTotalTokens: m.usageTotalTokens,
+        usageCacheHitTokens: m.usageCacheHitTokens,
+        usageCacheMissTokens: m.usageCacheMissTokens,
         responseDuration: m.responseDuration,
       );
     }
