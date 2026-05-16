@@ -62,8 +62,9 @@ extension _ProviderEditFormPart on _ProviderEditPageState {
         if (_balanceEndpointType != AIBalanceEndpointTypes.none) ...[
           const SizedBox(height: AppTheme.spacing4),
           _buildSwitchRow(
-            label: '余额为 0 时自动删除该 Key',
-            description: '检测到主余额为 0 时，自动从该提供商下移除对应 Key',
+            label: 'Auto-delete key when balance is 0',
+            description:
+                'When the main balance is detected as 0, automatically remove the matching key from this provider.',
             value: _balanceAutoDeleteZeroKey,
             onChanged: (v) =>
                 _providerEditSetState(() => _balanceAutoDeleteZeroKey = v),
@@ -206,7 +207,11 @@ extension _ProviderEditFormPart on _ProviderEditPageState {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed:
-                    (_keys.isEmpty || _saving || _fetching || _batchRunning)
+                    (_loaded == null ||
+                        _keys.isEmpty ||
+                        _saving ||
+                        _fetching ||
+                        _batchRunning)
                     ? null
                     : _refreshAllKeysAndProbeFailures,
                 icon: _batchRunning
@@ -284,17 +289,12 @@ extension _ProviderEditFormPart on _ProviderEditPageState {
               },
             ),
           ),
-        if (_loaded == null)
-          Text(
-            '请先保存当前提供商，然后再添加或批量测试 API Key。',
-            style: theme.textTheme.bodySmall,
-          )
-        else if (_keys.isEmpty)
+        if (_loaded != null && _keys.isEmpty)
           Text(
             AppLocalizations.of(context).providerNoApiKeys,
             style: theme.textTheme.bodySmall,
           )
-        else
+        else if (_loaded != null)
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -309,7 +309,7 @@ extension _ProviderEditFormPart on _ProviderEditPageState {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  '批量测试会先刷新模型列表，再对失败 Key 最多连续测试 3 次。',
+                  'Batch test refreshes models first, then retries failed keys up to 3 times.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                     height: 1.45,

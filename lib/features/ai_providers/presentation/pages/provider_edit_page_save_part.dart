@@ -63,6 +63,57 @@ extension _ProviderEditSavePart on _ProviderEditPageState {
         if (id == null) {
           throw Exception('Insert failed');
         }
+        await _svc.updateProvider(id: id, models: _models);
+        final pendingKeys = _keys
+            .where((key) => key.id == null && key.apiKey.trim().isNotEmpty)
+            .toList(growable: false);
+        if (pendingKeys.isNotEmpty) {
+          try {
+            for (var i = 0; i < pendingKeys.length; i++) {
+              final key = pendingKeys[i];
+              final created = await _svc.createProviderKey(
+                providerId: id,
+                name: key.name,
+                apiKey: key.apiKey,
+                models: key.models,
+                enabled: key.enabled,
+                priority: key.priority,
+                orderIndex: key.orderIndex + i,
+              );
+              if (created == null) {
+                throw Exception('Create provider key failed');
+              }
+              final balance = _pendingKeyBalances[key.apiKey.trim()];
+              if (balance != null) {
+                await _svc.saveFetchedBalanceForKey(
+                  providerId: id,
+                  keyId: created,
+                  balance: balance,
+                  providerOverride: AIProvider(
+                    id: id,
+                    name: name,
+                    type: _type,
+                    baseUrl: base.isEmpty ? null : base,
+                    chatPath: chatPath,
+                    modelsPath: modelsPathValue ?? '',
+                    useResponseApi: _useResponseApi,
+                    enabled: true,
+                    isDefault: false,
+                    models: _models,
+                    extra: _buildExtra(),
+                    orderIndex: null,
+                    balanceEndpointType: _balanceEndpointType,
+                    balanceAutoDeleteZeroKey: _balanceAutoDeleteZeroKey,
+                  ),
+                );
+              }
+            }
+          } catch (e) {
+            await _svc.deleteProvider(id);
+            rethrow;
+          }
+          await _svc.syncProviderModelsFromKeys(id);
+        }
       } else {
         final ok = await _svc.updateProvider(
           id: _loaded!.id!,

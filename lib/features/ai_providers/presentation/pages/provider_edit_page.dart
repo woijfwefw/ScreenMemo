@@ -81,6 +81,8 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
   List<String> _models = <String>[];
   final Map<String, ModelsDevModelInfo> _modelInfoByName =
       <String, ModelsDevModelInfo>{};
+  final Map<String, ProviderKeyBalance> _pendingKeyBalances =
+      <String, ProviderKeyBalance>{};
   List<AIProviderKey> _keys = <AIProviderKey>[];
   AIProvider? _loaded;
   bool _geminiNoticeShown = false;
@@ -232,7 +234,7 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
                       ],
                     ),
                   ),
-                  if (_loaded != null && displayKeys.isNotEmpty)
+                  if (displayKeys.isNotEmpty)
                     SliverPadding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppTheme.spacing4,

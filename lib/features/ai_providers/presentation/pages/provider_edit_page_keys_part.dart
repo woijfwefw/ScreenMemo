@@ -1,6 +1,92 @@
 part of 'provider_edit_page.dart';
 
 extension _ProviderEditKeysPart on _ProviderEditPageState {
+  AIProviderKey _buildLocalKeyDraft({
+    required String name,
+    required String apiKey,
+    required List<String> models,
+    required bool enabled,
+    required int priority,
+    required int orderIndex,
+    ProviderKeyBalance? balance,
+  }) {
+    return AIProviderKey(
+      id: null,
+      providerId: _loaded?.id ?? 0,
+      name: name.trim().isEmpty ? 'Key' : name.trim(),
+      apiKey: apiKey.trim(),
+      models: List<String>.from(models),
+      enabled: enabled,
+      priority: priority,
+      orderIndex: orderIndex,
+      failureCount: 0,
+      successCount: 0,
+      failureTotalCount: 0,
+      cooldownUntilMs: null,
+      lastErrorType: null,
+      lastErrorMessage: null,
+      lastFailedAt: null,
+      lastSuccessAt: null,
+      balanceDisplay: balance?.display,
+      balanceTotal: balance?.total,
+      balanceCurrency: balance?.currency,
+      balanceUpdatedAt: balance == null
+          ? null
+          : DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  AIProviderKey _replaceLocalKey(
+    AIProviderKey source, {
+    String? name,
+    String? apiKey,
+    List<String>? models,
+    bool? enabled,
+    int? priority,
+    int? orderIndex,
+    ProviderKeyBalance? balance,
+  }) {
+    return AIProviderKey(
+      id: source.id,
+      providerId: source.providerId,
+      name: name ?? source.name,
+      apiKey: apiKey ?? source.apiKey,
+      models: models ?? List<String>.from(source.models),
+      enabled: enabled ?? source.enabled,
+      priority: priority ?? source.priority,
+      orderIndex: orderIndex ?? source.orderIndex,
+      failureCount: source.failureCount,
+      successCount: source.successCount,
+      failureTotalCount: source.failureTotalCount,
+      cooldownUntilMs: source.cooldownUntilMs,
+      lastErrorType: source.lastErrorType,
+      lastErrorMessage: source.lastErrorMessage,
+      lastFailedAt: source.lastFailedAt,
+      lastSuccessAt: source.lastSuccessAt,
+      balanceDisplay: balance?.display ?? source.balanceDisplay,
+      balanceTotal: balance?.total ?? source.balanceTotal,
+      balanceCurrency: balance?.currency ?? source.balanceCurrency,
+      balanceUpdatedAt: balance == null
+          ? source.balanceUpdatedAt
+          : DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  void _commitLocalKeyList(List<AIProviderKey> nextKeys) {
+    final retainedApiKeys = nextKeys
+        .where((key) => key.id == null)
+        .map((key) => key.apiKey.trim())
+        .toSet();
+    _pendingKeyBalances.removeWhere(
+      (apiKey, _) => !retainedApiKeys.contains(apiKey),
+    );
+    _providerEditSetState(() {
+      _keys = nextKeys;
+      _models = _aggregateKeyModels(nextKeys);
+    });
+    unawaited(_loadModelMetadataFor(_models));
+  }
+
   String _keyNameForBatch({
     required String baseName,
     required int batchIndex,
@@ -21,10 +107,6 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
   Future<void> _openKeyDialog({AIProviderKey? key}) async {
     final l10n = AppLocalizations.of(context);
     final providerId = _loaded?.id;
-    if (providerId == null) {
-      UINotifier.warning(context, l10n.providerSaveBeforeAddingKey);
-      return;
-    }
     final nameCtrl = TextEditingController(
       text: key?.name ?? l10n.providerDefaultKeyName(_keys.length + 1),
     );
@@ -63,6 +145,10 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
         balanceEndpointType: _balanceEndpointType,
         balanceAutoDeleteZeroKey: _balanceAutoDeleteZeroKey,
       );
+    }
+
+    bool isLocalDraftKey(AIProviderKey candidate) {
+      return providerId == null || candidate.id == null;
     }
 
     List<String> parseDialogModels() {
@@ -313,11 +399,7 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
         );
         return;
       }
-      final providerSnapshot = _currentProviderSnapshot();
-      if (providerSnapshot == null) {
-        UINotifier.warning(context, l10n.providerSaveBeforeAddingKey);
-        return;
-      }
+      final providerSnapshot = buildDialogProviderSnapshot();
       final priority =
           int.tryParse(priorityCtrl.text.trim()) ??
           AIProviderKey.defaultPriority;
@@ -333,10 +415,21 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
         UINotifier.warning(context, l10n.providerNoNewApiKeyDuplicate);
         return;
       }
+      if (key != null && isLocalDraftKey(key)) {
+        final newKey = apiKeys.first.trim();
+        final duplicate = _keys.any(
+          (item) => !identical(item, key) && item.apiKey.trim() == newKey,
+        );
+        if (duplicate) {
+          UINotifier.warning(context, l10n.providerNoNewApiKeyDuplicate);
+          return;
+        }
+      }
 
       final total = key == null ? keysToCreate.length : 1;
       int savedCount = 0;
       int balanceUpdatedCount = 0;
+      bool changedPersistedKeys = false;
       bool shouldCloseDialog = false;
 
       setDialogState(() {
@@ -368,6 +461,25 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
                   message: l10n.providerKeyProgressSaving(keyName),
                 );
               });
+            }
+            if (providerId == null) {
+              final cachedBalance = fetchedBalancesByApiKey[apiKey];
+              if (cachedBalance != null) {
+                _pendingKeyBalances[apiKey.trim()] = cachedBalance;
+              }
+              final draft = _buildLocalKeyDraft(
+                name: keyName,
+                apiKey: apiKey,
+                models: models,
+                enabled: enabled,
+                priority: priority,
+                orderIndex: _keys.length + i,
+                balance: cachedBalance,
+              );
+              _commitLocalKeyList(<AIProviderKey>[..._keys, draft]);
+              savedCount++;
+              if (cachedBalance != null) balanceUpdatedCount++;
+              continue;
             }
             final newId = await _svc.createProviderKey(
               providerId: providerId,
@@ -407,6 +519,7 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
                     );
               if (balance != null) balanceUpdatedCount++;
             }
+            changedPersistedKeys = true;
           }
         } else {
           if (dialogContext.mounted) {
@@ -423,34 +536,63 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
               );
             });
           }
-          await _svc.updateProviderKey(
-            id: key.id!,
-            name: nameCtrl.text.trim(),
-            apiKey: apiKeys.first,
-            models: models,
-            enabled: enabled,
-            priority: priority,
-          );
-          savedCount = 1;
-          if (providerSnapshot.hasBalanceQuery) {
+          if (providerId == null || key.id == null) {
             final cachedBalance = fetchedBalancesByApiKey[apiKeys.first];
-            final balance = cachedBalance == null
-                ? await _svc.refreshBalanceForKey(
-                    providerId: providerId,
-                    keyId: key.id!,
-                    providerOverride: providerSnapshot,
-                  )
-                : await _svc.saveFetchedBalanceForKey(
-                    providerId: providerId,
-                    keyId: key.id!,
-                    balance: cachedBalance,
-                    providerOverride: providerSnapshot,
-                  );
-            if (balance != null) balanceUpdatedCount++;
+            if (cachedBalance != null) {
+              _pendingKeyBalances[apiKeys.first.trim()] = cachedBalance;
+            } else if (key.apiKey.trim() != apiKeys.first.trim()) {
+              _pendingKeyBalances.remove(key.apiKey.trim());
+            }
+            final updated = _replaceLocalKey(
+              key,
+              name: nameCtrl.text.trim(),
+              apiKey: apiKeys.first,
+              models: models,
+              enabled: enabled,
+              priority: priority,
+              balance: cachedBalance,
+            );
+            final index = _keys.indexWhere((item) => identical(item, key));
+            if (index == -1) {
+              _commitLocalKeyList(<AIProviderKey>[..._keys, updated]);
+            } else {
+              final nextKeys = List<AIProviderKey>.from(_keys);
+              nextKeys[index] = updated;
+              _commitLocalKeyList(nextKeys);
+            }
+            savedCount = 1;
+            if (cachedBalance != null) balanceUpdatedCount++;
+          } else {
+            await _svc.updateProviderKey(
+              id: key.id!,
+              name: nameCtrl.text.trim(),
+              apiKey: apiKeys.first,
+              models: models,
+              enabled: enabled,
+              priority: priority,
+            );
+            savedCount = 1;
+            if (providerSnapshot.hasBalanceQuery) {
+              final cachedBalance = fetchedBalancesByApiKey[apiKeys.first];
+              final balance = cachedBalance == null
+                  ? await _svc.refreshBalanceForKey(
+                      providerId: providerId,
+                      keyId: key.id!,
+                      providerOverride: providerSnapshot,
+                    )
+                  : await _svc.saveFetchedBalanceForKey(
+                      providerId: providerId,
+                      keyId: key.id!,
+                      balance: cachedBalance,
+                      providerOverride: providerSnapshot,
+                    );
+              if (balance != null) balanceUpdatedCount++;
+            }
+            changedPersistedKeys = true;
           }
         }
 
-        await _reloadKeys();
+        if (changedPersistedKeys) await _reloadKeys();
         if (!mounted || !dialogContext.mounted) return;
         UINotifier.success(
           context,
@@ -639,14 +781,41 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
   }
 
   Future<void> _deleteProviderKey(AIProviderKey key) async {
-    if (key.id == null) return;
+    if (key.id == null) {
+      final index = _keys.indexWhere((item) => identical(item, key));
+      if (index == -1) return;
+      final nextKeys = List<AIProviderKey>.from(_keys)..removeAt(index);
+      _commitLocalKeyList(nextKeys);
+      return;
+    }
     await _svc.deleteProviderKey(key.id!);
     await _reloadKeys();
   }
 
   Future<void> _deleteAllProviderKeys() async {
     final providerId = _loaded?.id;
-    if (providerId == null || _keys.isEmpty) return;
+    if (_keys.isEmpty) return;
+    if (providerId == null) {
+      final confirm =
+          await showUIDialog<bool>(
+            context: context,
+            title: 'Clear pending API keys',
+            message:
+                'This page has ${_keys.length} unsaved API keys. Clear all of them?',
+            actions: [
+              UIDialogAction<bool>(text: 'Cancel', result: false),
+              UIDialogAction<bool>(
+                text: 'Clear all',
+                style: UIDialogActionStyle.destructive,
+                result: true,
+              ),
+            ],
+          ) ??
+          false;
+      if (!confirm) return;
+      _commitLocalKeyList(<AIProviderKey>[]);
+      return;
+    }
     final confirm =
         await showUIDialog<bool>(
           context: context,
@@ -957,7 +1126,7 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
                     tooltip: '刷新模型',
                     icon: const Icon(Icons.refresh, size: 20),
                     visualDensity: VisualDensity.compact,
-                    onPressed: (_fetching || _batchRunning)
+                    onPressed: (_loaded == null || _fetching || _batchRunning)
                         ? null
                         : () => _refreshProviderKey(key),
                   ),
@@ -1006,7 +1175,14 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
   }
 
   Future<void> _toggleProviderKey(AIProviderKey key, bool enabled) async {
-    if (key.id == null) return;
+    if (key.id == null) {
+      final index = _keys.indexWhere((item) => identical(item, key));
+      if (index == -1) return;
+      final nextKeys = List<AIProviderKey>.from(_keys);
+      nextKeys[index] = _replaceLocalKey(key, enabled: enabled);
+      _commitLocalKeyList(nextKeys);
+      return;
+    }
     final ok = await _svc.updateProviderKey(id: key.id!, enabled: enabled);
     if (!mounted) return;
     if (!ok) {
