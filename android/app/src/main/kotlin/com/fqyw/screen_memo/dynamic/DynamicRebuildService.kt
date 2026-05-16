@@ -260,6 +260,16 @@ class DynamicRebuildService : Service() {
             return current.toMap()
         }
 
+        fun clearTask(context: Context): Map<String, Any?> {
+            val current = DynamicRebuildTaskStore.load(context)
+            if (current?.isRecoverable() == true) {
+                return current.toMap()
+            }
+            SegmentSummaryManager.cancelDynamicRebuildInFlightRequests("user_exit")
+            DynamicRebuildTaskStore.clear(context)
+            return DynamicRebuildTaskState.idle().toMap()
+        }
+
         fun isTaskActive(context: Context): Boolean {
             return DynamicRebuildTaskStore.load(context)?.isRecoverable() == true
         }
@@ -2423,6 +2433,11 @@ private object DynamicRebuildTaskStore {
             .put("dayWorks", dayWorks)
             .put("workerSlots", workerSlots)
         prefs(context).edit().putString(KEY_TASK_JSON, obj.toString()).commit()
+    }
+
+    @Synchronized
+    fun clear(context: Context) {
+        prefs(context).edit().remove(KEY_TASK_JSON).commit()
     }
 
     private fun loadDayWorks(obj: JSONObject): MutableList<DynamicRebuildDayWorkItem> {

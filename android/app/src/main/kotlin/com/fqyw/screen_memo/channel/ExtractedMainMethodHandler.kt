@@ -87,6 +87,7 @@ class ExtractedMainMethodHandler(
             "getDynamicRebuildTaskStatus" -> getDynamicRebuildTaskStatus(result)
             "ensureDynamicRebuildTaskResumed" -> ensureDynamicRebuildTaskResumed(result)
             "cancelDynamicRebuildTask" -> cancelDynamicRebuildTask(result)
+            "clearDynamicRebuildTask" -> clearDynamicRebuildTask(result)
             "triggerSegmentTick" -> triggerSegmentTick(result)
             "retrySegments" -> retrySegments(call, result)
             "forceMergeSegment" -> forceMergeSegment(call, result)
@@ -623,6 +624,14 @@ class ExtractedMainMethodHandler(
             result.success(DynamicRebuildService.cancelTask(activity.applicationContext))
         } catch (e: Exception) {
             result.error("cancel_dynamic_rebuild_task_failed", e.message, null)
+        }
+    }
+
+    private fun clearDynamicRebuildTask(result: MethodChannel.Result) {
+        try {
+            result.success(DynamicRebuildService.clearTask(activity.applicationContext))
+        } catch (e: Exception) {
+            result.error("clear_dynamic_rebuild_task_failed", e.message, null)
         }
     }
 

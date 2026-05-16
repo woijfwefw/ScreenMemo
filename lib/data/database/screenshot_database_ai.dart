@@ -3296,6 +3296,16 @@ ORDER BY day ASC
     return DynamicRebuildTaskStatus.fromMap(null);
   }
 
+  Future<DynamicRebuildTaskStatus> clearDynamicRebuildTask() async {
+    final dynamic raw = await ScreenshotDatabase._channel.invokeMethod(
+      'clearDynamicRebuildTask',
+    );
+    if (raw is Map) {
+      return DynamicRebuildTaskStatus.fromMap(raw);
+    }
+    return DynamicRebuildTaskStatus.fromMap(null);
+  }
+
   /// 强制将某个事件与其上一事件合并（跳过 same_event 判定，直接执行合并总结）
   /// - prevId 可选：指定要合并的上一事件ID（否则由原生侧自动选择）
   Future<bool> forceMergeSegment(int id, {int? prevId}) async {

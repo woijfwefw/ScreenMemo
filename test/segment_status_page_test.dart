@@ -444,6 +444,132 @@ void main() {
     }
   });
 
+  testWidgets('idle dynamic task sheet hides progress and workers', (
+    WidgetTester tester,
+  ) async {
+    final Directory tmp = await Directory.systemTemp.createTemp(
+      'screen_memo_segment_page_idle_task_',
+    );
+    try {
+      final Directory root = Directory(p.join(tmp.path, 'root'));
+      await root.create(recursive: true);
+      await _prepareDesktopDbRoot(root);
+      await _seedTimelineDays(<DateTime>[DateTime(2024, 4, 10)]);
+
+      await tester.pumpWidget(_buildHarness());
+      await _pumpUntilFound(
+        tester,
+        find.text(_summaryText(DateTime(2024, 4, 10))),
+      );
+
+      await tester.tap(find.byTooltip('重建动态'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+
+      expect(find.text('动态任务'), findsOneWidget);
+      expect(find.text('未启动'), findsOneWidget);
+      expect(find.text('0/0 (0%)'), findsNothing);
+      expect(find.textContaining('已处理 0/0 条动态'), findsNothing);
+      expect(find.text('线程进度'), findsNothing);
+      expect(find.textContaining('线程 1'), findsNothing);
+      expect(find.text('并发天数'), findsOneWidget);
+      expect(find.text('重建'), findsOneWidget);
+      expect(find.text('补全'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    } finally {
+      if (await tmp.exists()) {
+        await tmp.delete(recursive: true);
+      }
+    }
+  });
+
+  testWidgets('stopped dynamic task sheet hides progress and workers', (
+    WidgetTester tester,
+  ) async {
+    final Directory tmp = await Directory.systemTemp.createTemp(
+      'screen_memo_segment_page_stopped_task_',
+    );
+    try {
+      final Directory root = Directory(p.join(tmp.path, 'root'));
+      await root.create(recursive: true);
+      await _prepareDesktopDbRoot(root);
+      await _seedTimelineDays(<DateTime>[DateTime(2024, 4, 10)]);
+      _mockDynamicRebuildStatus = <String, Object?>{
+        'taskId': 'dynamic_rebuild_stopped',
+        'taskMode': 'rebuild',
+        'status': 'cancelled',
+        'startedAt': DateTime(2026, 3, 12, 9).millisecondsSinceEpoch,
+        'updatedAt': DateTime(2026, 3, 12, 9, 6).millisecondsSinceEpoch,
+        'completedAt': DateTime(2026, 3, 12, 9, 7).millisecondsSinceEpoch,
+        'dayConcurrency': 2,
+        'totalSegments': 6,
+        'processedSegments': 2,
+        'failedSegments': 0,
+        'totalDays': 3,
+        'completedDays': 1,
+        'pendingDays': 2,
+        'failedDays': 0,
+        'currentDayKey': '2026-03-12',
+        'timelineCutoffDayKey': '2026-03-12',
+        'currentSegmentId': 302,
+        'currentRangeLabel': '09:30:00-10:00:00',
+        'currentStage': 'cancelled',
+        'currentStageLabel': '已停止',
+        'currentStageDetail': '已停止后台重建，当前进度可稍后继续',
+        'lastError': null,
+        'isActive': false,
+        'progressPercent': '33.3%',
+        'aiModel': 'gpt-4.1',
+        'recentLogs': <String>['09:07:00 已停止：当前进度可稍后继续'],
+        'workers': <Object?>[
+          <String, Object?>{
+            'slotId': 1,
+            'status': 'running',
+            'dayKey': '2026-03-12',
+            'totalSegments': 3,
+            'processedSegments': 2,
+            'currentRangeLabel': '09:30:00-10:00:00',
+            'currentStageLabel': '等待 AI 总结',
+            'currentStageDetail': '线程快照来自停止前',
+            'currentSegmentId': 302,
+            'retryCount': 0,
+            'retryLimit': 3,
+            'recentStreamChunks': <String>[],
+          },
+        ],
+      };
+
+      await tester.pumpWidget(_buildHarness());
+      await _pumpUntilFound(
+        tester,
+        find.text(_summaryText(DateTime(2024, 4, 10))),
+      );
+
+      await tester.tap(find.byTooltip('重建动态'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+
+      expect(find.text('最近任务：动态重建'), findsOneWidget);
+      expect(find.text('重建 · 已停止'), findsOneWidget);
+      expect(find.text('2/6 (33.3%)'), findsNothing);
+      expect(find.textContaining('已处理 2/6 条动态'), findsNothing);
+      expect(find.text('线程进度'), findsNothing);
+      expect(find.textContaining('线程 1'), findsNothing);
+      expect(find.text('退出重建'), findsOneWidget);
+      expect(find.text('继续重建'), findsOneWidget);
+      expect(find.text('并发天数'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    } finally {
+      if (await tmp.exists()) {
+        await tmp.delete(recursive: true);
+      }
+    }
+  });
+
   testWidgets(
     'dynamic rebuild sheet shows concurrency controls and worker cards',
     (WidgetTester tester) async {

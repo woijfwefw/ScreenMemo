@@ -922,6 +922,29 @@ extension _SegmentStatusDynamicTaskPart on _SegmentStatusPageState {
     await _startDynamicRebuild(resumeExisting: true);
   }
 
+  Future<void> _clearDynamicRebuildTask() async {
+    if (_dynamicRebuildTaskStatus.isActive || _stoppingDynamicRebuild) return;
+    _segmentStatusSetState(() => _stoppingDynamicRebuild = true);
+    _publishDynamicRebuildUiSnapshot();
+    try {
+      final status = await _db.clearDynamicRebuildTask();
+      if (!mounted) return;
+      _segmentStatusSetState(() => _dynamicRebuildTaskStatus = status);
+      _publishDynamicRebuildUiSnapshot();
+      UINotifier.info(context, '已退出当前动态任务');
+      await _refresh(triggerSegmentTick: false);
+    } catch (_) {
+      if (mounted) {
+        UINotifier.error(context, '退出动态任务失败');
+      }
+    } finally {
+      if (mounted) {
+        _segmentStatusSetState(() => _stoppingDynamicRebuild = false);
+        _publishDynamicRebuildUiSnapshot();
+      }
+    }
+  }
+
   Future<void> _cancelDynamicRebuild() async {
     if (_stoppingDynamicRebuild) return;
     _segmentStatusSetState(() => _stoppingDynamicRebuild = true);

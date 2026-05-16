@@ -10,6 +10,8 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
     final cs = theme.colorScheme;
     final status = snapshot.status;
     final bool hasTask = _hasVisibleDynamicTask(status);
+    final bool showTaskProgress = _shouldShowDynamicTaskProgress(status);
+    final bool showWorkerProgress = _shouldShowDynamicWorkerProgress(status);
     final bool actualBackfill = hasTask && status.isBackfillMode;
     final String sheetTitle = hasTask
         ? '${status.isActive ? '当前后台任务' : '最近任务'}：${_dynamicTaskModeName(backfill: actualBackfill)}'
@@ -79,29 +81,31 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
             ),
           ],
         ),
-        const SizedBox(height: AppTheme.spacing4),
-        Text(
-          progressText,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: AppTheme.spacing2),
-        UIProgress(
-          value: progressValue,
-          height: 6,
-          valueColor: actualBackfill ? _dynamicBackfillColor() : null,
-        ),
-        Padding(
-          padding: const EdgeInsets.only(top: AppTheme.spacing2),
-          child: Text(
-            summaryLine,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: cs.onSurfaceVariant,
-              height: 1.35,
+        if (showTaskProgress) ...[
+          const SizedBox(height: AppTheme.spacing4),
+          Text(
+            progressText,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w700,
             ),
           ),
-        ),
+          const SizedBox(height: AppTheme.spacing2),
+          UIProgress(
+            value: progressValue,
+            height: 6,
+            valueColor: actualBackfill ? _dynamicBackfillColor() : null,
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: AppTheme.spacing2),
+            child: Text(
+              summaryLine,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
         if (currentLine.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: AppTheme.spacing3),
@@ -193,8 +197,10 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
         _buildDynamicTaskStartControls(context, snapshot),
         const SizedBox(height: AppTheme.spacing3),
         _buildDynamicRebuildDayConcurrencySection(context, snapshot),
-        const SizedBox(height: AppTheme.spacing3),
-        _buildDynamicRebuildWorkersSection(context, snapshot),
+        if (showWorkerProgress) ...[
+          const SizedBox(height: AppTheme.spacing3),
+          _buildDynamicRebuildWorkersSection(context, snapshot),
+        ],
         const SizedBox(height: AppTheme.spacing3),
         _buildDynamicAutoRepairSection(context, snapshot),
         if (status.recentLogs.isNotEmpty) ...[
@@ -221,6 +227,7 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
     );
 
     if (status.isActive) {
+      final String stopLabel = status.isBackfillMode ? '停止补全' : '停止重建';
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -237,7 +244,7 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
               ),
               onPressed: snapshot.stopping ? null : _cancelDynamicRebuild,
               icon: const Icon(Icons.stop_circle_outlined),
-              label: Text(snapshot.stopping ? '停止中...' : '停止任务'),
+              label: Text(snapshot.stopping ? '停止中...' : stopLabel),
             ),
           ),
           const SizedBox(height: AppTheme.spacing2),
@@ -257,8 +264,9 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
       required Color backgroundColor,
       required Color foregroundColor,
       required VoidCallback onPressed,
+      bool enabled = true,
     }) {
-      final bool disabled = snapshot.starting;
+      final bool disabled = snapshot.starting || snapshot.stopping || !enabled;
       final Color effectiveForeground = disabled
           ? cs.onSurfaceVariant
           : foregroundColor;
@@ -288,6 +296,39 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
       );
     }
 
+    if (status.canContinue) {
+      final bool backfill = status.isBackfillMode;
+      final String modeName = _dynamicTaskModeShortName(backfill: backfill);
+      final Color accentColor = backfill ? _dynamicBackfillColor() : cs.error;
+      final Color onAccentColor = backfill
+          ? _dynamicBackfillOnColor()
+          : cs.onError;
+      final VoidCallback continueAction = backfill
+          ? _confirmStartDynamicBackfill
+          : _confirmStartDynamicRebuild;
+      return Row(
+        children: [
+          Expanded(
+            child: startButton(
+              label: '退出$modeName',
+              backgroundColor: cs.error,
+              foregroundColor: cs.onError,
+              onPressed: _clearDynamicRebuildTask,
+            ),
+          ),
+          const SizedBox(width: AppTheme.spacing2),
+          Expanded(
+            child: startButton(
+              label: '继续$modeName',
+              backgroundColor: accentColor,
+              foregroundColor: onAccentColor,
+              onPressed: continueAction,
+            ),
+          ),
+        ],
+      );
+    }
+
     return Row(
       children: [
         Expanded(
@@ -313,6 +354,15 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
 
   bool _hasVisibleDynamicTask(DynamicRebuildTaskStatus status) {
     return !status.isIdle && status.taskId.trim().isNotEmpty;
+  }
+
+  bool _shouldShowDynamicTaskProgress(DynamicRebuildTaskStatus status) {
+    return _hasVisibleDynamicTask(status) &&
+        (status.isActive || status.isCompleted);
+  }
+
+  bool _shouldShowDynamicWorkerProgress(DynamicRebuildTaskStatus status) {
+    return _hasVisibleDynamicTask(status) && status.isActive;
   }
 
   String _dynamicTaskModeName({required bool backfill}) {
