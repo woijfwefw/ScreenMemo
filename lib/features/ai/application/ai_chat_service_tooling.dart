@@ -93,6 +93,12 @@ extension AIChatServiceToolingExt on AIChatService {
     final Map<String, dynamic> obj = _safeJsonObject(toolMsgs.first.content);
     final String tool = (obj['tool'] as String?)?.trim() ?? '';
     final Object? error = obj['error'];
+    if (tool == 'generate_image') {
+      final int count = _toInt(obj['count']) ?? 0;
+      if (count > 0) return _loc('已生成 $count 张', 'generated $count image(s)');
+      if (error != null) return _loc('错误：$error', 'error=$error');
+      return _loc('未生成图片', 'no images generated');
+    }
     if (error != null) return _loc('错误：$error', 'error=$error');
     if (tool == 'get_images') {
       final Map<String, dynamic>? stats = (obj['stats'] is Map)
@@ -146,6 +152,46 @@ extension AIChatServiceToolingExt on AIChatService {
 
   static List<Map<String, dynamic>>
   defaultChatTools() => <Map<String, dynamic>>[
+    <String, dynamic>{
+      'type': 'function',
+      'function': <String, dynamic>{
+        'name': 'generate_image',
+        'description':
+            'Generate new images from a text prompt using the internally configured image generation model. This is AI-only: call it only when the user asks for image generation or when generating an image is clearly useful. After the tool returns, include the returned [generated-image: filename] marker(s) in the final answer.',
+        'parameters': <String, dynamic>{
+          'type': 'object',
+          'properties': <String, dynamic>{
+            'prompt': <String, dynamic>{
+              'type': 'string',
+              'description':
+                  'Detailed image prompt. Do not include private local file paths.',
+            },
+            'count': <String, dynamic>{
+              'type': 'integer',
+              'description':
+                  'Number of images to generate. The app clamps this to 1..10. Default 1.',
+            },
+            'aspect_ratio': <String, dynamic>{
+              'type': 'string',
+              'enum': <String>['square', 'portrait', 'landscape'],
+              'description':
+                  'square=1024x1024, portrait=1024x1536, landscape=1536x1024. Default square.',
+            },
+            'quality': <String, dynamic>{
+              'type': 'string',
+              'enum': <String>['low', 'medium', 'high', 'auto'],
+              'description': 'Generation quality. Default medium.',
+            },
+            'output_format': <String, dynamic>{
+              'type': 'string',
+              'enum': <String>['png', 'jpeg', 'webp'],
+              'description': 'Output file format. Default png.',
+            },
+          },
+          'required': <String>['prompt'],
+        },
+      },
+    },
     <String, dynamic>{
       'type': 'function',
       'function': <String, dynamic>{
@@ -778,6 +824,19 @@ extension AIChatServiceToolingExt on AIChatService {
     int msToMin(int ms) => ms <= 0 ? 0 : (ms ~/ 60000);
 
     switch (call.name) {
+      case 'generate_image':
+        sig['prompt'] = ((args['prompt'] as String?) ?? '').trim();
+        sig['count'] = AIImageGenerationParams.normalizeCount(args['count']);
+        sig['aspect_ratio'] = AIImageGenerationParams.normalizeAspectRatio(
+          args['aspect_ratio'],
+        );
+        sig['quality'] = AIImageGenerationParams.normalizeQuality(
+          args['quality'],
+        );
+        sig['output_format'] = AIImageGenerationParams.normalizeOutputFormat(
+          args['output_format'],
+        );
+        break;
       case 'search_screenshots_ocr':
         sig['query'] = (args['query'] as String?)?.trim() ?? '';
         final List<String> appNames = _normalizeAppNamesArg(args);
@@ -868,6 +927,15 @@ extension AIChatServiceToolingExt on AIChatService {
     }
 
     switch (call.name) {
+      case 'generate_image':
+        final String prompt = ((args['prompt'] as String?) ?? '').trim();
+        final int count = AIImageGenerationParams.normalizeCount(args['count']);
+        return prompt.isEmpty
+            ? _loc('生成图片', 'Generate image')
+            : _loc(
+                '生成图片：$count 张 · ${clip(prompt)}',
+                'Generate image: $count · ${clip(prompt)}',
+              );
       case 'search_screenshots_ocr':
         return _loc(
           '搜索 OCR：${query.isEmpty ? '（无关键词）' : clip(query)}$rangeSuffix',
@@ -962,6 +1030,9 @@ extension AIChatServiceToolingExt on AIChatService {
       'skipped',
       'stats',
       'results',
+      'images',
+      'markers',
+      'normalized',
     ];
     for (final String k in keep) {
       if (payload.containsKey(k)) out[k] = payload[k];

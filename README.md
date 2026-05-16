@@ -138,6 +138,16 @@ ScreenMemo 是一款在本地运行的智能截屏备忘与检索工具：自动
 </details>
 
 <details>
+<summary>AI 生图如何工作？</summary>
+
+- 生图是 AI 对话内部工具能力，不提供独立生图页面、输入框、生成按钮或重新生成入口
+- 需要在 AI 设置的更多菜单中配置 `Image generation model`，该配置写入 `image_generation` 上下文；未配置时工具会返回英文错误，不会自动复用聊天模型
+- 当前仅支持 OpenAI-compatible Image API：`POST /v1/images/generations`，生成结果读取 `b64_json` 并保存到本地 `output/ai/generated_images/yyyy-MM/`
+- 生成期间聊天正文会显示图片加载骨架；完成后通过 `[generated-image: filename]` marker 自动替换为本地生成图，也可以在只读 `Generated images history` 页面查看、预览、分享或删除
+- 删除历史记录会软删除数据库记录并删除本地文件；聊天里已有的 marker 会显示为 `Image unavailable`
+</details>
+
+<details>
 <summary>主应用支持 iOS / 桌面自动采集吗？</summary>
 
 - 当前不支持。主采集链路围绕 Android 的无障碍截屏能力实现

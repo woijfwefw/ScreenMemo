@@ -1,6 +1,44 @@
 part of 'ai_chat_service.dart';
 
 extension AIChatServiceToolExecExt on AIChatService {
+  Future<List<AIMessage>> _executeGenerateImageTool(
+    AIToolCall call, {
+    required String conversationCid,
+    int? assistantCreatedAtMs,
+  }) async {
+    try {
+      final Map<String, dynamic> args = _safeJsonObject(call.argumentsJson);
+      final AIImageGenerationParams params =
+          AIImageGenerationParams.fromJson(args);
+      final AIImageGenerationResult result =
+          await AIImageGenerationService.instance.generate(
+            params: params,
+            conversationId: conversationCid,
+            assistantCreatedAtMs: assistantCreatedAtMs,
+            toolCallId: call.id,
+          );
+      return <AIMessage>[
+        AIMessage(
+          role: 'tool',
+          content: jsonEncode(result.toToolJson()),
+          toolCallId: call.id,
+        ),
+      ];
+    } catch (e) {
+      return <AIMessage>[
+        AIMessage(
+          role: 'tool',
+          content: jsonEncode(<String, dynamic>{
+            'tool': 'generate_image',
+            'ok': false,
+            'error': 'Image generation failed: $e',
+          }),
+          toolCallId: call.id,
+        ),
+      ];
+    }
+  }
+
   Future<List<AIMessage>> _executeGetImagesTool(AIToolCall call) async {
     final Map<String, dynamic> args = _safeJsonObject(call.argumentsJson);
     final dynamic raw = args['filenames'];
@@ -1733,8 +1771,18 @@ extension AIChatServiceToolExecExt on AIChatService {
     AIToolCall call, {
     int? toolStartMs,
     int? toolEndMs,
+    String? conversationCid,
+    int? assistantCreatedAtMs,
   }) async {
     switch (call.name) {
+      case 'generate_image':
+        return _executeGenerateImageTool(
+          call,
+          conversationCid: (conversationCid ?? '').trim().isEmpty
+              ? 'default'
+              : conversationCid!.trim(),
+          assistantCreatedAtMs: assistantCreatedAtMs,
+        );
       case 'get_images':
         return _executeGetImagesTool(call);
       case 'search_segments':

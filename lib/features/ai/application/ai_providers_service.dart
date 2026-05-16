@@ -192,6 +192,7 @@ class AIProviderKey {
   bool supportsModel(String model) {
     final target = model.trim().toLowerCase();
     if (target.isEmpty) return false;
+    if (models.isEmpty) return true;
     return models.any((m) => m.trim().toLowerCase() == target);
   }
 

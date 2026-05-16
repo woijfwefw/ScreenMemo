@@ -53,6 +53,15 @@ String _normalizeToolSummaryForDisplay(
   if (low == 'ok') return '完成';
   if (low == 'retrieved') return '已获取';
   if (low == 'no images') return '无图片';
+  final Match? mGenerated = RegExp(
+    r'generated\s+(\d+)\s+image',
+    caseSensitive: false,
+  ).firstMatch(s);
+  if (mGenerated != null) {
+    final int count = int.tryParse(mGenerated.group(1) ?? '') ?? 0;
+    return count <= 0 ? '未生成图片' : '已生成 $count 张';
+  }
+  if (low == 'no images generated') return '未生成图片';
   if (low.startsWith('error=')) {
     final int i = s.indexOf('=');
     return i >= 0 ? '错误：${s.substring(i + 1)}' : '错误';
@@ -636,6 +645,8 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
 
   IconData _toolIconFor(String toolName) {
     switch (toolName) {
+      case 'generate_image':
+        return Icons.auto_awesome_outlined;
       case 'get_images':
         return Icons.image_rounded;
       case 'search_screenshots_ocr':

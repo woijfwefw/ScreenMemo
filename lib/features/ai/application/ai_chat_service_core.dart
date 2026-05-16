@@ -109,6 +109,20 @@ extension AIChatServiceCoreExt on AIChatService {
         ),
       );
     }
+    if (names.contains('generate_image')) {
+      sb.writeln(
+        _loc(
+          '- generate_image 是内部生图工具；仅当用户明确提出生图需求，或生成图片明显能完成请求时调用。不要告诉用户有独立生图入口。',
+          '- generate_image is an internal image generation tool. Call it only when the user asks to generate images, or when an image clearly completes the request. Do not imply there is a separate user-facing generation UI.',
+        ),
+      );
+      sb.writeln(
+        _loc(
+          '- generate_image 返回后，最终回答必须包含返回的 [generated-image: filename] marker，应用会用它回显本地生成图。',
+          '- After generate_image returns, include the returned [generated-image: filename] marker(s) in the final answer so the app can display the local generated images.',
+        ),
+      );
+    }
     return sb.toString().trim();
   }
 

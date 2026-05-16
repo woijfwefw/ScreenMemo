@@ -34,6 +34,7 @@ import 'package:screen_memo/features/ai_chat/presentation/widgets/chat_context_s
 import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_request_logs_action.dart';
 import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_request_logs_viewer.dart';
 import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_request_logs_sheet.dart';
+import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_image_generation_menu_button.dart';
 import 'package:screen_memo/core/widgets/ui_perf_overlay.dart';
 import 'package:screen_memo/core/widgets/search_styles.dart';
 
@@ -764,11 +765,23 @@ class _AISettingsPageState extends State<AISettingsPage>
           ),
       ],
     );
-    if (widget.embedded) {
-      return bodyWithPerf;
-    }
+    if (widget.embedded) return bodyWithPerf;
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        leadingWidth: 96,
+        leading: Builder(
+          builder: (ctx) => Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.menu),
+                tooltip: AppLocalizations.of(context).actionMenu,
+                onPressed: () => Scaffold.of(ctx).openDrawer(),
+              ),
+              const AIImageGenerationMenuButton(),
+            ],
+          ),
+        ),
         title: Text(AppLocalizations.of(context).aiSettingsTitle),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,

@@ -3755,6 +3755,63 @@ class AppLocalizationsZh extends AppLocalizations {
   String get promptAddonSectionTitle => '补充说明';
 
   @override
+  String get aiGeneratedImageModelTitle => '生图模型';
+
+  @override
+  String get aiGeneratedImagesHistoryTitle => '生成图片历史';
+
+  @override
+  String get aiGeneratedImageModelDesc =>
+      '仅供 AI 内部 generate_image 工具使用，不提供直接生图入口。';
+
+  @override
+  String get aiGeneratedImageModelUnconfiguredHint =>
+      '如果未配置此上下文，工具会返回英文错误，聊天流程会继续。';
+
+  @override
+  String get aiGeneratedImageProviderSaved => '生图提供商已保存';
+
+  @override
+  String get aiGeneratedImageModelSaved => '生图模型已保存';
+
+  @override
+  String get aiGeneratedImageNotConfigured => '未配置';
+
+  @override
+  String get aiGeneratedHistoryLoadFailed => '加载生成图片失败';
+
+  @override
+  String get aiGeneratedImageUnavailable => '图片不可用';
+
+  @override
+  String get aiGeneratedShareText => 'ScreenMemo 生成图片';
+
+  @override
+  String get aiGeneratedDeleteTitle => '删除图片？';
+
+  @override
+  String get aiGeneratedDeleteMessage =>
+      '这会删除本地图片文件，并保持聊天消息只读。已有聊天 marker 将显示图片不可用。';
+
+  @override
+  String get aiGeneratedImageDeleted => '图片已删除';
+
+  @override
+  String get aiGeneratedHistoryEmptyTitle => '还没有生成图片';
+
+  @override
+  String get aiGeneratedHistoryEmptyDesc => '由 AI 内部工具创建的图片会显示在这里。';
+
+  @override
+  String get aiGeneratedDefaultTitle => '生成图片';
+
+  @override
+  String get aiGeneratedNoPromptStored => '未保存提示词';
+
+  @override
+  String get aiGeneratedCopyPrompt => '复制提示词';
+
+  @override
   String get modelMetaContextLabel => '上下文';
 
   @override

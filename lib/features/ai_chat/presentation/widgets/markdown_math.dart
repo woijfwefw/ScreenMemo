@@ -4,7 +4,9 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_math_fork/flutter_math.dart' as fm;
 import 'package:markdown/markdown.dart' as md;
 import 'package:shimmer/shimmer.dart';
+import 'dart:async';
 import 'dart:io';
+import 'package:screen_memo/data/database/screenshot_database.dart';
 import 'package:screen_memo/features/ai_chat/presentation/widgets/chat_markdown_chart.dart';
 import 'package:screen_memo/l10n/app_localizations.dart';
 import 'package:screen_memo/features/gallery/presentation/widgets/screenshot_image_widget.dart';
@@ -49,6 +51,26 @@ const Color _kThinkingShimmerHighlightColor = Color(0xFFFFFBEB);
 // TEMP (debug-only): show evidence resolve state under each image/placeholder.
 // Remove once the restore/render issue is confirmed fixed.
 const bool _kChatEvidenceDebugUi = kDebugMode;
+const String _kGeneratedImageBlockTag = 'generated-image-block';
+const String _kGeneratedImageLoadingBlockTag = 'generated-image-loading-block';
+const String _kGeneratedImageFilenameAttribute = 'filename';
+const String _kGeneratedImageLoadingIdAttribute = 'id';
+final RegExp _generatedImageMarkerPattern = RegExp(
+  r'\[\s*generated-image(?:-loading)?\s*:\s*([^\]\s]+)\s*\]',
+  caseSensitive: false,
+);
+
+bool containsGeneratedImageMarker(String content) {
+  return _generatedImageMarkerPattern.hasMatch(content);
+}
+
+String generatedImageMarkerDebugSummary(String content) {
+  return _generatedImageMarkerPattern
+      .allMatches(content)
+      .map((m) => (m.group(0) ?? '').trim())
+      .where((m) => m.isNotEmpty)
+      .join('|');
+}
 
 String _shortenDebugText(String s, {int max = 72}) {
   final String t = s.trim();
@@ -84,7 +106,8 @@ String preprocessForChatMarkdown(String content) {
       final s3 = _normalizeEvidenceTagsSkippingInlineCode(s2);
       final s4 = _removeTrailingPunctuationAfterEvidence(s3);
       final s5 = _ensureEvidenceBlocksOnOwnLine(s4);
-      buf.write(s5);
+      final s6 = _ensureGeneratedImagesOnOwnLine(s5);
+      buf.write(s6);
     }
   }
   return buf.toString();
@@ -240,15 +263,122 @@ String _ensureEvidenceBlocksOnOwnLine(String input) {
     final nextIsEv = next != null && evLine.hasMatch(next.trim());
 
     // 在 evidence-only 行前后添加空行（但相邻 evidence 行之间不加）
-    if (isEv && (prev != null) && prev.trim().isNotEmpty && !prevIsEv)
+    if (isEv && (prev != null) && prev.trim().isNotEmpty && !prevIsEv) {
       sb.writeln('');
+    }
     sb.writeln(cur);
-    if (isEv && (next != null) && next.trim().isNotEmpty && !nextIsEv)
+    if (isEv && (next != null) && next.trim().isNotEmpty && !nextIsEv) {
       sb.writeln('');
+    }
   }
   var s = sb.toString();
   if (s.endsWith('\n')) s = s.substring(0, s.length - 1);
   return s;
+}
+
+String _ensureGeneratedImagesOnOwnLine(String input) {
+  final List<String> lines = input.replaceAll('\r\n', '\n').split('\n');
+  final StringBuffer out = StringBuffer();
+  for (final String line in lines) {
+    if (!_generatedImageMarkerPattern.hasMatch(line)) {
+      out.writeln(line);
+      continue;
+    }
+    int cursor = 0;
+    final List<RegExpMatch> matches = _generatedImageMarkerPattern
+        .allMatches(line)
+        .toList();
+    for (final RegExpMatch match in matches) {
+      final String before = line.substring(cursor, match.start).trim();
+      if (before.isNotEmpty) out.writeln(before);
+      final String filename = (match.group(1) ?? '').trim();
+      if (filename.isNotEmpty) {
+        out.writeln();
+        final String raw = match.group(0) ?? '';
+        final bool loading = raw.toLowerCase().contains(
+          'generated-image-loading',
+        );
+        out.writeln(
+          loading
+              ? '[generated-image-loading: $filename]'
+              : '[generated-image: $filename]',
+        );
+        out.writeln();
+      }
+      cursor = match.end;
+    }
+    final String tail = line.substring(cursor).trim();
+    if (tail.isNotEmpty) out.writeln(tail);
+  }
+  String result = out.toString();
+  if (result.endsWith('\n')) result = result.substring(0, result.length - 1);
+  unawaited(
+    FlutterLogger.nativeInfo(
+      'AI_IMAGE',
+      'md.preprocess.generated_markers in=${_generatedImageMarkerPattern.allMatches(input).length} out=${_generatedImageMarkerPattern.allMatches(result).length} markers=${generatedImageMarkerDebugSummary(result)}',
+    ),
+  );
+  return result;
+}
+
+/// 自定义块语法：将独占一行的 [generated-image: FILENAME.EXT] 解析为生成图块。
+class GeneratedImageBlockSyntax extends md.BlockSyntax {
+  const GeneratedImageBlockSyntax();
+
+  static final RegExp _pattern = RegExp(
+    r'^[ ]{0,3}\[\s*generated-image\s*:\s*([^\]\s]+)\s*\][ \t]*$',
+    caseSensitive: false,
+  );
+
+  @override
+  RegExp get pattern => _pattern;
+
+  @override
+  md.Node parse(md.BlockParser parser) {
+    final Match match = _pattern.firstMatch(parser.current.content)!;
+    parser.advance();
+    final md.Element element = md.Element.empty(_kGeneratedImageBlockTag);
+    element.attributes[_kGeneratedImageFilenameAttribute] =
+        (match.group(1) ?? '').trim();
+    unawaited(
+      FlutterLogger.nativeInfo(
+        'AI_IMAGE',
+        'md.parse.generated_block filename=${element.attributes[_kGeneratedImageFilenameAttribute]}',
+      ),
+    );
+    return element;
+  }
+}
+
+/// 自定义块语法：将独占一行的 [generated-image-loading: ID] 解析为生图骨架块。
+class GeneratedImageLoadingBlockSyntax extends md.BlockSyntax {
+  const GeneratedImageLoadingBlockSyntax();
+
+  static final RegExp _pattern = RegExp(
+    r'^[ ]{0,3}\[\s*generated-image-loading\s*:\s*([^\]\s]+)\s*\][ \t]*$',
+    caseSensitive: false,
+  );
+
+  @override
+  RegExp get pattern => _pattern;
+
+  @override
+  md.Node parse(md.BlockParser parser) {
+    final Match match = _pattern.firstMatch(parser.current.content)!;
+    parser.advance();
+    final md.Element element = md.Element.empty(
+      _kGeneratedImageLoadingBlockTag,
+    );
+    element.attributes[_kGeneratedImageLoadingIdAttribute] =
+        (match.group(1) ?? '').trim();
+    unawaited(
+      FlutterLogger.nativeInfo(
+        'AI_IMAGE',
+        'md.parse.loading_block id=${element.attributes[_kGeneratedImageLoadingIdAttribute]}',
+      ),
+    );
+    return element;
+  }
 }
 
 /// 在跳过行内代码 (`...`) 的前提下，将 \(..\)/\[..] 替换成 <math-inline>/<math-block> 标签。
@@ -297,6 +427,51 @@ class EvidenceInlineSyntax extends md.InlineSyntax {
     if (name.isEmpty) return false;
     final el = md.Element.text('evidence', name);
     parser.addNode(el);
+    return true;
+  }
+}
+
+/// 自定义 Inline 语法：将 [generated-image: FILENAME.EXT] 解析为生成图元素。
+class GeneratedImageInlineSyntax extends md.InlineSyntax {
+  GeneratedImageInlineSyntax()
+    : super(
+        r'\[\s*generated-image\s*:\s*([^\]\s]+)\s*\]',
+        caseSensitive: false,
+      );
+
+  @override
+  bool onMatch(md.InlineParser parser, Match match) {
+    final String name = (match.group(1) ?? '').trim();
+    if (name.isEmpty) return false;
+    final md.Element el = md.Element.text('generated-image', name);
+    parser.addNode(el);
+    unawaited(
+      FlutterLogger.nativeInfo(
+        'AI_IMAGE',
+        'md.parse.generated_inline filename=$name',
+      ),
+    );
+    return true;
+  }
+}
+
+/// 自定义 Inline 语法：将 [generated-image-loading: ID] 解析为生成图骨架元素。
+class GeneratedImageLoadingInlineSyntax extends md.InlineSyntax {
+  GeneratedImageLoadingInlineSyntax()
+    : super(
+        r'\[\s*generated-image-loading\s*:\s*([^\]\s]+)\s*\]',
+        caseSensitive: false,
+      );
+
+  @override
+  bool onMatch(md.InlineParser parser, Match match) {
+    final String id = (match.group(1) ?? '').trim();
+    if (id.isEmpty) return false;
+    final md.Element el = md.Element.text('generated-image-loading', id);
+    parser.addNode(el);
+    unawaited(
+      FlutterLogger.nativeInfo('AI_IMAGE', 'md.parse.loading_inline id=$id'),
+    );
     return true;
   }
 }
@@ -851,6 +1026,358 @@ class _EvidenceBuilder extends MarkdownElementBuilder {
   }
 }
 
+class _GeneratedImageLookup {
+  const _GeneratedImageLookup({required this.filename, this.path});
+
+  final String filename;
+  final String? path;
+
+  bool get available => (path ?? '').trim().isNotEmpty;
+}
+
+class _GeneratedImagePreview extends StatefulWidget {
+  const _GeneratedImagePreview({required this.filename, this.perfLogger});
+
+  final String filename;
+  final UiPerfLogger? perfLogger;
+
+  @override
+  State<_GeneratedImagePreview> createState() => _GeneratedImagePreviewState();
+}
+
+class _GeneratedImagePreviewState extends State<_GeneratedImagePreview> {
+  late Future<_GeneratedImageLookup> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(
+      FlutterLogger.nativeInfo(
+        'AI_IMAGE',
+        'preview.init filename=${widget.filename}',
+      ),
+    );
+    _future = _resolve();
+  }
+
+  @override
+  void didUpdateWidget(covariant _GeneratedImagePreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.filename != widget.filename) {
+      unawaited(
+        FlutterLogger.nativeInfo(
+          'AI_IMAGE',
+          'preview.update old=${oldWidget.filename} new=${widget.filename}',
+        ),
+      );
+      _future = _resolve();
+    }
+  }
+
+  Future<_GeneratedImageLookup> _resolve() async {
+    final String name = widget.filename.trim();
+    if (name.isEmpty || name.contains('/') || name.contains('\\')) {
+      unawaited(
+        FlutterLogger.nativeWarn(
+          'AI_IMAGE',
+          'preview.resolve.invalid filename=${widget.filename}',
+        ),
+      );
+      return _GeneratedImageLookup(filename: name);
+    }
+    final Stopwatch sw = Stopwatch()..start();
+    try {
+      unawaited(
+        FlutterLogger.nativeInfo(
+          'AI_IMAGE',
+          'preview.resolve.begin filename=$name',
+        ),
+      );
+      final Map<String, String> map = await ScreenshotDatabase.instance
+          .findAiGeneratedImagePathsByFilenames(<String>{name})
+          .timeout(const Duration(seconds: 4));
+      final String path = (map[name] ?? '').trim();
+      if (path.isEmpty) {
+        widget.perfLogger?.log('generatedImage.unavailable', detail: name);
+        unawaited(
+          FlutterLogger.nativeWarn(
+            'AI_IMAGE',
+            'preview.resolve.no_db_path filename=$name keys=${map.keys.join("|")}',
+          ),
+        );
+        return _GeneratedImageLookup(filename: name);
+      }
+      final bool exists = await File(path).exists();
+      if (!exists) {
+        widget.perfLogger?.log('generatedImage.missingFile', detail: name);
+        unawaited(
+          FlutterLogger.nativeWarn(
+            'AI_IMAGE',
+            'preview.resolve.missing_file filename=$name path=$path',
+          ),
+        );
+        return _GeneratedImageLookup(filename: name);
+      }
+      final int bytes = await File(path).length();
+      widget.perfLogger?.log('generatedImage.resolved', detail: name);
+      unawaited(
+        FlutterLogger.nativeInfo(
+          'AI_IMAGE',
+          'preview.resolve.success filename=$name path=$path bytes=$bytes ms=${sw.elapsedMilliseconds}',
+        ),
+      );
+      return _GeneratedImageLookup(filename: name, path: path);
+    } catch (e) {
+      unawaited(
+        FlutterLogger.nativeError(
+          'AI_IMAGE',
+          'preview.resolve.error filename=$name err=$e',
+        ),
+      );
+      return _GeneratedImageLookup(filename: name);
+    } finally {
+      // Avoid keeping a loading skeleton forever if a platform/database call
+      // hangs in a constrained test or startup environment.
+      if (sw.elapsedMilliseconds > 4000) {
+        widget.perfLogger?.log(
+          'generatedImage.resolve.slow',
+          detail: '$name ${sw.elapsedMilliseconds}ms',
+        );
+      }
+    }
+  }
+
+  void _openViewer(String path) {
+    final String p = path.trim();
+    if (p.isEmpty) return;
+    final nav = NavigationService.instance.navigatorKey.currentState;
+    if (nav == null) return;
+    final String title = AppLocalizations.of(
+      nav.context,
+    ).aiGeneratedDefaultTitle;
+    nav.pushNamed(
+      '/screenshot_viewer',
+      arguments: {
+        'paths': <String>[p],
+        'initialIndex': 0,
+        'appName': title,
+        'appInfo': AppInfo(
+          packageName: 'generated.image',
+          appName: title,
+          icon: null,
+          version: '',
+          isSystemApp: false,
+        ),
+        'multiApp': false,
+        'singleMode': true,
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_GeneratedImageLookup>(
+      future: _future,
+      builder: (context, snapshot) {
+        final bool loading = snapshot.connectionState != ConnectionState.done;
+        if (loading) {
+          unawaited(
+            FlutterLogger.nativeInfo(
+              'AI_IMAGE',
+              'preview.build.loading filename=${widget.filename} state=${snapshot.connectionState.name}',
+            ),
+          );
+          return _buildLoading(context);
+        }
+        final _GeneratedImageLookup lookup =
+            snapshot.data ?? _GeneratedImageLookup(filename: widget.filename);
+        if (!lookup.available) {
+          unawaited(
+            FlutterLogger.nativeWarn(
+              'AI_IMAGE',
+              'preview.build.unavailable filename=${widget.filename}',
+            ),
+          );
+          return _buildUnavailable(context);
+        }
+        unawaited(
+          FlutterLogger.nativeInfo(
+            'AI_IMAGE',
+            'preview.build.image filename=${widget.filename} path=${lookup.path}',
+          ),
+        );
+        return _buildImage(context, lookup.path!);
+      },
+    );
+  }
+
+  Widget _buildLoading(BuildContext context) {
+    return _buildGeneratedImageLoading(context);
+  }
+
+  Widget _buildUnavailable(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return _buildGeneratedImagePlaceholder(
+      context,
+      Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.broken_image_outlined,
+              size: 32,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Image unavailable',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImage(BuildContext context, String path) {
+    final File file = File(path);
+    final ImageProvider provider = FileImage(file);
+    final Widget image = Image(
+      image: provider,
+      fit: BoxFit.fitWidth,
+      width: double.infinity,
+      filterQuality: FilterQuality.medium,
+      gaplessPlayback: true,
+      errorBuilder: (context, error, stackTrace) {
+        unawaited(
+          FlutterLogger.nativeError(
+            'AI_IMAGE',
+            'preview.image.error filename=${widget.filename} path=$path err=$error',
+          ),
+        );
+        return _buildUnavailable(context);
+      },
+    );
+    final Widget probedImage = widget.perfLogger == null
+        ? image
+        : _PerfImageProbe(
+            perfLogger: widget.perfLogger!,
+            tag: 'generated-image:${widget.filename}',
+            imageProvider: provider,
+            child: image,
+          );
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _openViewer(path),
+        child: probedImage,
+      ),
+    );
+  }
+}
+
+class _GeneratedImageBuilder extends MarkdownElementBuilder {
+  _GeneratedImageBuilder({required this.perfLogger});
+
+  final UiPerfLogger? perfLogger;
+
+  @override
+  Widget? visitElementAfterWithContext(
+    BuildContext context,
+    md.Element element,
+    TextStyle? preferredStyle,
+    TextStyle? parentStyle,
+  ) {
+    final String name =
+        (element.attributes[_kGeneratedImageFilenameAttribute] ??
+                element.textContent)
+            .trim();
+    if (name.isEmpty) return null;
+    unawaited(
+      FlutterLogger.nativeInfo(
+        'AI_IMAGE',
+        'md.builder.generated_image filename=$name tag=${element.tag}',
+      ),
+    );
+    return _GeneratedImagePreview(filename: name, perfLogger: perfLogger);
+  }
+}
+
+class _GeneratedImageBlockBuilder extends _GeneratedImageBuilder {
+  _GeneratedImageBlockBuilder({required super.perfLogger});
+
+  @override
+  bool isBlockElement() => true;
+}
+
+Widget _buildGeneratedImagePlaceholder(BuildContext context, Widget child) {
+  final ThemeData theme = Theme.of(context);
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.18),
+          width: 1,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        child: SizedBox(width: 220, height: 220, child: child),
+      ),
+    ),
+  );
+}
+
+Widget _buildGeneratedImageLoading(BuildContext context) {
+  final Color base = Theme.of(
+    context,
+  ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.65);
+  return _buildGeneratedImagePlaceholder(
+    context,
+    Shimmer.fromColors(
+      baseColor: base,
+      highlightColor: _kThinkingShimmerHighlightColor,
+      period: const Duration(milliseconds: 2200),
+      child: Container(color: base),
+    ),
+  );
+}
+
+class _GeneratedImageLoadingBuilder extends MarkdownElementBuilder {
+  @override
+  Widget? visitElementAfterWithContext(
+    BuildContext context,
+    md.Element element,
+    TextStyle? preferredStyle,
+    TextStyle? parentStyle,
+  ) {
+    final String id =
+        (element.attributes[_kGeneratedImageLoadingIdAttribute] ??
+                element.textContent)
+            .trim();
+    unawaited(
+      FlutterLogger.nativeInfo(
+        'AI_IMAGE',
+        'md.builder.loading id=$id tag=${element.tag}',
+      ),
+    );
+    return _buildGeneratedImageLoading(context);
+  }
+}
+
+class _GeneratedImageLoadingBlockBuilder extends _GeneratedImageLoadingBuilder {
+  @override
+  bool isBlockElement() => true;
+}
+
 class _PerfImageProbe extends StatefulWidget {
   const _PerfImageProbe({
     required this.perfLogger,
@@ -994,14 +1521,24 @@ class MarkdownMathConfig {
       screenshotByPath: _screenshotByPath,
       perfLogger: perfLogger,
     ),
+    'generated-image': _GeneratedImageBuilder(perfLogger: perfLogger),
+    'generated-image-loading': _GeneratedImageLoadingBuilder(),
+    _kGeneratedImageBlockTag: _GeneratedImageBlockBuilder(
+      perfLogger: perfLogger,
+    ),
+    _kGeneratedImageLoadingBlockTag: _GeneratedImageLoadingBlockBuilder(),
   };
 
   List<md.InlineSyntax> get inlineSyntaxes => <md.InlineSyntax>[
     AppInlineSyntax(),
     EvidenceInlineSyntax(),
+    GeneratedImageLoadingInlineSyntax(),
+    GeneratedImageInlineSyntax(),
   ];
 
   List<md.BlockSyntax> get blockSyntaxes => <md.BlockSyntax>[
+    const GeneratedImageLoadingBlockSyntax(),
+    const GeneratedImageBlockSyntax(),
     const ChartBlockSyntax(),
   ];
 }

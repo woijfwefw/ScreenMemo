@@ -1380,7 +1380,10 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
     required Color fg,
     required bool isCurrentStreaming,
   }) {
-    if (isCurrentStreaming && !_renderImagesDuringStreaming) {
+    final bool hasGeneratedMarker = containsGeneratedImageMarker(content);
+    if (isCurrentStreaming &&
+        !_renderImagesDuringStreaming &&
+        !hasGeneratedMarker) {
       // 流式期间渲染轻量文本，避免高频 Markdown 重建。
       // 同时裁掉开头的空行，避免与最终 Markdown（会忽略前导换行）出现明显跳动。
       final String t = content
@@ -1397,6 +1400,14 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
     final bool logOnce = _perfLoggedMarkdownMsgKeys.add(perfMsgKey);
     final Stopwatch mdSw = Stopwatch()..start();
     final String preprocessedMd = preprocessForChatMarkdown(content);
+    if (hasGeneratedMarker || containsGeneratedImageMarker(preprocessedMd)) {
+      unawaited(
+        FlutterLogger.nativeInfo(
+          'AI_IMAGE',
+          'md.route idx=$messageIndex streaming=$isCurrentStreaming renderImagesDuringStreaming=$_renderImagesDuringStreaming rawMarkers=${generatedImageMarkerDebugSummary(content)} preMarkers=${generatedImageMarkerDebugSummary(preprocessedMd)} rawLen=${content.length} preLen=${preprocessedMd.length}',
+        ),
+      );
+    }
     if (logOnce) {
       _uiPerf.log(
         'md.preprocess',

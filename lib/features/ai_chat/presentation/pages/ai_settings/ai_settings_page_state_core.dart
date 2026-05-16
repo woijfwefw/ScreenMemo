@@ -1607,6 +1607,14 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
   void _handleAiUiEvent(int assistantIdx, Map<String, dynamic> payload) {
     final String type = (payload['type'] as String?)?.trim() ?? '';
     if (type.isEmpty) return;
+    if (type == 'tool_batch_begin' || type == 'tool_call_end') {
+      unawaited(
+        FlutterLogger.nativeInfo(
+          'AI_IMAGE',
+          'ui.handle_event type=$type idx=$assistantIdx contentLen=${(assistantIdx >= 0 && assistantIdx < _messages.length) ? _messages[assistantIdx].content.length : -1}',
+        ),
+      );
+    }
 
     if (type == 'tool_batch_begin') {
       final List<dynamic> tools = (payload['tools'] as List?) ?? const [];
@@ -1643,6 +1651,13 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
         final String toolName = (m['tool_name'] as String?)?.trim() ?? '';
         final String label = (m['label'] as String?)?.trim() ?? toolName.trim();
         final String detailRef = (m['detail_ref'] as String?)?.trim() ?? '';
+        final int generatedImageLoadingCount =
+            (m['generated_image_loading_count'] is num)
+            ? (m['generated_image_loading_count'] as num).toInt()
+            : int.tryParse(
+                    (m['generated_image_loading_count'] ?? '').toString(),
+                  ) ??
+                  0;
 
         List<String> parseStringList(dynamic raw) {
           if (raw is List) {
@@ -1663,6 +1678,19 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
         final List<String> appPkgs = parseStringList(m['app_package_names']);
         if (callId.isEmpty || toolName.isEmpty) continue;
         seenInBatch.add(callId);
+        if (toolName == 'generate_image') {
+          unawaited(
+            FlutterLogger.nativeInfo(
+              'AI_IMAGE',
+              'ui.loading.begin idx=$assistantIdx call=$callId count=$generatedImageLoadingCount',
+            ),
+          );
+          _appendGeneratedImageLoadingMarkersToAssistant(
+            assistantIdx,
+            callId,
+            generatedImageLoadingCount,
+          );
+        }
 
         _ThinkingToolChip? existing;
         for (final c in toolsEvent.tools) {
@@ -1709,6 +1737,15 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
           ? (payload['duration_ms'] as num).toInt()
           : int.tryParse((payload['duration_ms'] ?? '').toString()) ?? 0;
       final String detailRef = (payload['detail_ref'] as String?)?.trim() ?? '';
+      final List<String> generatedImageMarkers = _parseStringList(
+        payload['generated_image_markers'],
+      );
+      unawaited(
+        FlutterLogger.nativeInfo(
+          'AI_IMAGE',
+          'ui.tool_end idx=$assistantIdx call=$callId markers=${generatedImageMarkers.join("|")} durationMs=$durationMs summary=$resultSummary',
+        ),
+      );
 
       final List<_ThinkingBlock> blocks =
           _thinkingBlocksByIndex[assistantIdx] ?? const <_ThinkingBlock>[];
@@ -1722,12 +1759,181 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
             if (resultSummary.isNotEmpty) chip.resultSummary = resultSummary;
             if (durationMs > 0) chip.durationMs = durationMs;
             if (detailRef.isNotEmpty) chip.detailRef = detailRef;
+            _appendGeneratedImageMarkersToAssistant(
+              assistantIdx,
+              generatedImageMarkers,
+              callId,
+            );
             return;
           }
         }
       }
+      _appendGeneratedImageMarkersToAssistant(
+        assistantIdx,
+        generatedImageMarkers,
+        callId,
+      );
       return;
     }
+  }
+
+  List<String> _parseStringList(Object? raw) {
+    if (raw is List) {
+      return raw
+          .map((e) => e?.toString().trim() ?? '')
+          .where((e) => e.isNotEmpty)
+          .toList(growable: false);
+    }
+    final String single = raw?.toString().trim() ?? '';
+    return single.isEmpty ? const <String>[] : <String>[single];
+  }
+
+  List<String> _generatedImageLoadingMarkers(String callId, int count) {
+    final String id = callId
+        .trim()
+        .replaceAll(RegExp(r'[^A-Za-z0-9_-]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_');
+    if (id.isEmpty) return const <String>[];
+    final int n = count.clamp(1, 10).toInt();
+    return List<String>.generate(
+      n,
+      (int index) => '[generated-image-loading: ${id}_${index + 1}]',
+      growable: false,
+    );
+  }
+
+  void _appendGeneratedImageMarkersToAssistant(
+    int assistantIdx,
+    List<String> markers,
+    String callId,
+  ) {
+    if (assistantIdx < 0 ||
+        assistantIdx >= _messages.length ||
+        _messages[assistantIdx].role != 'assistant') {
+      unawaited(
+        FlutterLogger.nativeWarn(
+          'AI_IMAGE',
+          'ui.append_markers.skip_invalid idx=$assistantIdx call=$callId markers=${markers.join("|")} messages=${_messages.length}',
+        ),
+      );
+      return;
+    }
+    final AIMessage current = _messages[assistantIdx];
+    String content = current.content.trimRight();
+    bool changed = false;
+    int removedLoading = 0;
+    for (final String marker in _generatedImageLoadingMarkers(callId, 10)) {
+      if (content.contains(marker)) {
+        content = content.replaceAll(marker, '').trimRight();
+        changed = true;
+        removedLoading += 1;
+      }
+    }
+    int appended = 0;
+    for (final String marker in markers) {
+      final String value = marker.trim();
+      if (value.isEmpty || content.contains(value)) continue;
+      if (content.isNotEmpty) content = '$content\n\n';
+      content = '$content$value';
+      changed = true;
+      appended += 1;
+    }
+    if (!changed) {
+      unawaited(
+        FlutterLogger.nativeInfo(
+          'AI_IMAGE',
+          'ui.append_markers.noop idx=$assistantIdx call=$callId markers=${markers.join("|")} contentLen=${current.content.length}',
+        ),
+      );
+      return;
+    }
+
+    final AIMessage updated = AIMessage(
+      role: current.role,
+      content: content,
+      createdAt: current.createdAt,
+      reasoningContent: current.reasoningContent,
+      reasoningDuration: current.reasoningDuration,
+      uiThinkingJson: current.uiThinkingJson,
+      usagePromptTokens: current.usagePromptTokens,
+      usageCompletionTokens: current.usageCompletionTokens,
+      usageTotalTokens: current.usageTotalTokens,
+      responseDuration: current.responseDuration,
+    );
+    final List<AIMessage> nextMessages = List<AIMessage>.from(_messages);
+    nextMessages[assistantIdx] = updated;
+    _messages = nextMessages;
+    _contentSegmentsByIndex[assistantIdx] = <String>[content];
+    _nextContentStartsNewSegmentByIndex[assistantIdx] = false;
+    _replaceAssistantContentOnNextToken = false;
+    unawaited(
+      FlutterLogger.nativeInfo(
+        'AI_IMAGE',
+        'ui.append_markers.done idx=$assistantIdx call=$callId removedLoading=$removedLoading appended=$appended newContentLen=${content.length} markers=${markers.join("|")}',
+      ),
+    );
+  }
+
+  void _appendGeneratedImageLoadingMarkersToAssistant(
+    int assistantIdx,
+    String callId,
+    int count,
+  ) {
+    final List<String> markers = _generatedImageLoadingMarkers(callId, count);
+    if (markers.isEmpty ||
+        assistantIdx < 0 ||
+        assistantIdx >= _messages.length ||
+        _messages[assistantIdx].role != 'assistant') {
+      unawaited(
+        FlutterLogger.nativeWarn(
+          'AI_IMAGE',
+          'ui.loading.skip_invalid idx=$assistantIdx call=$callId count=$count markers=${markers.length} messages=${_messages.length}',
+        ),
+      );
+      return;
+    }
+    final AIMessage current = _messages[assistantIdx];
+    String content = current.content.trimRight();
+    bool changed = false;
+    for (final String marker in markers) {
+      if (content.contains(marker)) continue;
+      if (content.isNotEmpty) content = '$content\n\n';
+      content = '$content$marker';
+      changed = true;
+    }
+    if (!changed) {
+      unawaited(
+        FlutterLogger.nativeInfo(
+          'AI_IMAGE',
+          'ui.loading.noop idx=$assistantIdx call=$callId markers=${markers.join("|")} contentLen=${current.content.length}',
+        ),
+      );
+      return;
+    }
+
+    final AIMessage updated = AIMessage(
+      role: current.role,
+      content: content,
+      createdAt: current.createdAt,
+      reasoningContent: current.reasoningContent,
+      reasoningDuration: current.reasoningDuration,
+      uiThinkingJson: current.uiThinkingJson,
+      usagePromptTokens: current.usagePromptTokens,
+      usageCompletionTokens: current.usageCompletionTokens,
+      usageTotalTokens: current.usageTotalTokens,
+      responseDuration: current.responseDuration,
+    );
+    final List<AIMessage> nextMessages = List<AIMessage>.from(_messages);
+    nextMessages[assistantIdx] = updated;
+    _messages = nextMessages;
+    _contentSegmentsByIndex[assistantIdx] = <String>[content];
+    _nextContentStartsNewSegmentByIndex[assistantIdx] = false;
+    unawaited(
+      FlutterLogger.nativeInfo(
+        'AI_IMAGE',
+        'ui.loading.append idx=$assistantIdx call=$callId count=${markers.length} newContentLen=${content.length} markers=${markers.join("|")}',
+      ),
+    );
   }
 
   void _finishActiveThinkingBlock(int assistantIdx) {

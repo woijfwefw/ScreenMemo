@@ -10,10 +10,20 @@ class PathService {
     'com.fqyw.screen_memo/accessibility',
   );
 
+  static Directory? _debugInternalAppDirBaseOverride;
+
+  static void debugSetInternalAppDirBaseOverride(Directory? directory) {
+    _debugInternalAppDirBaseOverride = directory;
+  }
+
   /// 获取应用内部私有目录（files）
   static Future<Directory?> getInternalAppDir([String? subDir]) async {
     StartupProfiler.begin('PathService.getInternalAppDir');
     try {
+      final Directory? overrideBase = _debugInternalAppDirBaseOverride;
+      if (overrideBase != null) {
+        return _resolveSubDir(overrideBase, subDir);
+      }
       if (Platform.isAndroid) {
         final String? path = await _channel.invokeMethod(
           'getInternalFilesDir',

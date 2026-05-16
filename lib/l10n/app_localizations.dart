@@ -6737,6 +6737,114 @@ abstract class AppLocalizations {
   /// **'Extra instructions'**
   String get promptAddonSectionTitle;
 
+  /// No description provided for @aiGeneratedImageModelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Image generation model'**
+  String get aiGeneratedImageModelTitle;
+
+  /// No description provided for @aiGeneratedImagesHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Generated images history'**
+  String get aiGeneratedImagesHistoryTitle;
+
+  /// No description provided for @aiGeneratedImageModelDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Used only by the AI-only generate_image tool. No direct generation UI is exposed.'**
+  String get aiGeneratedImageModelDesc;
+
+  /// No description provided for @aiGeneratedImageModelUnconfiguredHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If this context is not configured, the tool returns an English error and the chat loop continues.'**
+  String get aiGeneratedImageModelUnconfiguredHint;
+
+  /// No description provided for @aiGeneratedImageProviderSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Image generation provider saved'**
+  String get aiGeneratedImageProviderSaved;
+
+  /// No description provided for @aiGeneratedImageModelSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Image generation model saved'**
+  String get aiGeneratedImageModelSaved;
+
+  /// No description provided for @aiGeneratedImageNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Not configured'**
+  String get aiGeneratedImageNotConfigured;
+
+  /// No description provided for @aiGeneratedHistoryLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load images'**
+  String get aiGeneratedHistoryLoadFailed;
+
+  /// No description provided for @aiGeneratedImageUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Image unavailable'**
+  String get aiGeneratedImageUnavailable;
+
+  /// No description provided for @aiGeneratedShareText.
+  ///
+  /// In en, this message translates to:
+  /// **'ScreenMemo generated image'**
+  String get aiGeneratedShareText;
+
+  /// No description provided for @aiGeneratedDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete image?'**
+  String get aiGeneratedDeleteTitle;
+
+  /// No description provided for @aiGeneratedDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes the local image file and keeps chat messages read-only. Existing chat markers will show Image unavailable.'**
+  String get aiGeneratedDeleteMessage;
+
+  /// No description provided for @aiGeneratedImageDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Image deleted'**
+  String get aiGeneratedImageDeleted;
+
+  /// No description provided for @aiGeneratedHistoryEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No generated images yet'**
+  String get aiGeneratedHistoryEmptyTitle;
+
+  /// No description provided for @aiGeneratedHistoryEmptyDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Images created by the AI-only tool will appear here.'**
+  String get aiGeneratedHistoryEmptyDesc;
+
+  /// No description provided for @aiGeneratedDefaultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Generated image'**
+  String get aiGeneratedDefaultTitle;
+
+  /// No description provided for @aiGeneratedNoPromptStored.
+  ///
+  /// In en, this message translates to:
+  /// **'No prompt stored'**
+  String get aiGeneratedNoPromptStored;
+
+  /// No description provided for @aiGeneratedCopyPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy prompt'**
+  String get aiGeneratedCopyPrompt;
+
   /// No description provided for @modelMetaContextLabel.
   ///
   /// In en, this message translates to:

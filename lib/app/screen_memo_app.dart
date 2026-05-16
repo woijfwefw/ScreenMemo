@@ -12,6 +12,7 @@ import 'package:screen_memo/app/navigation/main_navigation_page.dart';
 import 'package:screen_memo/features/onboarding/presentation/pages/onboarding_page.dart';
 import 'package:screen_memo/features/gallery/presentation/pages/screenshot_gallery_page.dart';
 import 'package:screen_memo/features/gallery/presentation/pages/screenshot_viewer_page.dart';
+import 'package:screen_memo/features/ai_generated_images/presentation/pages/generated_images_history_page.dart';
 import 'package:screen_memo/features/search/presentation/pages/search_page.dart';
 import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
 import 'package:screen_memo/features/daily_summary/application/daily_summary_service.dart';
@@ -111,6 +112,8 @@ class _ScreenMemoAppState extends State<ScreenMemoApp>
       routes: {
         '/screenshot_gallery': (context) => const ScreenshotGalleryPage(),
         '/screenshot_viewer': (context) => const ScreenshotViewerPage(),
+        '/generated_images_history': (context) =>
+            const GeneratedImagesHistoryPage(),
         '/search': (context) => const SearchPage(),
         '/app_screenshot_settings': (context) =>
             const AppScreenshotSettingsPage(),

@@ -18,6 +18,7 @@ import 'package:screen_memo/core/widgets/search_styles.dart';
 import 'package:screen_memo/core/logging/flutter_logger.dart';
 import 'package:screen_memo/app/navigation/navigation_service.dart';
 import 'package:screen_memo/features/ai_chat/presentation/widgets/chat_context_sheet.dart';
+import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_image_generation_menu_button.dart';
 
 class EventHomePage extends StatefulWidget {
   const EventHomePage({super.key});
@@ -603,11 +604,17 @@ class _EventHomePageState extends State<EventHomePage> {
       appBar: AppBar(
         centerTitle: true,
         automaticallyImplyLeading: false,
+        leadingWidth: 96,
         leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu),
-            tooltip: AppLocalizations.of(context).actionMenu,
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
+          builder: (ctx) => Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.menu),
+                tooltip: AppLocalizations.of(context).actionMenu,
+                onPressed: () => Scaffold.of(ctx).openDrawer(),
+              ),
+              const AIImageGenerationMenuButton(),
+            ],
           ),
         ),
         title: _buildChatProviderModelAppBarTitle(),

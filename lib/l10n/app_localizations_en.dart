@@ -3888,6 +3888,64 @@ class AppLocalizationsEn extends AppLocalizations {
   String get promptAddonSectionTitle => 'Extra instructions';
 
   @override
+  String get aiGeneratedImageModelTitle => 'Image generation model';
+
+  @override
+  String get aiGeneratedImagesHistoryTitle => 'Generated images history';
+
+  @override
+  String get aiGeneratedImageModelDesc =>
+      'Used only by the AI-only generate_image tool. No direct generation UI is exposed.';
+
+  @override
+  String get aiGeneratedImageModelUnconfiguredHint =>
+      'If this context is not configured, the tool returns an English error and the chat loop continues.';
+
+  @override
+  String get aiGeneratedImageProviderSaved => 'Image generation provider saved';
+
+  @override
+  String get aiGeneratedImageModelSaved => 'Image generation model saved';
+
+  @override
+  String get aiGeneratedImageNotConfigured => 'Not configured';
+
+  @override
+  String get aiGeneratedHistoryLoadFailed => 'Failed to load images';
+
+  @override
+  String get aiGeneratedImageUnavailable => 'Image unavailable';
+
+  @override
+  String get aiGeneratedShareText => 'ScreenMemo generated image';
+
+  @override
+  String get aiGeneratedDeleteTitle => 'Delete image?';
+
+  @override
+  String get aiGeneratedDeleteMessage =>
+      'This removes the local image file and keeps chat messages read-only. Existing chat markers will show Image unavailable.';
+
+  @override
+  String get aiGeneratedImageDeleted => 'Image deleted';
+
+  @override
+  String get aiGeneratedHistoryEmptyTitle => 'No generated images yet';
+
+  @override
+  String get aiGeneratedHistoryEmptyDesc =>
+      'Images created by the AI-only tool will appear here.';
+
+  @override
+  String get aiGeneratedDefaultTitle => 'Generated image';
+
+  @override
+  String get aiGeneratedNoPromptStored => 'No prompt stored';
+
+  @override
+  String get aiGeneratedCopyPrompt => 'Copy prompt';
+
+  @override
   String get modelMetaContextLabel => 'Context';
 
   @override

@@ -3793,6 +3793,63 @@ class AppLocalizationsJa extends AppLocalizations {
   String get promptAddonSectionTitle => '補足説明';
 
   @override
+  String get aiGeneratedImageModelTitle => '画像生成モデル';
+
+  @override
+  String get aiGeneratedImagesHistoryTitle => '生成画像履歴';
+
+  @override
+  String get aiGeneratedImageModelDesc =>
+      'AI 内部の generate_image ツール専用です。直接生成する UI はありません。';
+
+  @override
+  String get aiGeneratedImageModelUnconfiguredHint =>
+      'このコンテキストが未設定の場合、ツールは英語のエラーを返し、チャットループは継続します。';
+
+  @override
+  String get aiGeneratedImageProviderSaved => '画像生成プロバイダーを保存しました';
+
+  @override
+  String get aiGeneratedImageModelSaved => '画像生成モデルを保存しました';
+
+  @override
+  String get aiGeneratedImageNotConfigured => '未設定';
+
+  @override
+  String get aiGeneratedHistoryLoadFailed => '生成画像の読み込みに失敗しました';
+
+  @override
+  String get aiGeneratedImageUnavailable => '画像を利用できません';
+
+  @override
+  String get aiGeneratedShareText => 'ScreenMemo 生成画像';
+
+  @override
+  String get aiGeneratedDeleteTitle => '画像を削除しますか？';
+
+  @override
+  String get aiGeneratedDeleteMessage =>
+      'ローカル画像ファイルを削除し、チャットメッセージは読み取り専用のままにします。既存のチャット marker は画像を利用できない状態で表示されます。';
+
+  @override
+  String get aiGeneratedImageDeleted => '画像を削除しました';
+
+  @override
+  String get aiGeneratedHistoryEmptyTitle => '生成画像はまだありません';
+
+  @override
+  String get aiGeneratedHistoryEmptyDesc => 'AI 内部ツールで作成された画像がここに表示されます。';
+
+  @override
+  String get aiGeneratedDefaultTitle => '生成画像';
+
+  @override
+  String get aiGeneratedNoPromptStored => '保存されたプロンプトはありません';
+
+  @override
+  String get aiGeneratedCopyPrompt => 'プロンプトをコピー';
+
+  @override
   String get modelMetaContextLabel => 'コンテキスト';
 
   @override

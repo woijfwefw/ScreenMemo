@@ -519,6 +519,14 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
                         // Debug logs are out-of-band; do not drive scrolling/persistence.
                         return;
                       } else {
+                        if (t == 'tool_batch_begin' || t == 'tool_call_end') {
+                          unawaited(
+                            FlutterLogger.nativeInfo(
+                              'AI_IMAGE',
+                              'ui.stream_event type=$t idx=$idx payload=${evt.data}',
+                            ),
+                          );
+                        }
                         _setState(() => _handleAiUiEvent(idx, payload));
                       }
                       _scheduleAutoScroll();
@@ -558,7 +566,11 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
                   }
                   final AIMessage target = _messages[targetIdx];
                   if (target.role == 'assistant') {
-                    final String base = _replaceAssistantContentOnNextToken
+                    final bool hasGeneratedImageMarker = target.content
+                        .contains(RegExp(r'\[generated-image(?:-loading)?:'));
+                    final String base =
+                        _replaceAssistantContentOnNextToken &&
+                            !hasGeneratedImageMarker
                         ? ''
                         : target.content;
                     final String incoming = evt.data;
@@ -1192,6 +1204,14 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
                 if (payload == null) return;
                 final String t = (payload['type'] as String?)?.trim() ?? '';
                 if (t == 'gateway_log') return;
+                if (t == 'tool_batch_begin' || t == 'tool_call_end') {
+                  unawaited(
+                    FlutterLogger.nativeInfo(
+                      'AI_IMAGE',
+                      'ui.emit_event type=$t idx=$assistantIdx payload=${evt.data}',
+                    ),
+                  );
+                }
                 setStateIfActive(() => _handleAiUiEvent(assistantIdx, payload));
                 _scheduleAutoScroll();
                 return;

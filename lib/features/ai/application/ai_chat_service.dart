@@ -13,6 +13,7 @@ import 'package:screen_memo/features/ai/application/ai_context_budgets.dart';
 import 'package:screen_memo/features/ai/application/ai_prompt_time_context.dart';
 import 'package:screen_memo/features/ai/application/ai_request_gateway.dart';
 import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
+import 'package:screen_memo/features/ai/application/ai_image_generation_service.dart';
 import 'package:screen_memo/features/ai/application/chat_context_service.dart';
 import 'package:screen_memo/features/ai/application/chat_history_merge.dart';
 import 'package:screen_memo/features/timeline/application/dynamic_entry_perf_service.dart';

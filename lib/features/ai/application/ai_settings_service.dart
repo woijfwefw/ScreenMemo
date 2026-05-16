@@ -647,15 +647,29 @@ class AISettingsService {
 
     final db = ScreenshotDatabase.instance;
     final Map<String, dynamic>? ctx = await db.getAIContext(context);
+    if (context == 'image_generation' && ctx == null) {
+      return <AIEndpoint>[];
+    }
     AIProvider? pSelected;
     final int? ctxProviderId = (ctx != null && ctx['provider_id'] is int)
         ? (ctx['provider_id'] as int)
         : null;
     if (ctxProviderId != null) {
-      pSelected = providers.firstWhere(
-        (p) => (p.id ?? -1) == ctxProviderId,
-        orElse: () => providers.first,
-      );
+      for (final AIProvider provider in providers) {
+        if ((provider.id ?? -1) == ctxProviderId) {
+          pSelected = provider;
+          break;
+        }
+      }
+    }
+    if (context == 'image_generation') {
+      if (ctxProviderId == null || pSelected == null) {
+        return <AIEndpoint>[];
+      }
+      final String imageModel = ((ctx?['model'] as String?) ?? '').trim();
+      if (imageModel.isEmpty) {
+        return <AIEndpoint>[];
+      }
     }
     pSelected ??=
         (await AIProvidersService.instance.getDefaultProvider()) ??
@@ -669,11 +683,12 @@ class AISettingsService {
         : (pSelected.extra['active_model'] as String? ?? pSelected.defaultModel)
               .toString()
               .trim();
-    if (model.isEmpty ||
-        (pSelected.models.isNotEmpty &&
-            !pSelected.models.any(
-              (m) => m.trim().toLowerCase() == model.toLowerCase(),
-            ))) {
+    if (context != 'image_generation' &&
+        (model.isEmpty ||
+            (pSelected.models.isNotEmpty &&
+                !pSelected.models.any(
+                  (m) => m.trim().toLowerCase() == model.toLowerCase(),
+                )))) {
       final String fb =
           (pSelected.extra['active_model'] as String? ?? pSelected.defaultModel)
               .toString()

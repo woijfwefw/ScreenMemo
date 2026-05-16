@@ -617,6 +617,7 @@ extension ScreenshotDatabaseAI on ScreenshotDatabase {
       'CREATE INDEX IF NOT EXISTS idx_ai_prompt_usage_events_conv ON ai_prompt_usage_events(conversation_id, id)',
     );
     await _createAiToolCallDetailsTable(db);
+    await _createAiGeneratedImagesTable(db);
 
     // Context/compaction diagnostics (lightweight rollout log).
     await db.execute('''
@@ -1167,6 +1168,292 @@ ORDER BY day ASC
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_ai_tool_call_details_lookup ON ai_tool_call_details(conversation_id, assistant_created_at, call_id)',
     );
+  }
+
+  Future<void> _createAiGeneratedImagesTable(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS ai_generated_images (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        conversation_id TEXT NOT NULL,
+        assistant_created_at INTEGER,
+        tool_call_id TEXT NOT NULL,
+        prompt TEXT NOT NULL,
+        model TEXT NOT NULL,
+        provider_id INTEGER,
+        file_path TEXT NOT NULL UNIQUE,
+        mime_type TEXT NOT NULL,
+        size TEXT NOT NULL,
+        quality TEXT NOT NULL,
+        output_format TEXT NOT NULL,
+        usage_json TEXT,
+        created_at INTEGER DEFAULT (strftime('%s','now') * 1000),
+        deleted_at INTEGER
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_ai_generated_images_created ON ai_generated_images(deleted_at, created_at DESC, id DESC)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_ai_generated_images_conversation ON ai_generated_images(conversation_id, assistant_created_at, id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_ai_generated_images_tool_call ON ai_generated_images(tool_call_id)',
+    );
+  }
+
+  Future<int> insertAiGeneratedImage({
+    required String conversationId,
+    int? assistantCreatedAt,
+    required String toolCallId,
+    required String prompt,
+    required String model,
+    int? providerId,
+    required String filePath,
+    required String mimeType,
+    required String size,
+    required String quality,
+    required String outputFormat,
+    String? usageJson,
+    int? createdAt,
+  }) async {
+    final String cid = conversationId.trim();
+    final String callId = toolCallId.trim();
+    final String file = filePath.trim();
+    if (cid.isEmpty || callId.isEmpty || file.isEmpty) return 0;
+    try {
+      final db = await database;
+      await _createAiGeneratedImagesTable(db);
+      return await db.insert('ai_generated_images', <String, Object?>{
+        'conversation_id': cid,
+        'assistant_created_at': assistantCreatedAt,
+        'tool_call_id': callId,
+        'prompt': prompt,
+        'model': model,
+        'provider_id': providerId,
+        'file_path': file,
+        'mime_type': mimeType,
+        'size': size,
+        'quality': quality,
+        'output_format': outputFormat,
+        'usage_json': usageJson,
+        'created_at': createdAt ?? DateTime.now().millisecondsSinceEpoch,
+        'deleted_at': null,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> listAiGeneratedImages({
+    int limit = 100,
+    int offset = 0,
+    bool includeDeleted = false,
+  }) async {
+    try {
+      final db = await database;
+      await _createAiGeneratedImagesTable(db);
+      final int safeLimit = limit.clamp(1, 500).toInt();
+      final int safeOffset = offset < 0 ? 0 : offset;
+      final rows = await db.query(
+        'ai_generated_images',
+        where: includeDeleted ? null : 'deleted_at IS NULL',
+        orderBy: 'created_at DESC, id DESC',
+        limit: safeLimit,
+        offset: safeOffset,
+      );
+      return rows.map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (_) {
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<Map<String, int>> getAiGeneratedImagesStorageStats({
+    bool includeDeleted = false,
+  }) async {
+    try {
+      final db = await database;
+      await _createAiGeneratedImagesTable(db);
+      final rows = await db.query(
+        'ai_generated_images',
+        columns: const <String>['file_path'],
+        where: includeDeleted ? null : 'deleted_at IS NULL',
+      );
+      int totalBytes = 0;
+      for (final row in rows) {
+        final String path = (row['file_path'] as String?)?.trim() ?? '';
+        if (path.isEmpty) continue;
+        try {
+          final File file = File(path);
+          if (await file.exists()) {
+            totalBytes += await file.length();
+          }
+        } catch (_) {}
+      }
+      return <String, int>{'count': rows.length, 'bytes': totalBytes};
+    } catch (_) {
+      return const <String, int>{'count': 0, 'bytes': 0};
+    }
+  }
+
+  Future<Map<String, dynamic>?> getAiGeneratedImageById(int id) async {
+    if (id <= 0) return null;
+    try {
+      final db = await database;
+      await _createAiGeneratedImagesTable(db);
+      final rows = await db.query(
+        'ai_generated_images',
+        where: 'id = ?',
+        whereArgs: <Object?>[id],
+        limit: 1,
+      );
+      if (rows.isEmpty) return null;
+      return Map<String, dynamic>.from(rows.first);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getAiGeneratedImageByFilename(
+    String filename, {
+    bool includeDeleted = false,
+  }) async {
+    final String name = filename.trim();
+    if (name.isEmpty || name.contains('/') || name.contains('\\')) return null;
+    try {
+      final db = await database;
+      await _createAiGeneratedImagesTable(db);
+      final String where = includeDeleted
+          ? "file_path LIKE ? ESCAPE '\\'"
+          : "deleted_at IS NULL AND file_path LIKE ? ESCAPE '\\'";
+      final rows = await db.query(
+        'ai_generated_images',
+        where: where,
+        whereArgs: <Object?>['%${_escapeSqlLike(name)}'],
+        orderBy: 'created_at DESC, id DESC',
+        limit: 20,
+      );
+      unawaited(
+        FlutterLogger.nativeInfo(
+          'AI_IMAGE',
+          'db.lookup_filename query=$name rows=${rows.length} includeDeleted=$includeDeleted',
+        ),
+      );
+      for (final row in rows) {
+        final map = Map<String, dynamic>.from(row);
+        final String path = (map['file_path'] as String?)?.trim() ?? '';
+        final String basename = _basenameFromAnyPath(path);
+        unawaited(
+          FlutterLogger.nativeInfo(
+            'AI_IMAGE',
+            'db.lookup_filename.row query=$name basename=$basename path=$path deletedAt=${map['deleted_at']}',
+          ),
+        );
+        if (basename == name) return map;
+      }
+      unawaited(
+        FlutterLogger.nativeWarn(
+          'AI_IMAGE',
+          'db.lookup_filename.not_found query=$name includeDeleted=$includeDeleted',
+        ),
+      );
+      return null;
+    } catch (e) {
+      unawaited(
+        FlutterLogger.nativeError(
+          'AI_IMAGE',
+          'db.lookup_filename.error query=$name err=$e',
+        ),
+      );
+      return null;
+    }
+  }
+
+  Future<Map<String, String>> findAiGeneratedImagePathsByFilenames(
+    Set<String> filenames, {
+    bool includeDeleted = false,
+  }) async {
+    final List<String> names = filenames
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty && !e.contains('/') && !e.contains('\\'))
+        .toSet()
+        .toList();
+    if (names.isEmpty) return <String, String>{};
+    final Map<String, String> out = <String, String>{};
+    for (final String name in names) {
+      final row = await getAiGeneratedImageByFilename(
+        name,
+        includeDeleted: includeDeleted,
+      );
+      final String path = (row?['file_path'] as String?)?.trim() ?? '';
+      final int deletedAt = (row?['deleted_at'] as int?) ?? 0;
+      if (path.isNotEmpty && (includeDeleted || deletedAt <= 0)) {
+        out[name] = path;
+      }
+    }
+    unawaited(
+      FlutterLogger.nativeInfo(
+        'AI_IMAGE',
+        'db.lookup_many names=${names.join("|")} out=${out.entries.map((e) => '${e.key}=>${e.value}').join("|")} includeDeleted=$includeDeleted',
+      ),
+    );
+    return out;
+  }
+
+  Future<List<Map<String, dynamic>>> listAiGeneratedImagesByToolCallId(
+    String toolCallId, {
+    bool includeDeleted = false,
+  }) async {
+    final String callId = toolCallId.trim();
+    if (callId.isEmpty) return <Map<String, dynamic>>[];
+    try {
+      final db = await database;
+      await _createAiGeneratedImagesTable(db);
+      final rows = await db.query(
+        'ai_generated_images',
+        where: includeDeleted
+            ? 'tool_call_id = ?'
+            : 'tool_call_id = ? AND deleted_at IS NULL',
+        whereArgs: <Object?>[callId],
+        orderBy: 'created_at ASC, id ASC',
+      );
+      return rows.map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (_) {
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<int> softDeleteAiGeneratedImage(int id, {int? deletedAt}) async {
+    if (id <= 0) return 0;
+    try {
+      final db = await database;
+      await _createAiGeneratedImagesTable(db);
+      return await db.update(
+        'ai_generated_images',
+        <String, Object?>{
+          'deleted_at': deletedAt ?? DateTime.now().millisecondsSinceEpoch,
+        },
+        where: 'id = ?',
+        whereArgs: <Object?>[id],
+      );
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  String _escapeSqlLike(String value) {
+    return value
+        .replaceAll('\\', r'\\')
+        .replaceAll('%', r'\%')
+        .replaceAll('_', r'\_');
+  }
+
+  String _basenameFromAnyPath(String value) {
+    final String t = value.trim();
+    if (t.isEmpty) return '';
+    final int a = t.lastIndexOf('/');
+    final int b = t.lastIndexOf('\\');
+    final int i = a > b ? a : b;
+    return i >= 0 ? t.substring(i + 1) : t;
   }
 
   Future<void> _ensureAiMessageUsageColumns(DatabaseExecutor db) async {
