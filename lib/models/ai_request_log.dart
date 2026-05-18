@@ -53,6 +53,7 @@ class AIRequestTrace {
   const AIRequestTrace({
     required this.source,
     this.traceId,
+    this.segmentId,
     this.startedAt,
     this.endedAt,
     this.durationMs,
@@ -78,6 +79,7 @@ class AIRequestTrace {
 
   final AIRequestLogSource source;
   final String? traceId;
+  final int? segmentId;
   final DateTime? startedAt;
   final DateTime? endedAt;
   final int? durationMs;

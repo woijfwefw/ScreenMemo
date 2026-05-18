@@ -288,6 +288,7 @@ List<AIRequestTrace> parseSegmentTrace({
     source: AIRequestLogSource.segmentTrace,
     traceId: tid?.toString(),
   );
+  b.segmentId = tid;
 
   b.bumpTime(createdAt);
   final String providerText = (parsedProvider ?? provider ?? '').trim();
@@ -601,6 +602,7 @@ class _TraceBuilder {
   String? providerType;
   String? providerId;
   String? model;
+  int? segmentId;
   int? toolsCount;
   int? imagesCount;
   int? usagePromptTokens;
@@ -697,6 +699,7 @@ class _TraceBuilder {
     return AIRequestTrace(
       source: source,
       traceId: traceId,
+      segmentId: segmentId,
       startedAt: startedAt,
       endedAt: endedAt,
       durationMs: dur,

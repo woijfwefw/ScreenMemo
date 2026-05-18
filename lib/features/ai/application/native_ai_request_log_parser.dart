@@ -211,6 +211,18 @@ List<AIRequestTrace> parseNativeAiRequestLogText(
       continue;
     }
 
+    if (_isNativeRequestErrorLine(message)) {
+      final _NativeTraceBuilder? builder =
+          legacyCurrent ?? pickBuilder(at: entry.time, createIfMissing: false);
+      if (builder != null) {
+        builder.addRaw(entry.raw);
+        builder.bumpTime(entry.time);
+        builder.respStatusCode ??= _parseLegacyFailureStatusCode(message);
+        builder.appendError(message);
+      }
+      continue;
+    }
+
     if (message.startsWith('AI 请求')) {
       final _NativeTraceBuilder? builder =
           legacyCurrent ?? pickBuilder(at: entry.time, createIfMissing: true);
@@ -282,18 +294,6 @@ List<AIRequestTrace> parseNativeAiRequestLogText(
       if (builder != null) {
         builder.addRaw(entry.raw);
         builder.responsePreview ??= _afterFirstColon(message);
-      }
-      continue;
-    }
-
-    if (_isNativeRequestErrorLine(message)) {
-      final _NativeTraceBuilder? builder =
-          legacyCurrent ?? pickBuilder(at: entry.time, createIfMissing: false);
-      if (builder != null) {
-        builder.addRaw(entry.raw);
-        builder.bumpTime(entry.time);
-        builder.respStatusCode ??= _parseLegacyFailureStatusCode(message);
-        builder.appendError(message);
       }
       continue;
     }
@@ -421,6 +421,7 @@ class _NativeTraceBuilder {
     return AIRequestTrace(
       source: AIRequestLogSource.nativeLog,
       traceId: traceId,
+      segmentId: segmentId,
       startedAt: startedAt,
       endedAt: endedAt,
       durationMs: durationMs,

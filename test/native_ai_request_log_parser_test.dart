@@ -25,6 +25,8 @@ void main() {
     expect(traces, hasLength(1));
     final AIRequestTrace trace = traces.single;
     expect(trace.source, AIRequestLogSource.nativeLog);
+    expect(trace.traceId, 'seg101');
+    expect(trace.segmentId, 101);
     expect(trace.logContext, 'segment=101');
     expect(trace.providerName, 'google');
     expect(trace.model, 'gemini-2.0');
@@ -50,6 +52,7 @@ void main() {
 
       expect(traces, hasLength(1));
       final AIRequestTrace trace = traces.single;
+      expect(trace.segmentId, 202);
       expect(trace.logContext, 'segment=202');
       expect(trace.providerName, 'openai-compat');
       expect(trace.response?.statusCode, 500);

@@ -15,6 +15,7 @@ import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_request_log
 import 'package:screen_memo/features/gallery/presentation/widgets/screenshot_image_widget.dart';
 import 'package:screen_memo/core/widgets/screenshot_style_tab_bar.dart';
 import 'package:screen_memo/core/widgets/ui_components.dart';
+import 'package:screen_memo/core/widgets/ui_select_field.dart';
 
 class AIRequestLogsViewer extends StatefulWidget {
   const AIRequestLogsViewer._({
@@ -285,6 +286,8 @@ class _AIRequestLogsViewerState extends State<AIRequestLogsViewer>
     final int startedAt = tr.startedAt?.millisecondsSinceEpoch ?? 0;
     final int endedAt = tr.endedAt?.millisecondsSinceEpoch ?? 0;
     final String traceId = (tr.traceId ?? '').trim();
+    final int? sid = tr.segmentId;
+    final String segmentId = sid != null && sid > 0 ? sid.toString() : '';
     final String context = (tr.logContext ?? '').trim();
     final String model = (tr.model ?? '').trim();
     final String uri = (tr.request?.uri?.toString() ?? '').trim();
@@ -292,6 +295,7 @@ class _AIRequestLogsViewerState extends State<AIRequestLogsViewer>
     final int rawHash = Object.hashAll(tr.rawBlocks);
     return [
       traceId,
+      segmentId,
       context,
       model,
       uri,
@@ -397,6 +401,21 @@ class _AIRequestLogsViewerState extends State<AIRequestLogsViewer>
         UINotifier.error(context, l10n.copyFailed);
       }
     }
+  }
+
+  String _traceSegmentIdText(AIRequestTrace tr, _RequestViewData req) {
+    final String fromMeta = (req.requestMeta['segment_id'] ?? '').trim();
+    if (fromMeta.isNotEmpty) return fromMeta;
+    final int? segmentId = tr.segmentId;
+    if (segmentId != null && segmentId > 0) return segmentId.toString();
+    final String ctx = (tr.logContext ?? '').trim();
+    final RegExpMatch? m = RegExp(r'\bsegment=(\d+)\b').firstMatch(ctx);
+    final String? fromContext = m?.group(1)?.trim();
+    if (fromContext != null && fromContext.isNotEmpty) return fromContext;
+    if (tr.source == AIRequestLogSource.segmentTrace) {
+      return (tr.traceId ?? '').trim();
+    }
+    return '';
   }
 
   String _fmtBytes(int? bytes) {
@@ -1122,32 +1141,20 @@ class _AIRequestLogsViewerState extends State<AIRequestLogsViewer>
           ),
           const SizedBox(width: AppTheme.spacing3),
           Expanded(
-            child: DropdownButtonFormField<int>(
-              initialValue: _selectedTraceIndex,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                isDense: true,
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
+            child: UISelectField<int>(
+              value: _selectedTraceIndex,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppTheme.spacing3,
+                vertical: AppTheme.spacing2,
               ),
-              items: List<DropdownMenuItem<int>>.generate(
-                widget.traces.length,
-                (int i) {
-                  final AIRequestTrace tr = widget.traces[i];
-                  final String label = '#${i + 1} ${_buildTraceTitle(tr)}';
-                  return DropdownMenuItem<int>(
-                    value: i,
-                    child: Text(
-                      label,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                  );
-                },
-              ),
+              menuMaxHeight: 360,
+              items: List<UISelectItem<int>>.generate(widget.traces.length, (
+                int i,
+              ) {
+                final AIRequestTrace tr = widget.traces[i];
+                final String label = '#${i + 1} ${_buildTraceTitle(tr)}';
+                return UISelectItem<int>(value: i, label: label);
+              }),
               onChanged: (int? value) {
                 if (value == null) return;
                 setState(() {
@@ -1738,8 +1745,7 @@ class _AIRequestLogsViewerState extends State<AIRequestLogsViewer>
     final ThemeData theme = Theme.of(context);
     final ColorScheme cs = theme.colorScheme;
 
-    final String segmentId = (req.requestMeta['segment_id'] ?? tr.traceId ?? '')
-        .trim();
+    final String segmentId = _traceSegmentIdText(tr, req);
     final String model = (tr.model ?? req.requestMeta['model'] ?? '').trim();
     final String provider =
         (tr.providerName ?? req.requestMeta['provider'] ?? '').trim();

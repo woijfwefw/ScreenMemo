@@ -246,6 +246,7 @@ void main() {
     final AIRequestTrace tr = traces.single;
     expect(tr.source, AIRequestLogSource.segmentTrace);
     expect(tr.traceId, '42');
+    expect(tr.segmentId, 42);
     expect(tr.providerName, 'google');
     expect(tr.model, 'gemini-1.5-pro');
     expect(tr.imagesCount, 2);
