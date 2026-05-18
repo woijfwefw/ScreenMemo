@@ -73,32 +73,6 @@ class _ProviderListPageState extends State<ProviderListPage> with RouteAware {
     }
   }
 
-  String _formatBalanceTotal(double value) {
-    final rounded = value.toStringAsFixed(value.abs() >= 100 ? 2 : 4);
-    return rounded
-        .replaceFirst(RegExp(r'0+$'), '')
-        .replaceFirst(RegExp(r'\.$'), '');
-  }
-
-  String? _providerBalanceSummary(AIProvider provider) {
-    final summary = provider.keySummary;
-    if (!provider.hasBalanceQuery || summary.totalCount == 0) return null;
-    if (!summary.hasKnownBalance) return '总余额 —';
-    if (summary.numericBalanceCount == 0) {
-      if (summary.totalCount == 1) {
-        return '余额 ${summary.balanceDisplay ?? '已获取'}';
-      }
-      return '余额已获取 ${summary.knownBalanceCount}/${summary.totalCount}';
-    }
-    final currency = summary.balanceCurrency == null
-        ? ''
-        : ' ${summary.balanceCurrency}';
-    final partial = summary.numericBalanceCount < summary.totalCount
-        ? '（${summary.numericBalanceCount}/${summary.totalCount}）'
-        : '';
-    return '总余额 ${_formatBalanceTotal(summary.balanceTotal ?? 0)}$currency$partial';
-  }
-
   Widget _buildProviderKeySummary(AIProvider p) {
     final theme = Theme.of(context);
     final summary = p.keySummary;
@@ -149,8 +123,6 @@ class _ProviderListPageState extends State<ProviderListPage> with RouteAware {
         ? '暂无调用记录'
         : '成功率 ${(successRate * 100).toStringAsFixed(2)}%';
     final availableText = '可用 $availableCount / 总计 $totalCount';
-    final balanceSummary = _providerBalanceSummary(p);
-
     return Container(
       margin: const EdgeInsets.only(top: AppTheme.spacing2),
       padding: const EdgeInsets.all(AppTheme.spacing3),
@@ -223,26 +195,6 @@ class _ProviderListPageState extends State<ProviderListPage> with RouteAware {
               ),
             ],
           ),
-          if (balanceSummary != null) ...[
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Icon(
-                  Icons.account_balance_wallet_outlined,
-                  size: 15,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  balanceSummary,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );

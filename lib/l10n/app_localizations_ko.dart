@@ -2823,9 +2823,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get providerEditApiKey => 'API Key 편집';
 
   @override
-  String get providerFetchModelsAndBalance => '모델과 잔액 가져오기';
-
-  @override
   String get actionSaving => '저장 중';
 
   @override
@@ -2848,12 +2845,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get providerNoApiKeys => 'API Key가 없습니다.';
-
-  @override
-  String get balanceEndpointNone => '조회 안 함';
-
-  @override
-  String get balanceEndpointSub2api => 'sub2api（/v1/usage）';
 
   @override
   String get segmentEntryLogHint => '길게 눌러 텍스트를 선택하거나 복사 버튼을 눌러 한 번에 복사하세요.';
@@ -3586,9 +3577,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get providerKeyProgressFetchModels => '모델 가져오기';
 
   @override
-  String get providerKeyProgressFetchBalance => '잔액 가져오기';
-
-  @override
   String get providerKeyProgressScanKeys => 'Key 스캔';
 
   @override
@@ -3599,9 +3587,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get providerKeyProgressSaveKey => 'Key 저장';
-
-  @override
-  String get providerKeyProgressSaveBalance => '잔액 저장';
 
   @override
   String get providerKeyProgressSaveFailed => '저장 실패';
@@ -3617,27 +3602,9 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String providerKeyProgressFetchingBalance(Object label) {
-    return '$label의 잔액을 가져오는 중...';
-  }
-
-  @override
   String providerKeyProgressModelFetchFailed(Object label, Object error) {
     return '$label 모델 가져오기 실패: $error';
   }
-
-  @override
-  String providerKeyProgressBalanceFetchFailed(Object label, Object error) {
-    return '$label 잔액 가져오기 실패: $error';
-  }
-
-  @override
-  String providerKeyProgressBalanceDisplay(Object display) {
-    return ', 잔액: $display';
-  }
-
-  @override
-  String get providerKeyProgressBalanceFailedShort => ', 잔액 가져오기 실패';
 
   @override
   String providerKeyProgressModelsCount(Object count) {
@@ -3652,11 +3619,9 @@ class AppLocalizationsKo extends AppLocalizations {
     Object modelSuccess,
     Object total,
     Object fetchedCount,
-    Object balanceSuccess,
-    Object balanceTotal,
     Object failedCount,
   ) {
-    return '모델 가져오기 완료: $modelSuccess/$total개 Key 성공, 모델 $fetchedCount개 병합, 잔액 $balanceSuccess/$balanceTotal, 실패 항목 $failedCount';
+    return '모델 가져오기 완료: $modelSuccess/$total개 Key 성공, 모델 $fetchedCount개 병합, 실패 항목 $failedCount';
   }
 
   @override
@@ -3667,10 +3632,8 @@ class AppLocalizationsKo extends AppLocalizations {
   String providerKeyProgressFetchCompleteMessage(
     Object modelSuccess,
     Object total,
-    Object balanceSuccess,
-    Object balanceTotal,
   ) {
-    return '모델 $modelSuccess/$total, 잔액 $balanceSuccess/$balanceTotal';
+    return '모델 $modelSuccess/$total';
   }
 
   @override
@@ -3682,27 +3645,12 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String providerKeyProgressSavingBalance(Object label) {
-    return '$label의 잔액 저장 중...';
+  String providerKeySaveSuccessNew(Object saved, Object skipped) {
+    return 'API Key $saved개를 가져왔습니다. 중복 $skipped개 건너뜀';
   }
 
   @override
-  String providerKeySaveSuccessNew(
-    Object saved,
-    Object balanceUpdated,
-    Object balanceTotal,
-    Object skipped,
-  ) {
-    return 'API Key $saved개를 가져왔습니다. 잔액 $balanceUpdated/$balanceTotal, 중복 $skipped개 건너뜀';
-  }
-
-  @override
-  String providerKeySaveSuccessEdit(
-    Object balanceUpdated,
-    Object balanceTotal,
-  ) {
-    return 'API Key를 저장했습니다. 잔액 $balanceUpdated/$balanceTotal';
-  }
+  String get providerKeySaveSuccessEdit => 'API Key를 저장했습니다';
 
   @override
   String providerKeySaveFailedToast(Object error) {
@@ -3767,32 +3715,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String promptAddonTooLongError(Object max) {
     return '추가 설명은 $max자를 초과할 수 없습니다.';
   }
-
-  @override
-  String providerKeyFetchCompleteToastNoBalance(
-    Object modelSuccess,
-    Object total,
-    Object fetchedCount,
-    Object failedCount,
-  ) {
-    return '모델 가져오기 완료: $modelSuccess/$total개 Key 성공, 모델 $fetchedCount개 병합, 실패 항목 $failedCount';
-  }
-
-  @override
-  String providerKeyProgressFetchCompleteMessageNoBalance(
-    Object modelSuccess,
-    Object total,
-  ) {
-    return '모델 $modelSuccess/$total';
-  }
-
-  @override
-  String providerKeySaveSuccessNewNoBalance(Object saved, Object skipped) {
-    return 'API Key $saved개를 가져왔습니다. 중복 $skipped개 건너뜀';
-  }
-
-  @override
-  String get providerKeySaveSuccessEditNoBalance => 'API Key를 저장했습니다';
 
   @override
   String settingCurrentValue(Object value) {

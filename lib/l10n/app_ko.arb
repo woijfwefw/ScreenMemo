@@ -1491,7 +1491,6 @@
   "providerOnlyOneApiKeyCanEdit": "한 번에 하나의 API Key만 편집할 수 있습니다",
   "providerAddApiKey": "API Key 추가",
   "providerEditApiKey": "API Key 편집",
-  "providerFetchModelsAndBalance": "모델과 잔액 가져오기",
   "actionSaving": "저장 중",
   "providerFetchModelsFailedManual": "모델을 가져오지 못했습니다. 수동으로 추가할 수 있습니다.",
   "providerDeletedApiKeys": "API Key {count}개를 삭제했습니다",
@@ -1504,8 +1503,6 @@
   "providerBatchTestButton": "일괄 테스트",
   "providerDeleteAllKeys": "모두 삭제",
   "providerNoApiKeys": "API Key가 없습니다.",
-  "balanceEndpointNone": "조회 안 함",
-  "balanceEndpointSub2api": "sub2api（/v1/usage）",
   "segmentEntryLogHint": "길게 눌러 텍스트를 선택하거나 복사 버튼을 눌러 한 번에 복사하세요.",
   "segmentEntryLogCopied": "동적 진입 로그를 복사했습니다",
   "copyLogAction": "로그 복사",
@@ -1937,12 +1934,10 @@
   "providerKeyPriorityLabel": "우선순위(100 = 동적 할당)",
   "providerKeyModelsLabel": "지원 모델(한 줄에 하나)",
   "providerKeyProgressFetchModels": "모델 가져오기",
-  "providerKeyProgressFetchBalance": "잔액 가져오기",
   "providerKeyProgressScanKeys": "Key 스캔",
   "providerKeyProgressFetchComplete": "가져오기 완료",
   "providerKeyProgressSaveKeys": "Key 저장",
   "providerKeyProgressSaveKey": "Key 저장",
-  "providerKeyProgressSaveBalance": "잔액 저장",
   "providerKeyProgressSaveFailed": "저장 실패",
   "providerKeyProgressPreparingScan": "API Key {count}개 스캔 준비 중...",
   "@providerKeyProgressPreparingScan": {
@@ -1956,12 +1951,6 @@
       "label": {}
     }
   },
-  "providerKeyProgressFetchingBalance": "{label}의 잔액을 가져오는 중...",
-  "@providerKeyProgressFetchingBalance": {
-    "placeholders": {
-      "label": {}
-    }
-  },
   "providerKeyProgressModelFetchFailed": "{label} 모델 가져오기 실패: {error}",
   "@providerKeyProgressModelFetchFailed": {
     "placeholders": {
@@ -1969,20 +1958,6 @@
       "error": {}
     }
   },
-  "providerKeyProgressBalanceFetchFailed": "{label} 잔액 가져오기 실패: {error}",
-  "@providerKeyProgressBalanceFetchFailed": {
-    "placeholders": {
-      "label": {},
-      "error": {}
-    }
-  },
-  "providerKeyProgressBalanceDisplay": ", 잔액: {display}",
-  "@providerKeyProgressBalanceDisplay": {
-    "placeholders": {
-      "display": {}
-    }
-  },
-  "providerKeyProgressBalanceFailedShort": ", 잔액 가져오기 실패",
   "providerKeyProgressModelsCount": "모델 {count}개",
   "@providerKeyProgressModelsCount": {
     "placeholders": {
@@ -1990,25 +1965,21 @@
     }
   },
   "providerKeyProgressModelFailedSkipped": "모델 가져오기 실패로 건너뜀",
-  "providerKeyFetchCompleteToast": "모델 가져오기 완료: {modelSuccess}/{total}개 Key 성공, 모델 {fetchedCount}개 병합, 잔액 {balanceSuccess}/{balanceTotal}, 실패 항목 {failedCount}",
+  "providerKeyFetchCompleteToast": "모델 가져오기 완료: {modelSuccess}/{total}개 Key 성공, 모델 {fetchedCount}개 병합, 실패 항목 {failedCount}",
   "@providerKeyFetchCompleteToast": {
     "placeholders": {
       "modelSuccess": {},
       "total": {},
       "fetchedCount": {},
-      "balanceSuccess": {},
-      "balanceTotal": {},
       "failedCount": {}
     }
   },
   "providerKeyNoModelsFetchedToast": "모델을 반환한 Key가 없습니다. 현재 수동 모델 목록은 변경되지 않습니다.",
-  "providerKeyProgressFetchCompleteMessage": "모델 {modelSuccess}/{total}, 잔액 {balanceSuccess}/{balanceTotal}",
+  "providerKeyProgressFetchCompleteMessage": "모델 {modelSuccess}/{total}",
   "@providerKeyProgressFetchCompleteMessage": {
     "placeholders": {
       "modelSuccess": {},
-      "total": {},
-      "balanceSuccess": {},
-      "balanceTotal": {}
+      "total": {}
     }
   },
   "providerKeyProgressPreparingSave": "저장 준비 중...",
@@ -2018,28 +1989,14 @@
       "label": {}
     }
   },
-  "providerKeyProgressSavingBalance": "{label}의 잔액 저장 중...",
-  "@providerKeyProgressSavingBalance": {
-    "placeholders": {
-      "label": {}
-    }
-  },
-  "providerKeySaveSuccessNew": "API Key {saved}개를 가져왔습니다. 잔액 {balanceUpdated}/{balanceTotal}, 중복 {skipped}개 건너뜀",
+  "providerKeySaveSuccessNew": "API Key {saved}개를 가져왔습니다. 중복 {skipped}개 건너뜀",
   "@providerKeySaveSuccessNew": {
     "placeholders": {
       "saved": {},
-      "balanceUpdated": {},
-      "balanceTotal": {},
       "skipped": {}
     }
   },
-  "providerKeySaveSuccessEdit": "API Key를 저장했습니다. 잔액 {balanceUpdated}/{balanceTotal}",
-  "@providerKeySaveSuccessEdit": {
-    "placeholders": {
-      "balanceUpdated": {},
-      "balanceTotal": {}
-    }
-  },
+  "providerKeySaveSuccessEdit": "API Key를 저장했습니다",
   "providerKeySaveFailedToast": "API Key 저장 실패: {error}",
   "@providerKeySaveFailedToast": {
     "placeholders": {
@@ -2077,30 +2034,6 @@
       "max": {}
     }
   },
-  "providerKeyFetchCompleteToastNoBalance": "모델 가져오기 완료: {modelSuccess}/{total}개 Key 성공, 모델 {fetchedCount}개 병합, 실패 항목 {failedCount}",
-  "@providerKeyFetchCompleteToastNoBalance": {
-    "placeholders": {
-      "modelSuccess": {},
-      "total": {},
-      "fetchedCount": {},
-      "failedCount": {}
-    }
-  },
-  "providerKeyProgressFetchCompleteMessageNoBalance": "모델 {modelSuccess}/{total}",
-  "@providerKeyProgressFetchCompleteMessageNoBalance": {
-    "placeholders": {
-      "modelSuccess": {},
-      "total": {}
-    }
-  },
-  "providerKeySaveSuccessNewNoBalance": "API Key {saved}개를 가져왔습니다. 중복 {skipped}개 건너뜀",
-  "@providerKeySaveSuccessNewNoBalance": {
-    "placeholders": {
-      "saved": {},
-      "skipped": {}
-    }
-  },
-  "providerKeySaveSuccessEditNoBalance": "API Key를 저장했습니다",
   "settingCurrentValue": "현재: {value}",
   "@settingCurrentValue": {
     "placeholders": {

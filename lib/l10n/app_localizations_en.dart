@@ -2907,9 +2907,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerEditApiKey => 'Edit API Key';
 
   @override
-  String get providerFetchModelsAndBalance => 'Fetch models and balance';
-
-  @override
   String get actionSaving => 'Saving';
 
   @override
@@ -2932,12 +2929,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get providerNoApiKeys => 'No API Keys.';
-
-  @override
-  String get balanceEndpointNone => 'Do not query';
-
-  @override
-  String get balanceEndpointSub2api => 'sub2api (/v1/usage)';
 
   @override
   String get segmentEntryLogHint =>
@@ -3679,9 +3670,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerKeyProgressFetchModels => 'Fetch models';
 
   @override
-  String get providerKeyProgressFetchBalance => 'Fetch balance';
-
-  @override
   String get providerKeyProgressScanKeys => 'Scan keys';
 
   @override
@@ -3692,9 +3680,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get providerKeyProgressSaveKey => 'Save key';
-
-  @override
-  String get providerKeyProgressSaveBalance => 'Save balance';
 
   @override
   String get providerKeyProgressSaveFailed => 'Save failed';
@@ -3710,27 +3695,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String providerKeyProgressFetchingBalance(Object label) {
-    return 'Fetching balance for $label...';
-  }
-
-  @override
   String providerKeyProgressModelFetchFailed(Object label, Object error) {
     return '$label model fetch failed: $error';
   }
-
-  @override
-  String providerKeyProgressBalanceFetchFailed(Object label, Object error) {
-    return '$label balance fetch failed: $error';
-  }
-
-  @override
-  String providerKeyProgressBalanceDisplay(Object display) {
-    return ', balance: $display';
-  }
-
-  @override
-  String get providerKeyProgressBalanceFailedShort => ', balance failed';
 
   @override
   String providerKeyProgressModelsCount(Object count) {
@@ -3746,11 +3713,9 @@ class AppLocalizationsEn extends AppLocalizations {
     Object modelSuccess,
     Object total,
     Object fetchedCount,
-    Object balanceSuccess,
-    Object balanceTotal,
     Object failedCount,
   ) {
-    return 'Model fetch complete: $modelSuccess/$total keys succeeded, $fetchedCount models merged, balance $balanceSuccess/$balanceTotal, failed items $failedCount';
+    return 'Model fetch complete: $modelSuccess/$total keys succeeded, $fetchedCount models merged, failed items $failedCount';
   }
 
   @override
@@ -3761,10 +3726,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String providerKeyProgressFetchCompleteMessage(
     Object modelSuccess,
     Object total,
-    Object balanceSuccess,
-    Object balanceTotal,
   ) {
-    return 'Models $modelSuccess/$total, balances $balanceSuccess/$balanceTotal';
+    return 'Models $modelSuccess/$total';
   }
 
   @override
@@ -3776,27 +3739,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String providerKeyProgressSavingBalance(Object label) {
-    return 'Saving balance for $label...';
+  String providerKeySaveSuccessNew(Object saved, Object skipped) {
+    return 'Imported $saved API keys, skipped $skipped duplicate keys';
   }
 
   @override
-  String providerKeySaveSuccessNew(
-    Object saved,
-    Object balanceUpdated,
-    Object balanceTotal,
-    Object skipped,
-  ) {
-    return 'Imported $saved API keys, balance $balanceUpdated/$balanceTotal, skipped $skipped duplicate keys';
-  }
-
-  @override
-  String providerKeySaveSuccessEdit(
-    Object balanceUpdated,
-    Object balanceTotal,
-  ) {
-    return 'API Key saved, balance $balanceUpdated/$balanceTotal';
-  }
+  String get providerKeySaveSuccessEdit => 'API Key saved';
 
   @override
   String providerKeySaveFailedToast(Object error) {
@@ -3861,32 +3809,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String promptAddonTooLongError(Object max) {
     return 'Extra instructions cannot exceed $max characters.';
   }
-
-  @override
-  String providerKeyFetchCompleteToastNoBalance(
-    Object modelSuccess,
-    Object total,
-    Object fetchedCount,
-    Object failedCount,
-  ) {
-    return 'Model fetch complete: $modelSuccess/$total keys succeeded, $fetchedCount models merged, failed items $failedCount';
-  }
-
-  @override
-  String providerKeyProgressFetchCompleteMessageNoBalance(
-    Object modelSuccess,
-    Object total,
-  ) {
-    return 'Models $modelSuccess/$total';
-  }
-
-  @override
-  String providerKeySaveSuccessNewNoBalance(Object saved, Object skipped) {
-    return 'Imported $saved API keys, skipped $skipped duplicate keys';
-  }
-
-  @override
-  String get providerKeySaveSuccessEditNoBalance => 'API Key saved';
 
   @override
   String settingCurrentValue(Object value) {

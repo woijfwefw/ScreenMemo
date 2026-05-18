@@ -59,32 +59,6 @@ class AIProviderTypes {
   ];
 }
 
-/// 余额查询接口类型。
-class AIBalanceEndpointTypes {
-  /// 不查询余额。
-  static const String none = 'none';
-
-  /// sub2api：GET /v1/usage，Bearer 鉴权，
-  /// 顶层 remaining 字段（USD），unrestricted 模式还包含 balance。
-  static const String sub2api = 'sub2api';
-
-  // 历史配置值。new-api 的普通模型 Key 无法稳定代表用户实际余额，
-  // 因此旧配置统一降级为 none，不再发起余额查询。
-  static const String _legacyNewApi = 'new_api';
-
-  static const List<String> all = <String>[none, sub2api];
-
-  /// 规范化字符串：把空 / null / 未识别值和历史 new-api 值都归一为 [none]。
-  static String normalize(String? value) {
-    final v = (value ?? '').trim().toLowerCase();
-    if (v == _legacyNewApi) return none;
-    if (v == sub2api) return sub2api;
-    return none;
-  }
-
-  static bool isQueryable(String? value) => normalize(value) != none;
-}
-
 /// 提供商实体（来自 ai_providers 表 + 衍生字段）
 
 class AIProviderKey {
@@ -107,18 +81,6 @@ class AIProviderKey {
   final int? lastFailedAt;
   final int? lastSuccessAt;
 
-  /// 余额展示文本（如 "$5.23 USD"），来自 ai_provider_keys.balance_display。
-  final String? balanceDisplay;
-
-  /// 余额数值（保留原始单位，通常 USD），来自 balance_total。
-  final double? balanceTotal;
-
-  /// 货币代码（USD/CNY 等），来自 balance_currency。
-  final String? balanceCurrency;
-
-  /// 余额最后更新时间（毫秒时间戳）。
-  final int? balanceUpdatedAt;
-
   const AIProviderKey({
     required this.id,
     required this.providerId,
@@ -136,10 +98,6 @@ class AIProviderKey {
     required this.lastErrorMessage,
     required this.lastFailedAt,
     required this.lastSuccessAt,
-    this.balanceDisplay,
-    this.balanceTotal,
-    this.balanceCurrency,
-    this.balanceUpdatedAt,
   });
 
   factory AIProviderKey.fromDbRow(Map<String, dynamic> row) {
@@ -151,16 +109,6 @@ class AIProviderKey {
     } catch (_) {
       parsedModels = <String>[];
     }
-    final Object? totalRaw = row['balance_total'];
-    double? balanceTotal;
-    if (totalRaw is num) {
-      balanceTotal = totalRaw.toDouble();
-    } else if (totalRaw is String) {
-      balanceTotal = double.tryParse(totalRaw);
-    }
-    final String? balanceDisplay = (row['balance_display'] as String?)?.trim();
-    final String? balanceCurrency = (row['balance_currency'] as String?)
-        ?.trim();
     return AIProviderKey(
       id: row['id'] as int?,
       providerId: (row['provider_id'] as int?) ?? 0,
@@ -178,14 +126,6 @@ class AIProviderKey {
       lastErrorMessage: row['last_error_message'] as String?,
       lastFailedAt: row['last_failed_at'] as int?,
       lastSuccessAt: row['last_success_at'] as int?,
-      balanceDisplay: (balanceDisplay == null || balanceDisplay.isEmpty)
-          ? null
-          : balanceDisplay,
-      balanceTotal: balanceTotal,
-      balanceCurrency: (balanceCurrency == null || balanceCurrency.isEmpty)
-          ? null
-          : balanceCurrency,
-      balanceUpdatedAt: row['balance_updated_at'] as int?,
     );
   }
 
@@ -211,22 +151,6 @@ class AIProviderKey {
     if (k.length <= 4) return k;
     return '?${k.substring(k.length - 4)}';
   }
-
-  /// 是否已查询到余额（display 或 total 任一非空即可视为有数据）。
-  bool get hasBalance =>
-      (balanceDisplay != null && balanceDisplay!.isNotEmpty) ||
-      balanceTotal != null;
-
-  /// 兼容旧调用命名：是否已有可展示的余额数据。
-  bool get hasBalanceData => hasBalance;
-
-  /// 余额是否为 0（仅在 [balanceTotal] 已知时判断）。
-  bool get isBalanceZero {
-    final t = balanceTotal;
-    if (t == null) return false;
-    // 允许 1e-6 的浮点误差
-    return t <= 0.000001;
-  }
 }
 
 class AIProviderKeySummary {
@@ -237,11 +161,6 @@ class AIProviderKeySummary {
   final int errorCount;
   final int successTotal;
   final int failureTotal;
-  final int knownBalanceCount;
-  final int numericBalanceCount;
-  final double? balanceTotal;
-  final String? balanceDisplay;
-  final String? balanceCurrency;
   final int? latestSuccessAt;
   final int? latestFailedAt;
   final int? updatedAt;
@@ -254,11 +173,6 @@ class AIProviderKeySummary {
     this.errorCount = 0,
     this.successTotal = 0,
     this.failureTotal = 0,
-    this.knownBalanceCount = 0,
-    this.numericBalanceCount = 0,
-    this.balanceTotal,
-    this.balanceDisplay,
-    this.balanceCurrency,
     this.latestSuccessAt,
     this.latestFailedAt,
     this.updatedAt,
@@ -310,11 +224,6 @@ class AIProviderKeySummary {
         errorCount: readInt('errorCount'),
         successTotal: readInt('successTotal'),
         failureTotal: readInt('failureTotal'),
-        knownBalanceCount: readInt('knownBalanceCount'),
-        numericBalanceCount: readInt('numericBalanceCount'),
-        balanceTotal: readNullableDouble('balanceTotal'),
-        balanceDisplay: readNullableString('balanceDisplay'),
-        balanceCurrency: readNullableString('balanceCurrency'),
         latestSuccessAt: readNullableInt('latestSuccessAt'),
         latestFailedAt: readNullableInt('latestFailedAt'),
         updatedAt: readNullableInt('updatedAt'),
@@ -323,8 +232,6 @@ class AIProviderKeySummary {
       return const AIProviderKeySummary();
     }
   }
-
-  bool get hasKnownBalance => knownBalanceCount > 0;
 }
 
 class AIProvider {
@@ -340,14 +247,6 @@ class AIProvider {
   final List<String> models; // 缓存模型列表（来自 models_json）
   final Map<String, dynamic> extra; // 额外配置（如 azure apiVersion、默认模型等）
   final int? orderIndex;
-
-  /// 余额查询接口类型（[AIBalanceEndpointTypes] 之一）。
-  ///
-  /// 仅当不为 [AIBalanceEndpointTypes.none] 时，才会发起余额查询。
-  final String balanceEndpointType;
-
-  /// 是否在余额为 0 时自动删除该 key。
-  final bool balanceAutoDeleteZeroKey;
 
   /// 列表页展示用 Key 状态摘要，缓存于 ai_providers.key_summary_json。
   final AIProviderKeySummary keySummary;
@@ -365,8 +264,6 @@ class AIProvider {
     required this.models,
     required this.extra,
     required this.orderIndex,
-    this.balanceEndpointType = AIBalanceEndpointTypes.none,
-    this.balanceAutoDeleteZeroKey = false,
     this.keySummary = const AIProviderKeySummary(),
   });
 
@@ -408,11 +305,6 @@ class AIProvider {
       models: parsedModels,
       extra: parsedExtra,
       orderIndex: row['order_index'] as int?,
-      balanceEndpointType: AIBalanceEndpointTypes.normalize(
-        row['balance_endpoint_type'] as String?,
-      ),
-      balanceAutoDeleteZeroKey:
-          ((row['balance_auto_delete_zero_key'] as int?) ?? 0) == 1,
       keySummary: AIProviderKeySummary.fromJsonString(
         row['key_summary_json'] as String?,
       ),
@@ -420,10 +312,6 @@ class AIProvider {
   }
 
   String get defaultModel => (extra['default_model'] as String?) ?? '';
-
-  /// 是否启用余额查询（即 [balanceEndpointType] 不是 [AIBalanceEndpointTypes.none]）。
-  bool get hasBalanceQuery =>
-      AIBalanceEndpointTypes.isQueryable(balanceEndpointType);
 
   AIProvider copyWith({
     int? id,
@@ -438,8 +326,6 @@ class AIProvider {
     Map<String, dynamic>? extra,
     String? modelsPath,
     int? orderIndex,
-    String? balanceEndpointType,
-    bool? balanceAutoDeleteZeroKey,
     AIProviderKeySummary? keySummary,
   }) {
     return AIProvider(
@@ -455,9 +341,6 @@ class AIProvider {
       models: models ?? this.models,
       extra: extra ?? this.extra,
       orderIndex: orderIndex ?? this.orderIndex,
-      balanceEndpointType: balanceEndpointType ?? this.balanceEndpointType,
-      balanceAutoDeleteZeroKey:
-          balanceAutoDeleteZeroKey ?? this.balanceAutoDeleteZeroKey,
       keySummary: keySummary ?? this.keySummary,
     );
   }
@@ -470,11 +353,6 @@ class AIProvider {
       'base_url': baseUrl,
       'chat_path': chatPath,
       'models_path': normalizedModelsPath,
-      'balance_endpoint_type':
-          balanceEndpointType == AIBalanceEndpointTypes.none
-          ? null
-          : balanceEndpointType,
-      'balance_auto_delete_zero_key': balanceAutoDeleteZeroKey ? 1 : 0,
       'use_response_api': useResponseApi ? 1 : 0,
       'enabled': enabled ? 1 : 0,
       'is_default': isDefault ? 1 : 0,
@@ -482,32 +360,6 @@ class AIProvider {
       'extra_json': jsonEncode(extra),
       'order_index': orderIndex ?? 0,
     };
-  }
-}
-
-/// 余额查询结果。
-///
-/// - [display]：用于 UI 展示的字符串，如 `"$5.23 USD"`。
-/// - [total]：余额数值（通常 USD），用于"=0 自动删除"判断与排序。
-/// - [currency]：货币代码（USD / CNY 等），可选。
-/// - [raw]：响应体的简短预览，便于调试。
-class ProviderKeyBalance {
-  final String display;
-  final double? total;
-  final String? currency;
-  final String? raw;
-
-  const ProviderKeyBalance({
-    required this.display,
-    this.total,
-    this.currency,
-    this.raw,
-  });
-
-  bool get isZero {
-    final t = total;
-    if (t == null) return false;
-    return t <= 0.000001;
   }
 }
 
@@ -525,6 +377,29 @@ class AIProvidersService {
 
   // 旧版安全存储键名（用于迁移）
   String _apiKeyKey(int providerId) => 'ai_provider_key_$providerId';
+
+  String _apiKeyFingerprint(String value) {
+    final key = value.trim();
+    if (key.isEmpty) return 'empty';
+    final suffix = key.length <= 4 ? key : key.substring(key.length - 4);
+    return 'len=${key.length},last4=$suffix';
+  }
+
+  String _providerKeyDebugList(List<AIProviderKey> keys) {
+    if (keys.isEmpty) return '[]';
+    return keys
+        .map(
+          (key) =>
+              '#${key.id ?? 'null'}:${_apiKeyFingerprint(key.apiKey)} models=${key.models.length} enabled=${key.enabled}',
+        )
+        .join('; ');
+  }
+
+  Future<void> _logKeyFlow(String message) async {
+    try {
+      await FlutterLogger.nativeInfo('AI_KEY', message);
+    } catch (_) {}
+  }
 
   // ---------------- 基础 CRUD ----------------
 
@@ -573,12 +448,10 @@ class AIProvidersService {
     List<String>? models,
     String? apiKey, // 将写入安全存储
     int? orderIndex,
-    String? balanceEndpointType,
-    bool balanceAutoDeleteZeroKey = false,
   }) async {
     final normalizedModelsPath = _normalizeModelsPathForStorage(modelsPath);
-    final String normalizedBalanceType = AIBalanceEndpointTypes.normalize(
-      balanceEndpointType,
+    await _logKeyFlow(
+      'service.provider.create.start name=$name type=$type models=${models?.length ?? 0} hasApiKey=${apiKey?.trim().isNotEmpty == true}',
     );
     final id = await _db.insertAIProvider(
       name: name,
@@ -586,10 +459,6 @@ class AIProvidersService {
       baseUrl: _normalizeBaseUrlOrNull(baseUrl),
       chatPath: chatPath,
       modelsPath: normalizedModelsPath,
-      balanceEndpointType: normalizedBalanceType == AIBalanceEndpointTypes.none
-          ? null
-          : normalizedBalanceType,
-      balanceAutoDeleteZeroKey: balanceAutoDeleteZeroKey,
       useResponseApi: useResponseApi,
       enabled: enabled,
       isDefault: isDefault,
@@ -598,7 +467,13 @@ class AIProvidersService {
       orderIndex: orderIndex,
       apiKey: apiKey?.trim(),
     );
+    await _logKeyFlow(
+      'service.provider.create.inserted id=${id?.toString() ?? 'null'} name=$name',
+    );
     if (id != null && apiKey != null && apiKey.trim().isNotEmpty) {
+      await _logKeyFlow(
+        'service.provider.create.default_key.start provider=$id key=${_apiKeyFingerprint(apiKey)} models=${models?.length ?? 0}',
+      );
       await createProviderKey(
         providerId: id,
         name: 'Default key',
@@ -609,12 +484,20 @@ class AIProvidersService {
         orderIndex: 0,
       );
       await saveApiKey(id, apiKey.trim());
+      await _logKeyFlow(
+        'service.provider.create.default_key.done provider=$id',
+      );
     } else if (id != null) {
-      await syncProviderModelsFromKeys(id);
+      await _logKeyFlow(
+        'service.provider.create.no_api_key provider=$id keepInitialModels=${models?.length ?? 0}',
+      );
     }
     if (isDefault && id != null) {
       await setDefault(id);
     }
+    await _logKeyFlow(
+      'service.provider.create.finish id=${id?.toString() ?? 'null'}',
+    );
     return id;
   }
 
@@ -626,9 +509,6 @@ class AIProvidersService {
     String? baseUrl,
     String? chatPath,
     String? modelsPath,
-    String? balanceEndpointType,
-    bool setBalanceEndpointType = false,
-    bool? balanceAutoDeleteZeroKey,
     bool? useResponseApi,
     bool? enabled,
     bool? isDefault,
@@ -647,9 +527,6 @@ class AIProvidersService {
         ? _normalizeModelsPathForStorage(modelsPath)
         : null;
     final bool shouldUpdateModelsPath = modelsPath != null;
-    final String? normalizedBalanceType = setBalanceEndpointType
-        ? AIBalanceEndpointTypes.normalize(balanceEndpointType)
-        : null;
 
     bool updated = await _db.updateAIProvider(
       id: id,
@@ -659,11 +536,6 @@ class AIProvidersService {
       chatPath: chatPath,
       modelsPath: normalizedModelsPath,
       setModelsPath: shouldUpdateModelsPath,
-      balanceEndpointType: normalizedBalanceType == AIBalanceEndpointTypes.none
-          ? null
-          : normalizedBalanceType,
-      setBalanceEndpointType: setBalanceEndpointType,
-      balanceAutoDeleteZeroKey: balanceAutoDeleteZeroKey,
       useResponseApi: useResponseApi,
       enabled: enabled,
       isDefault: isDefault,
@@ -806,11 +678,97 @@ class AIProvidersService {
   }
 
   Future<void> syncProviderModelsFromKeys(int providerId) async {
+    await _logKeyFlow('service.keys.sync_models.start provider=$providerId');
     final keys = await listProviderKeys(providerId, includeDisabled: false);
     final models = _normalizeModelList(keys.expand((k) => k.models));
     await _db.saveAIProviderModelsJson(
       id: providerId,
       modelsJson: jsonEncode(models),
+    );
+    await _logKeyFlow(
+      'service.keys.sync_models.done provider=$providerId enabledKeys=${keys.length} models=${models.length} keys=${_providerKeyDebugList(keys)}',
+    );
+  }
+
+  Future<String?> _readLegacyApiKeyForMigration(int providerId) async {
+    final dbValue = await _db.getAIProviderApiKey(providerId);
+    if (dbValue != null && dbValue.trim().isNotEmpty) {
+      await _logKeyFlow(
+        'service.keys.legacy.read_db provider=$providerId key=${_apiKeyFingerprint(dbValue)}',
+      );
+      return dbValue.trim();
+    }
+    try {
+      final old = await SecureStorageService.instance.read(
+        _apiKeyKey(providerId),
+      );
+      if (old != null && old.trim().isNotEmpty) {
+        final trimmed = old.trim();
+        await _db.setAIProviderApiKey(id: providerId, apiKey: trimmed);
+        try {
+          await SecureStorageService.instance.delete(_apiKeyKey(providerId));
+        } catch (_) {}
+        await _logKeyFlow(
+          'service.keys.legacy.read_secure provider=$providerId key=${_apiKeyFingerprint(trimmed)}',
+        );
+        return trimmed;
+      }
+    } catch (e) {
+      await _logKeyFlow(
+        'service.keys.legacy.read_secure.error provider=$providerId error=$e',
+      );
+    }
+    await _logKeyFlow('service.keys.legacy.none provider=$providerId');
+    return null;
+  }
+
+  Future<bool> _restoreLegacyKeyListIfEmpty(int providerId) async {
+    await _logKeyFlow('service.keys.restore_legacy.start provider=$providerId');
+    final apiKey = await _readLegacyApiKeyForMigration(providerId);
+    if (apiKey == null || apiKey.isEmpty) {
+      await _logKeyFlow(
+        'service.keys.restore_legacy.skip provider=$providerId reason=no_legacy_key',
+      );
+      return false;
+    }
+    final row = await _db.getAIProviderById(providerId);
+    final provider = row == null ? null : AIProvider.fromDbRow(row);
+    final id = await _db.insertAIProviderKey(
+      providerId: providerId,
+      name: 'Default key',
+      apiKey: apiKey,
+      modelsJson: jsonEncode(
+        _normalizeModelList(provider?.models ?? const <String>[]),
+      ),
+      enabled: true,
+      priority: AIProviderKey.defaultPriority,
+      orderIndex: 0,
+    );
+    await _logKeyFlow(
+      'service.keys.restore_legacy.insert provider=$providerId keyId=${id?.toString() ?? 'null'} key=${_apiKeyFingerprint(apiKey)} models=${provider?.models.length ?? 0}',
+    );
+    if (id == null) return false;
+    await syncProviderModelsFromKeys(providerId);
+    await _db.refreshAIProviderKeySummary(providerId);
+    await _logKeyFlow('service.keys.restore_legacy.done provider=$providerId');
+    return true;
+  }
+
+  Future<void> _syncLegacyApiKeyFromKeys(int providerId) async {
+    final keys = await listProviderKeys(providerId, includeDisabled: false);
+    String? apiKey;
+    for (final key in keys) {
+      final value = key.apiKey.trim();
+      if (value.isEmpty) continue;
+      apiKey = value;
+      break;
+    }
+    await _db.setAIProviderApiKey(id: providerId, apiKey: apiKey);
+    try {
+      await SecureStorageService.instance.delete(_apiKeyKey(providerId));
+    } catch (_) {}
+    await _logKeyFlow(
+      'service.keys.sync_legacy_field provider=$providerId enabledKeys=${keys.length} selected=${apiKey == null ? 'null' : _apiKeyFingerprint(apiKey)}',
     );
   }
 
@@ -818,9 +776,27 @@ class AIProvidersService {
     int providerId, {
     bool includeDisabled = true,
   }) async {
-    final rows = await _db.listAIProviderKeys(providerId);
+    await _logKeyFlow(
+      'service.keys.list.start provider=$providerId includeDisabled=$includeDisabled',
+    );
+    var rows = await _db.listAIProviderKeys(providerId);
+    await _logKeyFlow(
+      'service.keys.list.db_rows provider=$providerId rows=${rows.length}',
+    );
+    if (rows.isEmpty && await _restoreLegacyKeyListIfEmpty(providerId)) {
+      rows = await _db.listAIProviderKeys(providerId);
+      await _logKeyFlow(
+        'service.keys.list.after_restore provider=$providerId rows=${rows.length}',
+      );
+    }
     final keys = rows.map((e) => AIProviderKey.fromDbRow(e)).toList();
-    return includeDisabled ? keys : keys.where((k) => k.enabled).toList();
+    final visible = includeDisabled
+        ? keys
+        : keys.where((k) => k.enabled).toList();
+    await _logKeyFlow(
+      'service.keys.list.done provider=$providerId all=${keys.length} visible=${visible.length} keys=${_providerKeyDebugList(visible)}',
+    );
+    return visible;
   }
 
   Future<AIProviderKey?> getProviderKey(int keyId) async {
@@ -837,18 +813,36 @@ class AIProvidersService {
     int priority = 100,
     int? orderIndex,
   }) async {
+    final trimmedApiKey = apiKey.trim();
+    if (trimmedApiKey.isEmpty) {
+      await _logKeyFlow(
+        'service.keys.create.reject_empty provider=$providerId name=$name',
+      );
+      throw Exception('API key is required');
+    }
+    await _logKeyFlow(
+      'service.keys.create.start provider=$providerId name=$name key=${_apiKeyFingerprint(trimmedApiKey)} models=${models.length} enabled=$enabled priority=$priority order=${orderIndex ?? 0}',
+    );
     final id = await _db.insertAIProviderKey(
       providerId: providerId,
       name: name.trim().isEmpty ? 'Key' : name.trim(),
-      apiKey: apiKey.trim(),
+      apiKey: trimmedApiKey,
       modelsJson: jsonEncode(_normalizeModelList(models)),
       enabled: enabled,
       priority: priority,
       orderIndex: orderIndex,
     );
+    await _logKeyFlow(
+      'service.keys.create.insert_result provider=$providerId keyId=${id?.toString() ?? 'null'} key=${_apiKeyFingerprint(trimmedApiKey)}',
+    );
     if (id == null) return null;
     await syncProviderModelsFromKeys(providerId);
     await _db.refreshAIProviderKeySummary(providerId);
+    await _syncLegacyApiKeyFromKeys(providerId);
+    final readback = await getProviderKey(id);
+    await _logKeyFlow(
+      'service.keys.create.done provider=$providerId keyId=$id readback=${readback != null} providerKeyCount=${(await listProviderKeys(providerId)).length}',
+    );
     return id;
   }
 
@@ -863,6 +857,9 @@ class AIProvidersService {
     bool clearErrorState = true,
   }) async {
     final before = await getProviderKey(id);
+    await _logKeyFlow(
+      'service.keys.update.start keyId=$id provider=${before?.providerId ?? 'unknown'} beforeExists=${before != null} newKey=${apiKey == null ? 'unchanged' : _apiKeyFingerprint(apiKey)} models=${models?.length.toString() ?? 'unchanged'} enabled=${enabled?.toString() ?? 'unchanged'}',
+    );
     final ok = await _db.updateAIProviderKey(
       id: id,
       name: name,
@@ -880,25 +877,43 @@ class AIProvidersService {
     if (providerId != null) {
       await syncProviderModelsFromKeys(providerId);
       await _db.refreshAIProviderKeySummary(providerId);
+      await _syncLegacyApiKeyFromKeys(providerId);
     }
+    await _logKeyFlow(
+      'service.keys.update.done keyId=$id ok=$ok provider=${providerId ?? 'unknown'}',
+    );
     return ok;
   }
 
   Future<bool> deleteProviderKey(int id) async {
     final before = await getProviderKey(id);
+    await _logKeyFlow(
+      'service.keys.delete.start keyId=$id provider=${before?.providerId ?? 'unknown'} beforeExists=${before != null}',
+    );
+    if (before != null) {
+      await deleteApiKey(before.providerId);
+    }
     final ok = await _db.deleteAIProviderKey(id);
     if (before != null) {
       await syncProviderModelsFromKeys(before.providerId);
       await _db.refreshAIProviderKeySummary(before.providerId);
+      await _syncLegacyApiKeyFromKeys(before.providerId);
     }
+    await _logKeyFlow(
+      'service.keys.delete.done keyId=$id ok=$ok provider=${before?.providerId ?? 'unknown'}',
+    );
     return ok;
   }
 
   Future<int> deleteAllProviderKeys(int providerId) async {
+    await _logKeyFlow('service.keys.delete_all.start provider=$providerId');
+    await deleteApiKey(providerId);
     final count = await _db.deleteAIProviderKeysForProvider(providerId);
     await syncProviderModelsFromKeys(providerId);
     await _db.refreshAIProviderKeySummary(providerId);
-    await deleteApiKey(providerId);
+    await _logKeyFlow(
+      'service.keys.delete_all.done provider=$providerId deleted=$count',
+    );
     return count;
   }
 
@@ -906,7 +921,6 @@ class AIProvidersService {
     required int providerId,
     required int keyId,
     AIProvider? providerOverride,
-    bool awaitBalance = false,
   }) async {
     final provider = providerOverride ?? await getProvider(providerId);
     final key = await getProviderKey(keyId);
@@ -916,20 +930,6 @@ class AIProvidersService {
       final models = await fetchModels(provider: provider, apiKey: key.apiKey);
       await updateProviderKey(id: keyId, models: models, clearErrorState: true);
       await markProviderKeySuccess(keyId);
-      // Best-effort：若提供商配置了余额查询接口，顺带刷新该 key 的余额。
-      // awaitBalance=true 时等待余额写库，便于 UI 立即显示最新余额。
-      if (provider.hasBalanceQuery) {
-        final future = refreshBalanceForKey(
-          providerId: providerId,
-          keyId: keyId,
-          providerOverride: provider,
-        );
-        if (awaitBalance) {
-          await future;
-        } else {
-          unawaited(future);
-        }
-      }
       return models;
     } catch (e) {
       await markProviderKeyFailure(
@@ -967,212 +967,12 @@ class AIProvidersService {
     if (key != null) await _db.refreshAIProviderKeySummary(key.providerId);
   }
 
-  // ---------------- 余额查询（new-api / sub2api） ----------------
-
-  /// 调用提供商的余额接口，返回 [ProviderKeyBalance]。
-  ///
-  /// - 仅支持 [AIBalanceEndpointTypes.sub2api]；其他类型会抛出异常。
-  /// - 失败时抛出 [Exception]，调用方应捕获并降级处理。
-  Future<ProviderKeyBalance> fetchBalance({
-    required AIProvider provider,
-    required String apiKey,
-  }) async {
-    final type = AIBalanceEndpointTypes.normalize(provider.balanceEndpointType);
-    if (type == AIBalanceEndpointTypes.none) {
-      throw Exception('Provider has no balance endpoint configured');
-    }
-    final trimmedKey = apiKey.trim();
-    if (trimmedKey.isEmpty) {
-      throw Exception('API key is empty');
-    }
-    final baseUrl = _baseUrlOrDefaultOpenAI(provider.baseUrl);
-    switch (type) {
-      case AIBalanceEndpointTypes.sub2api:
-        return _fetchSub2ApiBalance(baseUrl: baseUrl, apiKey: trimmedKey);
-      default:
-        throw Exception('Unsupported balance endpoint type: $type');
-    }
-  }
-
-  /// 刷新指定 key 的余额并写入数据库。
-  ///
-  /// 行为：
-  /// 1. 若 provider 未配置余额接口（[AIBalanceEndpointTypes.none]），直接返回 null。
-  /// 2. 调用 [fetchBalance]，写入 ai_provider_keys.balance_*。
-  /// 3. 若 provider.balanceAutoDeleteZeroKey 开启且余额为 0，则删除该 key 并返回 null。
-  /// 4. 失败仅记日志，不抛出（不阻塞调用方）。
-  ///
-  /// 返回最新余额；删除或失败时返回 null。
-  Future<ProviderKeyBalance?> refreshBalanceForKey({
-    required int providerId,
-    required int keyId,
-    AIProvider? providerOverride,
-  }) async {
-    final provider = providerOverride ?? await getProvider(providerId);
-    final key = await getProviderKey(keyId);
-    if (provider == null || key == null) return null;
-    if (!provider.hasBalanceQuery) return null;
-    if (key.apiKey.trim().isEmpty) return null;
-
-    ProviderKeyBalance balance;
-    try {
-      balance = await fetchBalance(provider: provider, apiKey: key.apiKey);
-    } catch (e) {
-      try {
-        await FlutterLogger.nativeWarn(
-          'AI',
-          'refreshBalanceForKey 失败 provider=${provider.name} key=${key.name}#$keyId error=$e',
-        );
-      } catch (_) {}
-      return null;
-    }
-
-    return _saveFetchedBalanceForKey(
-      provider: provider,
-      keyId: keyId,
-      keyName: key.name,
-      balance: balance,
-      providerId: providerId,
-    );
-  }
-
-  /// 将已获取到的余额写入指定 Key。
-  ///
-  /// 批量新增 Key 时，弹窗内可能已经用明文 Key 获取过余额；保存后直接复用该
-  /// 结果，避免再次请求导致页面仍显示占位符或与通知里的余额不一致。
-  Future<ProviderKeyBalance?> saveFetchedBalanceForKey({
-    required int providerId,
-    required int keyId,
-    required ProviderKeyBalance balance,
-    AIProvider? providerOverride,
-  }) async {
-    final provider = providerOverride ?? await getProvider(providerId);
-    final key = await getProviderKey(keyId);
-    if (provider == null || key == null) return null;
-    if (!provider.hasBalanceQuery) return null;
-    return _saveFetchedBalanceForKey(
-      provider: provider,
-      keyId: keyId,
-      keyName: key.name,
-      balance: balance,
-      providerId: providerId,
-    );
-  }
-
-  Future<ProviderKeyBalance?> _saveFetchedBalanceForKey({
-    required AIProvider provider,
-    required int providerId,
-    required int keyId,
-    required String keyName,
-    required ProviderKeyBalance balance,
-  }) async {
-    final int now = DateTime.now().millisecondsSinceEpoch;
-    await _db.updateAIProviderKeyBalance(
-      keyId: keyId,
-      balanceDisplay: balance.display,
-      balanceTotal: balance.total,
-      balanceCurrency: balance.currency,
-      balanceRaw: balance.raw,
-      balanceUpdatedAt: now,
-    );
-    await _db.refreshAIProviderKeySummary(providerId);
-
-    // 余额为 0 且开启了“自动删除”，则移除该 key。
-    if (provider.balanceAutoDeleteZeroKey && balance.isZero) {
-      try {
-        await FlutterLogger.nativeInfo(
-          'AI',
-          'auto-delete zero-balance key provider=${provider.name} key=$keyName#$keyId',
-        );
-      } catch (_) {}
-      await deleteProviderKey(keyId);
-      return null;
-    }
-
-    return balance;
-  }
-
-  /// sub2api 兼容：
-  /// - GET {baseUrl}/v1/usage → 顶层 remaining/balance（USD）
-  /// - 不同模式（quota_limited / unrestricted）字段略有差异，统一取 remaining。
-  Future<ProviderKeyBalance> _fetchSub2ApiBalance({
-    required String baseUrl,
-    required String apiKey,
-  }) async {
-    final uri = Uri.parse('$baseUrl/v1/usage');
-    final resp = await http.get(
-      uri,
-      headers: <String, String>{'Authorization': 'Bearer $apiKey'},
-    );
-    if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      throw Exception(
-        'sub2api usage request failed: ${resp.statusCode} ${resp.body}',
-      );
-    }
-
-    double? remaining;
-    String? currency = 'USD';
-    try {
-      final body = jsonDecode(resp.body);
-      if (body is Map) {
-        // 优先 remaining；若不存在再退回 balance / quota.remaining
-        remaining = _coerceDouble(body['remaining']);
-        remaining ??= _coerceDouble(body['balance']);
-        if (remaining == null && body['quota'] is Map) {
-          final quota = body['quota'] as Map;
-          remaining = _coerceDouble(quota['remaining']);
-        }
-        final unit = (body['unit'] as String?)?.trim();
-        if (unit != null && unit.isNotEmpty) currency = unit;
-      }
-    } catch (_) {}
-
-    if (remaining == null) {
-      throw Exception('sub2api usage parse failed: ${_clipBody(resp.body)}');
-    }
-    // sub2api 在订阅模式无限额时返回 -1 表示"无限制"。
-    if (remaining < 0) {
-      return ProviderKeyBalance(
-        display: '∞ ${currency ?? ''}'.trim(),
-        total: null,
-        currency: currency,
-        raw: _clipBody(resp.body),
-      );
-    }
-    final formatted = _formatUsd(remaining);
-    return ProviderKeyBalance(
-      display: '\$$formatted',
-      total: remaining,
-      currency: currency,
-      raw: _clipBody(resp.body),
-    );
-  }
-
-  static double? _coerceDouble(Object? v) {
-    if (v == null) return null;
-    if (v is num) return v.toDouble();
-    if (v is String) return double.tryParse(v.trim());
-    return null;
-  }
-
-  static String _formatUsd(double v) {
-    if (v.abs() >= 1000) {
-      return v.toStringAsFixed(2);
-    }
-    return v
-        .toStringAsFixed(4)
-        .replaceFirst(RegExp(r'0+$'), '')
-        .replaceFirst(RegExp(r'\.$'), '');
-  }
-
-  static String? _clipBody(String body) {
-    if (body.isEmpty) return null;
-    return body.length > 240 ? body.substring(0, 240) : body;
-  }
-
   // ---------------- API Key 存储（数据库） + 兼容迁移 ----------------
 
   Future<void> saveApiKey(int providerId, String apiKey) async {
+    await _logKeyFlow(
+      'service.legacy_api_key.save provider=$providerId key=${_apiKeyFingerprint(apiKey)}',
+    );
     await _db.setAIProviderApiKey(id: providerId, apiKey: apiKey);
     // 清理旧版安全存储
     try {
@@ -1181,12 +981,21 @@ class AIProvidersService {
   }
 
   Future<String?> getApiKey(int providerId) async {
+    await _logKeyFlow('service.legacy_api_key.get.start provider=$providerId');
     final keys = await listProviderKeys(providerId, includeDisabled: false);
     if (keys.isNotEmpty && keys.first.apiKey.trim().isNotEmpty) {
+      await _logKeyFlow(
+        'service.legacy_api_key.get.from_key_list provider=$providerId key=${_apiKeyFingerprint(keys.first.apiKey)}',
+      );
       return keys.first.apiKey.trim();
     }
     final v = await _db.getAIProviderApiKey(providerId);
-    if (v != null && v.trim().isNotEmpty) return v.trim();
+    if (v != null && v.trim().isNotEmpty) {
+      await _logKeyFlow(
+        'service.legacy_api_key.get.from_db provider=$providerId key=${_apiKeyFingerprint(v)}',
+      );
+      return v.trim();
+    }
     // 一次性迁移：若 DB 为空，尝试从安全存储读取并写回 DB
     try {
       final old = await SecureStorageService.instance.read(
@@ -1197,13 +1006,18 @@ class AIProvidersService {
         try {
           await SecureStorageService.instance.delete(_apiKeyKey(providerId));
         } catch (_) {}
+        await _logKeyFlow(
+          'service.legacy_api_key.get.from_secure provider=$providerId key=${_apiKeyFingerprint(old)}',
+        );
         return old.trim();
       }
     } catch (_) {}
+    await _logKeyFlow('service.legacy_api_key.get.none provider=$providerId');
     return null;
   }
 
   Future<void> deleteApiKey(int providerId) async {
+    await _logKeyFlow('service.legacy_api_key.delete provider=$providerId');
     await _db.setAIProviderApiKey(id: providerId, apiKey: null);
     try {
       await SecureStorageService.instance.delete(_apiKeyKey(providerId));

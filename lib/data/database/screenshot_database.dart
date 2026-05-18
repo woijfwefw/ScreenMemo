@@ -770,10 +770,6 @@ class ScreenshotDatabase {
     if (oldVersion < 45) {
       await _ensureAiProviderKeyStatsColumns(db);
     }
-    if (oldVersion < 46) {
-      await _ensureAiProvidersBalanceColumns(db);
-      await _ensureAiProviderKeyBalanceColumns(db);
-    }
     if (oldVersion < 47) {
       await _createAppHealthTables(db);
     }

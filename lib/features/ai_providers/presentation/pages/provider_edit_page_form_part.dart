@@ -57,26 +57,12 @@ extension _ProviderEditFormPart on _ProviderEditPageState {
             hint: AppLocalizations.of(context).azureApiVersionHint,
           ),
         ],
-        const SizedBox(height: AppTheme.spacing4),
-        _buildBalanceEndpointPicker(),
-        if (_balanceEndpointType != AIBalanceEndpointTypes.none) ...[
-          const SizedBox(height: AppTheme.spacing4),
-          _buildSwitchRow(
-            label: 'Auto-delete key when balance is 0',
-            description:
-                'When the main balance is detected as 0, automatically remove the matching key from this provider.',
-            value: _balanceAutoDeleteZeroKey,
-            onChanged: (v) =>
-                _providerEditSetState(() => _balanceAutoDeleteZeroKey = v),
-          ),
-        ],
       ],
     );
   }
 
   Widget _buildKeysHeaderCard(ThemeData theme) {
     final keyCountText = _keys.length > 99 ? '99+' : '${_keys.length}';
-    final balanceSummary = _keysBalanceSummary();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -101,55 +87,20 @@ extension _ProviderEditFormPart on _ProviderEditPageState {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  if (balanceSummary != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainerHighest
-                            .withValues(alpha: 0.22),
-                        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                        border: Border.all(
-                          color: theme.colorScheme.outline.withValues(
-                            alpha: 0.35,
-                          ),
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.account_balance_wallet_outlined,
-                            size: 14,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            balanceSummary,
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                 ],
               ),
             ),
             const SizedBox(width: AppTheme.spacing2),
-            PopupMenuButton<_ProviderKeySortMode>(
-              initialValue: _keySortMode,
+            UIActionMenuButton<_ProviderKeySortMode>(
+              selectedValue: _keySortMode,
               onSelected: (mode) =>
                   _providerEditSetState(() => _keySortMode = mode),
-              itemBuilder: (context) => [
+              minWidth: 204,
+              items: [
                 for (final mode in _ProviderKeySortMode.values)
-                  PopupMenuItem<_ProviderKeySortMode>(
+                  UIActionMenuItem<_ProviderKeySortMode>(
                     value: mode,
-                    child: Text(_keySortModeLabel(mode)),
+                    label: _keySortModeLabel(mode),
                   ),
               ],
               child: Padding(
@@ -293,30 +244,6 @@ extension _ProviderEditFormPart on _ProviderEditPageState {
           Text(
             AppLocalizations.of(context).providerNoApiKeys,
             style: theme.textTheme.bodySmall,
-          )
-        else if (_loaded != null)
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 1),
-                child: Icon(
-                  Icons.info_outline_rounded,
-                  size: 16,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Batch test refreshes models first, then retries failed keys up to 3 times.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    height: 1.45,
-                  ),
-                ),
-              ),
-            ],
           ),
       ],
     );
@@ -614,112 +541,29 @@ extension _ProviderEditFormPart on _ProviderEditPageState {
     );
   }
 
-  Widget _buildBalanceEndpointPicker() {
-    final theme = Theme.of(context);
-    final bool isDark = theme.brightness == Brightness.dark;
-    final Color fieldBg = isDark
-        ? theme.colorScheme.surface
-        : theme.scaffoldBackgroundColor;
-    final l10n = AppLocalizations.of(context);
-    final items = <DropdownMenuItem<String>>[
-      DropdownMenuItem(
-        value: AIBalanceEndpointTypes.none,
-        child: Text(l10n.balanceEndpointNone),
-      ),
-      DropdownMenuItem(
-        value: AIBalanceEndpointTypes.sub2api,
-        child: Text(l10n.balanceEndpointSub2api),
-      ),
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              '余额查询接口',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const Spacer(),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: fieldBg,
-                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                border: Border.all(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.55),
-                  width: 0.5,
-                ),
-              ),
-              child: Text(
-                '可选',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppTheme.spacing1),
-        DropdownButtonFormField<String>(
-          initialValue: _balanceEndpointType,
-          isDense: true,
-          style: theme.textTheme.bodyMedium,
-          items: items,
-          onChanged: (v) {
-            if (v == null) return;
-            _providerEditSetState(() {
-              _balanceEndpointType = AIBalanceEndpointTypes.normalize(v);
-              if (_balanceEndpointType == AIBalanceEndpointTypes.none) {
-                _balanceAutoDeleteZeroKey = false;
-              }
-            });
-          },
-          decoration: InputDecoration(
-            isDense: true,
-            filled: true,
-            fillColor: fieldBg,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppTheme.spacing3,
-              vertical: AppTheme.spacing2,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildTypePicker() {
     final theme = Theme.of(context);
-    final bool isDark = theme.brightness == Brightness.dark;
-    final Color fieldBg = isDark
-        ? theme.colorScheme.surface
-        : theme.scaffoldBackgroundColor;
     final l10n = AppLocalizations.of(context);
-    final items = <DropdownMenuItem<String>>[
-      DropdownMenuItem(
+    final items = <UISelectItem<String>>[
+      UISelectItem<String>(
         value: AIProviderTypes.openai,
-        child: Text(l10n.providerTypeOpenAI),
+        label: l10n.providerTypeOpenAI,
       ),
-      DropdownMenuItem(
+      UISelectItem<String>(
         value: AIProviderTypes.azureOpenAI,
-        child: Text(l10n.providerTypeAzureOpenAI),
+        label: l10n.providerTypeAzureOpenAI,
       ),
-      DropdownMenuItem(
+      UISelectItem<String>(
         value: AIProviderTypes.claude,
-        child: Text(l10n.providerTypeClaude),
+        label: l10n.providerTypeClaude,
       ),
-      DropdownMenuItem(
+      UISelectItem<String>(
         value: AIProviderTypes.gemini,
-        child: Text(l10n.providerTypeGemini),
+        label: l10n.providerTypeGemini,
       ),
-      DropdownMenuItem(
+      UISelectItem<String>(
         value: AIProviderTypes.custom,
-        child: Text(l10n.customLabel),
+        label: l10n.customLabel,
       ),
     ];
     return Column(
@@ -752,10 +596,8 @@ extension _ProviderEditFormPart on _ProviderEditPageState {
           ],
         ),
         const SizedBox(height: AppTheme.spacing1),
-        DropdownButtonFormField<String>(
-          initialValue: _type,
-          isDense: true,
-          style: theme.textTheme.bodyMedium,
+        UISelectField<String>(
+          value: _type,
           items: items,
           onChanged: (v) {
             if (v == null) return;
@@ -763,15 +605,6 @@ extension _ProviderEditFormPart on _ProviderEditPageState {
               _applyTypeDefaults(v);
             });
           },
-          decoration: InputDecoration(
-            isDense: true,
-            filled: true,
-            fillColor: fieldBg,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppTheme.spacing3,
-              vertical: AppTheme.spacing2,
-            ),
-          ),
         ),
       ],
     );

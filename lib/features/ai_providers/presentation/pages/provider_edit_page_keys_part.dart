@@ -8,7 +8,6 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
     required bool enabled,
     required int priority,
     required int orderIndex,
-    ProviderKeyBalance? balance,
   }) {
     return AIProviderKey(
       id: null,
@@ -27,12 +26,6 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
       lastErrorMessage: null,
       lastFailedAt: null,
       lastSuccessAt: null,
-      balanceDisplay: balance?.display,
-      balanceTotal: balance?.total,
-      balanceCurrency: balance?.currency,
-      balanceUpdatedAt: balance == null
-          ? null
-          : DateTime.now().millisecondsSinceEpoch,
     );
   }
 
@@ -44,7 +37,6 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
     bool? enabled,
     int? priority,
     int? orderIndex,
-    ProviderKeyBalance? balance,
   }) {
     return AIProviderKey(
       id: source.id,
@@ -63,22 +55,14 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
       lastErrorMessage: source.lastErrorMessage,
       lastFailedAt: source.lastFailedAt,
       lastSuccessAt: source.lastSuccessAt,
-      balanceDisplay: balance?.display ?? source.balanceDisplay,
-      balanceTotal: balance?.total ?? source.balanceTotal,
-      balanceCurrency: balance?.currency ?? source.balanceCurrency,
-      balanceUpdatedAt: balance == null
-          ? source.balanceUpdatedAt
-          : DateTime.now().millisecondsSinceEpoch,
     );
   }
 
   void _commitLocalKeyList(List<AIProviderKey> nextKeys) {
-    final retainedApiKeys = nextKeys
-        .where((key) => key.id == null)
-        .map((key) => key.apiKey.trim())
-        .toSet();
-    _pendingKeyBalances.removeWhere(
-      (apiKey, _) => !retainedApiKeys.contains(apiKey),
+    unawaited(
+      _logKeyFlow(
+        'edit.local_keys.commit provider=${_loaded?.id ?? 'new'} before=${_keys.length} after=${nextKeys.length} keys=${_debugKeyList(nextKeys)}',
+      ),
     );
     _providerEditSetState(() {
       _keys = nextKeys;
@@ -118,7 +102,6 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
       text: (key?.models ?? const <String>[]).join('\n'),
     );
     final enabled = key?.enabled ?? true;
-    final fetchedBalancesByApiKey = <String, ProviderKeyBalance>{};
     bool dialogFetching = false;
     bool dialogSaving = false;
     ProviderKeyBatchProgress? dialogProgress;
@@ -142,8 +125,6 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
         models: const <String>[],
         extra: _buildExtra(),
         orderIndex: _loaded?.orderIndex ?? 0,
-        balanceEndpointType: _balanceEndpointType,
-        balanceAutoDeleteZeroKey: _balanceAutoDeleteZeroKey,
       );
     }
 
@@ -213,7 +194,6 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
       final fetchedModelPool = <String>[];
       final failureHints = <String>[];
       int modelSuccessCount = 0;
-      int balanceSuccessCount = 0;
 
       setDialogState(() {
         dialogFetching = true;
@@ -274,37 +254,6 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
             } catch (_) {}
           }
 
-          String balanceMessage = '';
-          if (provider.hasBalanceQuery) {
-            if (dialogContext.mounted) {
-              setDialogState(() {
-                dialogProgress = ProviderKeyBatchProgress(
-                  phaseLabel: l10n.providerKeyProgressFetchBalance,
-                  current: i + 1,
-                  total: apiKeys.length,
-                  message: l10n.providerKeyProgressFetchingBalance(label),
-                );
-              });
-            }
-            try {
-              final balance = await _svc.fetchBalance(
-                provider: provider,
-                apiKey: apiKey,
-              );
-              fetchedBalancesByApiKey[apiKey] = balance;
-              balanceSuccessCount++;
-              balanceMessage = l10n.providerKeyProgressBalanceDisplay(
-                balance.display,
-              );
-            } catch (e) {
-              final errorText = _clipDialogText(e.toString(), 120);
-              balanceMessage = l10n.providerKeyProgressBalanceFailedShort;
-              failureHints.add(
-                l10n.providerKeyProgressBalanceFetchFailed(label, errorText),
-              );
-            }
-          }
-
           if (dialogContext.mounted) {
             final modelMessage = modelOk
                 ? l10n.providerKeyProgressModelsCount(fetched.length)
@@ -314,7 +263,7 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
                 phaseLabel: l10n.providerKeyProgressScanKeys,
                 current: i + 1,
                 total: apiKeys.length,
-                message: '$label: $modelMessage$balanceMessage',
+                message: '$label: $modelMessage',
               );
             });
           }
@@ -327,21 +276,12 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
           ]).length;
           UINotifier.success(
             context,
-            provider.hasBalanceQuery
-                ? l10n.providerKeyFetchCompleteToast(
-                    modelSuccessCount,
-                    apiKeys.length,
-                    fetchedCount,
-                    balanceSuccessCount,
-                    apiKeys.length,
-                    failureHints.length,
-                  )
-                : l10n.providerKeyFetchCompleteToastNoBalance(
-                    modelSuccessCount,
-                    apiKeys.length,
-                    fetchedCount,
-                    failureHints.length,
-                  ),
+            l10n.providerKeyFetchCompleteToast(
+              modelSuccessCount,
+              apiKeys.length,
+              fetchedCount,
+              failureHints.length,
+            ),
           );
         } else {
           UINotifier.error(context, l10n.providerKeyNoModelsFetchedToast);
@@ -354,17 +294,10 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
               phaseLabel: l10n.providerKeyProgressFetchComplete,
               current: apiKeys.length,
               total: apiKeys.length,
-              message: provider.hasBalanceQuery
-                  ? l10n.providerKeyProgressFetchCompleteMessage(
-                      modelSuccessCount,
-                      apiKeys.length,
-                      balanceSuccessCount,
-                      apiKeys.length,
-                    )
-                  : l10n.providerKeyProgressFetchCompleteMessageNoBalance(
-                      modelSuccessCount,
-                      apiKeys.length,
-                    ),
+              message: l10n.providerKeyProgressFetchCompleteMessage(
+                modelSuccessCount,
+                apiKeys.length,
+              ),
             );
           });
         }
@@ -399,7 +332,6 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
         );
         return;
       }
-      final providerSnapshot = buildDialogProviderSnapshot();
       final priority =
           int.tryParse(priorityCtrl.text.trim()) ??
           AIProviderKey.defaultPriority;
@@ -428,9 +360,13 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
 
       final total = key == null ? keysToCreate.length : 1;
       int savedCount = 0;
-      int balanceUpdatedCount = 0;
       bool changedPersistedKeys = false;
       bool shouldCloseDialog = false;
+      unawaited(
+        _logKeyFlow(
+          'edit.key_dialog.save.start provider=${providerId ?? 'new'} editKey=${key?.id ?? 'new'} inputKeys=${apiKeys.length} createKeys=${keysToCreate.length} models=${models.length} existing=${_keys.length}',
+        ),
+      );
 
       setDialogState(() {
         dialogSaving = true;
@@ -463,10 +399,11 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
               });
             }
             if (providerId == null) {
-              final cachedBalance = fetchedBalancesByApiKey[apiKey];
-              if (cachedBalance != null) {
-                _pendingKeyBalances[apiKey.trim()] = cachedBalance;
-              }
+              unawaited(
+                _logKeyFlow(
+                  'edit.key_dialog.local_draft provider=new index=$i key=${_debugApiKeyFingerprint(apiKey)} models=${models.length}',
+                ),
+              );
               final draft = _buildLocalKeyDraft(
                 name: keyName,
                 apiKey: apiKey,
@@ -474,13 +411,21 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
                 enabled: enabled,
                 priority: priority,
                 orderIndex: _keys.length + i,
-                balance: cachedBalance,
               );
               _commitLocalKeyList(<AIProviderKey>[..._keys, draft]);
               savedCount++;
-              if (cachedBalance != null) balanceUpdatedCount++;
+              unawaited(
+                _logKeyFlow(
+                  'edit.key_dialog.local_draft.done provider=new key=${_debugApiKeyFingerprint(apiKey)} localCount=${_keys.length}',
+                ),
+              );
               continue;
             }
+            unawaited(
+              _logKeyFlow(
+                'edit.key_dialog.persist.create.start provider=$providerId index=$i key=${_debugApiKeyFingerprint(apiKey)} models=${models.length}',
+              ),
+            );
             final newId = await _svc.createProviderKey(
               providerId: providerId,
               name: keyName,
@@ -490,35 +435,16 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
               priority: priority,
               orderIndex: _keys.length + i,
             );
-            if (newId == null) continue;
-            savedCount++;
-
-            if (providerSnapshot.hasBalanceQuery) {
-              if (dialogContext.mounted) {
-                setDialogState(() {
-                  dialogProgress = ProviderKeyBatchProgress(
-                    phaseLabel: l10n.providerKeyProgressSaveBalance,
-                    current: i + 1,
-                    total: total,
-                    message: l10n.providerKeyProgressSavingBalance(keyName),
-                  );
-                });
-              }
-              final cachedBalance = fetchedBalancesByApiKey[apiKey];
-              final balance = cachedBalance == null
-                  ? await _svc.refreshBalanceForKey(
-                      providerId: providerId,
-                      keyId: newId,
-                      providerOverride: providerSnapshot,
-                    )
-                  : await _svc.saveFetchedBalanceForKey(
-                      providerId: providerId,
-                      keyId: newId,
-                      balance: cachedBalance,
-                      providerOverride: providerSnapshot,
-                    );
-              if (balance != null) balanceUpdatedCount++;
+            if (newId == null) {
+              throw Exception('Create provider key failed');
             }
+            savedCount++;
+            unawaited(
+              _logKeyFlow(
+                'edit.key_dialog.persist.create.done provider=$providerId keyId=$newId key=${_debugApiKeyFingerprint(apiKey)}',
+              ),
+            );
+
             changedPersistedKeys = true;
           }
         } else {
@@ -537,12 +463,11 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
             });
           }
           if (providerId == null || key.id == null) {
-            final cachedBalance = fetchedBalancesByApiKey[apiKeys.first];
-            if (cachedBalance != null) {
-              _pendingKeyBalances[apiKeys.first.trim()] = cachedBalance;
-            } else if (key.apiKey.trim() != apiKeys.first.trim()) {
-              _pendingKeyBalances.remove(key.apiKey.trim());
-            }
+            unawaited(
+              _logKeyFlow(
+                'edit.key_dialog.local_update provider=${providerId ?? 'new'} key=${key.id ?? 'draft'} newKey=${_debugApiKeyFingerprint(apiKeys.first)} models=${models.length}',
+              ),
+            );
             final updated = _replaceLocalKey(
               key,
               name: nameCtrl.text.trim(),
@@ -550,7 +475,6 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
               models: models,
               enabled: enabled,
               priority: priority,
-              balance: cachedBalance,
             );
             final index = _keys.indexWhere((item) => identical(item, key));
             if (index == -1) {
@@ -561,8 +485,12 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
               _commitLocalKeyList(nextKeys);
             }
             savedCount = 1;
-            if (cachedBalance != null) balanceUpdatedCount++;
           } else {
+            unawaited(
+              _logKeyFlow(
+                'edit.key_dialog.persist.update.start provider=$providerId keyId=${key.id} key=${_debugApiKeyFingerprint(apiKeys.first)} models=${models.length}',
+              ),
+            );
             await _svc.updateProviderKey(
               id: key.id!,
               name: nameCtrl.text.trim(),
@@ -572,52 +500,36 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
               priority: priority,
             );
             savedCount = 1;
-            if (providerSnapshot.hasBalanceQuery) {
-              final cachedBalance = fetchedBalancesByApiKey[apiKeys.first];
-              final balance = cachedBalance == null
-                  ? await _svc.refreshBalanceForKey(
-                      providerId: providerId,
-                      keyId: key.id!,
-                      providerOverride: providerSnapshot,
-                    )
-                  : await _svc.saveFetchedBalanceForKey(
-                      providerId: providerId,
-                      keyId: key.id!,
-                      balance: cachedBalance,
-                      providerOverride: providerSnapshot,
-                    );
-              if (balance != null) balanceUpdatedCount++;
-            }
+            unawaited(
+              _logKeyFlow(
+                'edit.key_dialog.persist.update.done provider=$providerId keyId=${key.id}',
+              ),
+            );
             changedPersistedKeys = true;
           }
         }
 
         if (changedPersistedKeys) await _reloadKeys();
+        unawaited(
+          _logKeyFlow(
+            'edit.key_dialog.save.finish provider=${providerId ?? 'new'} saved=$savedCount localCount=${_keys.length} changedPersisted=$changedPersistedKeys keys=${_debugKeyList(_keys)}',
+          ),
+        );
         if (!mounted || !dialogContext.mounted) return;
         UINotifier.success(
           context,
           key == null
-              ? (providerSnapshot.hasBalanceQuery
-                    ? l10n.providerKeySaveSuccessNew(
-                        savedCount,
-                        balanceUpdatedCount,
-                        savedCount,
-                        skipped,
-                      )
-                    : l10n.providerKeySaveSuccessNewNoBalance(
-                        savedCount,
-                        skipped,
-                      ))
-              : (providerSnapshot.hasBalanceQuery
-                    ? l10n.providerKeySaveSuccessEdit(
-                        balanceUpdatedCount,
-                        savedCount,
-                      )
-                    : l10n.providerKeySaveSuccessEditNoBalance),
+              ? l10n.providerKeySaveSuccessNew(savedCount, skipped)
+              : l10n.providerKeySaveSuccessEdit,
         );
         shouldCloseDialog = true;
         Navigator.of(dialogContext).pop(true);
       } catch (e) {
+        unawaited(
+          _logKeyFlow(
+            'edit.key_dialog.save.error provider=${providerId ?? 'new'} saved=$savedCount error=$e',
+          ),
+        );
         try {
           await FlutterLogger.nativeError(
             'AI',
@@ -706,7 +618,7 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
                       label: Text(
                         AppLocalizations.of(
                           context,
-                        ).providerFetchModelsAndBalance,
+                        ).providerKeyProgressFetchModels,
                       ),
                     ),
                     if (dialogProgress != null) ...[
@@ -759,14 +671,10 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
         providerId: providerId,
         keyId: key.id!,
         providerOverride: provider,
-        awaitBalance: true,
       );
       await _reloadKeys();
       if (mounted) {
-        UINotifier.success(
-          context,
-          provider.hasBalanceQuery ? '模型列表与余额已更新' : '模型列表已更新',
-        );
+        UINotifier.success(context, '模型列表已更新');
       }
     } catch (_) {
       if (mounted) {
@@ -781,15 +689,30 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
   }
 
   Future<void> _deleteProviderKey(AIProviderKey key) async {
+    unawaited(
+      _logKeyFlow(
+        'edit.key.delete.start provider=${_loaded?.id ?? 'new'} key=${key.id ?? 'draft'} fp=${_debugApiKeyFingerprint(key.apiKey)} localCount=${_keys.length}',
+      ),
+    );
     if (key.id == null) {
       final index = _keys.indexWhere((item) => identical(item, key));
       if (index == -1) return;
       final nextKeys = List<AIProviderKey>.from(_keys)..removeAt(index);
       _commitLocalKeyList(nextKeys);
+      unawaited(
+        _logKeyFlow(
+          'edit.key.delete.local_done provider=new key=draft localCount=${nextKeys.length}',
+        ),
+      );
       return;
     }
     await _svc.deleteProviderKey(key.id!);
     await _reloadKeys();
+    unawaited(
+      _logKeyFlow(
+        'edit.key.delete.persist_done provider=${_loaded?.id} key=${key.id} localCount=${_keys.length}',
+      ),
+    );
   }
 
   Future<void> _deleteAllProviderKeys() async {
@@ -1053,21 +976,6 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
                         ? theme.colorScheme.error
                         : theme.colorScheme.onSurfaceVariant,
                   ),
-                  if (AIBalanceEndpointTypes.isQueryable(
-                    _balanceEndpointType,
-                  )) ...[
-                    _buildThinVerticalDivider(theme),
-                    _buildKeyStatCell(
-                      icon: Icons.account_balance_wallet_outlined,
-                      value: key.balanceDisplay ?? '—',
-                      label: '余额',
-                      color: key.hasBalance
-                          ? (key.isBalanceZero
-                                ? theme.colorScheme.error
-                                : AppTheme.info)
-                          : theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ],
                 ],
               ),
             ),

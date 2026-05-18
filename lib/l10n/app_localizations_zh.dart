@@ -2795,9 +2795,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerEditApiKey => '编辑 API Key';
 
   @override
-  String get providerFetchModelsAndBalance => '获取模型与余额';
-
-  @override
   String get actionSaving => '保存中';
 
   @override
@@ -2819,12 +2816,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get providerNoApiKeys => '暂无 API Key。';
-
-  @override
-  String get balanceEndpointNone => '不查询';
-
-  @override
-  String get balanceEndpointSub2api => 'sub2api（/v1/usage）';
 
   @override
   String get segmentEntryLogHint => '直接长按选择文本，或点复制按钮一次性复制。';
@@ -3549,9 +3540,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerKeyProgressFetchModels => '获取模型';
 
   @override
-  String get providerKeyProgressFetchBalance => '获取余额';
-
-  @override
   String get providerKeyProgressScanKeys => '扫描 Key';
 
   @override
@@ -3562,9 +3550,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get providerKeyProgressSaveKey => '保存 Key';
-
-  @override
-  String get providerKeyProgressSaveBalance => '保存余额';
 
   @override
   String get providerKeyProgressSaveFailed => '保存失败';
@@ -3580,27 +3565,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String providerKeyProgressFetchingBalance(Object label) {
-    return '正在获取 $label 的余额...';
-  }
-
-  @override
   String providerKeyProgressModelFetchFailed(Object label, Object error) {
     return '$label 获取模型失败：$error';
   }
-
-  @override
-  String providerKeyProgressBalanceFetchFailed(Object label, Object error) {
-    return '$label 获取余额失败：$error';
-  }
-
-  @override
-  String providerKeyProgressBalanceDisplay(Object display) {
-    return '，余额：$display';
-  }
-
-  @override
-  String get providerKeyProgressBalanceFailedShort => '，余额获取失败';
 
   @override
   String providerKeyProgressModelsCount(Object count) {
@@ -3615,11 +3582,9 @@ class AppLocalizationsZh extends AppLocalizations {
     Object modelSuccess,
     Object total,
     Object fetchedCount,
-    Object balanceSuccess,
-    Object balanceTotal,
     Object failedCount,
   ) {
-    return '模型获取完成：$modelSuccess/$total 个 Key 成功，合并 $fetchedCount 个模型，余额 $balanceSuccess/$balanceTotal，失败项 $failedCount';
+    return '模型获取完成：$modelSuccess/$total 个 Key 成功，合并 $fetchedCount 个模型，失败项 $failedCount';
   }
 
   @override
@@ -3629,10 +3594,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String providerKeyProgressFetchCompleteMessage(
     Object modelSuccess,
     Object total,
-    Object balanceSuccess,
-    Object balanceTotal,
   ) {
-    return '模型 $modelSuccess/$total，余额 $balanceSuccess/$balanceTotal';
+    return '模型 $modelSuccess/$total';
   }
 
   @override
@@ -3644,27 +3607,12 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String providerKeyProgressSavingBalance(Object label) {
-    return '正在保存 $label 的余额...';
+  String providerKeySaveSuccessNew(Object saved, Object skipped) {
+    return '已导入 $saved 个 API Key，跳过 $skipped 个重复 Key';
   }
 
   @override
-  String providerKeySaveSuccessNew(
-    Object saved,
-    Object balanceUpdated,
-    Object balanceTotal,
-    Object skipped,
-  ) {
-    return '已导入 $saved 个 API Key，余额 $balanceUpdated/$balanceTotal，跳过 $skipped 个重复 Key';
-  }
-
-  @override
-  String providerKeySaveSuccessEdit(
-    Object balanceUpdated,
-    Object balanceTotal,
-  ) {
-    return 'API Key 已保存，余额 $balanceUpdated/$balanceTotal';
-  }
+  String get providerKeySaveSuccessEdit => 'API Key 已保存';
 
   @override
   String providerKeySaveFailedToast(Object error) {
@@ -3728,32 +3676,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String promptAddonTooLongError(Object max) {
     return '补充说明不能超过 $max 字。';
   }
-
-  @override
-  String providerKeyFetchCompleteToastNoBalance(
-    Object modelSuccess,
-    Object total,
-    Object fetchedCount,
-    Object failedCount,
-  ) {
-    return '模型获取完成：$modelSuccess/$total 个 Key 成功，合并 $fetchedCount 个模型，失败项 $failedCount';
-  }
-
-  @override
-  String providerKeyProgressFetchCompleteMessageNoBalance(
-    Object modelSuccess,
-    Object total,
-  ) {
-    return '模型 $modelSuccess/$total';
-  }
-
-  @override
-  String providerKeySaveSuccessNewNoBalance(Object saved, Object skipped) {
-    return '已导入 $saved 个 API Key，跳过 $skipped 个重复 Key';
-  }
-
-  @override
-  String get providerKeySaveSuccessEditNoBalance => 'API Key 已保存';
 
   @override
   String settingCurrentValue(Object value) {

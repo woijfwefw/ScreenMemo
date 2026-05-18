@@ -1491,7 +1491,6 @@
   "providerOnlyOneApiKeyCanEdit": "Only one API Key can be edited at a time",
   "providerAddApiKey": "Add API Key",
   "providerEditApiKey": "Edit API Key",
-  "providerFetchModelsAndBalance": "Fetch models and balance",
   "actionSaving": "Saving",
   "providerFetchModelsFailedManual": "Failed to fetch models. You can add them manually.",
   "providerDeletedApiKeys": "Deleted {count} API Keys",
@@ -1504,8 +1503,6 @@
   "providerBatchTestButton": "Batch test",
   "providerDeleteAllKeys": "Delete all",
   "providerNoApiKeys": "No API Keys.",
-  "balanceEndpointNone": "Do not query",
-  "balanceEndpointSub2api": "sub2api (/v1/usage)",
   "segmentEntryLogHint": "Long-press to select text, or tap Copy to copy everything.",
   "segmentEntryLogCopied": "Dynamic entry log copied",
   "copyLogAction": "Copy log",
@@ -1937,12 +1934,10 @@
   "providerKeyPriorityLabel": "Priority (100 = dynamic allocation)",
   "providerKeyModelsLabel": "Supported models (one per line)",
   "providerKeyProgressFetchModels": "Fetch models",
-  "providerKeyProgressFetchBalance": "Fetch balance",
   "providerKeyProgressScanKeys": "Scan keys",
   "providerKeyProgressFetchComplete": "Fetch complete",
   "providerKeyProgressSaveKeys": "Save keys",
   "providerKeyProgressSaveKey": "Save key",
-  "providerKeyProgressSaveBalance": "Save balance",
   "providerKeyProgressSaveFailed": "Save failed",
   "providerKeyProgressPreparingScan": "Preparing to scan {count} API keys...",
   "@providerKeyProgressPreparingScan": {
@@ -1956,12 +1951,6 @@
       "label": {}
     }
   },
-  "providerKeyProgressFetchingBalance": "Fetching balance for {label}...",
-  "@providerKeyProgressFetchingBalance": {
-    "placeholders": {
-      "label": {}
-    }
-  },
   "providerKeyProgressModelFetchFailed": "{label} model fetch failed: {error}",
   "@providerKeyProgressModelFetchFailed": {
     "placeholders": {
@@ -1969,20 +1958,6 @@
       "error": {}
     }
   },
-  "providerKeyProgressBalanceFetchFailed": "{label} balance fetch failed: {error}",
-  "@providerKeyProgressBalanceFetchFailed": {
-    "placeholders": {
-      "label": {},
-      "error": {}
-    }
-  },
-  "providerKeyProgressBalanceDisplay": ", balance: {display}",
-  "@providerKeyProgressBalanceDisplay": {
-    "placeholders": {
-      "display": {}
-    }
-  },
-  "providerKeyProgressBalanceFailedShort": ", balance failed",
   "providerKeyProgressModelsCount": "{count} models",
   "@providerKeyProgressModelsCount": {
     "placeholders": {
@@ -1990,25 +1965,21 @@
     }
   },
   "providerKeyProgressModelFailedSkipped": "model fetch failed, skipped",
-  "providerKeyFetchCompleteToast": "Model fetch complete: {modelSuccess}/{total} keys succeeded, {fetchedCount} models merged, balance {balanceSuccess}/{balanceTotal}, failed items {failedCount}",
+  "providerKeyFetchCompleteToast": "Model fetch complete: {modelSuccess}/{total} keys succeeded, {fetchedCount} models merged, failed items {failedCount}",
   "@providerKeyFetchCompleteToast": {
     "placeholders": {
       "modelSuccess": {},
       "total": {},
       "fetchedCount": {},
-      "balanceSuccess": {},
-      "balanceTotal": {},
       "failedCount": {}
     }
   },
   "providerKeyNoModelsFetchedToast": "No key returned models. The current manual model list is unchanged.",
-  "providerKeyProgressFetchCompleteMessage": "Models {modelSuccess}/{total}, balances {balanceSuccess}/{balanceTotal}",
+  "providerKeyProgressFetchCompleteMessage": "Models {modelSuccess}/{total}",
   "@providerKeyProgressFetchCompleteMessage": {
     "placeholders": {
       "modelSuccess": {},
-      "total": {},
-      "balanceSuccess": {},
-      "balanceTotal": {}
+      "total": {}
     }
   },
   "providerKeyProgressPreparingSave": "Preparing to save...",
@@ -2018,28 +1989,14 @@
       "label": {}
     }
   },
-  "providerKeyProgressSavingBalance": "Saving balance for {label}...",
-  "@providerKeyProgressSavingBalance": {
-    "placeholders": {
-      "label": {}
-    }
-  },
-  "providerKeySaveSuccessNew": "Imported {saved} API keys, balance {balanceUpdated}/{balanceTotal}, skipped {skipped} duplicate keys",
+  "providerKeySaveSuccessNew": "Imported {saved} API keys, skipped {skipped} duplicate keys",
   "@providerKeySaveSuccessNew": {
     "placeholders": {
       "saved": {},
-      "balanceUpdated": {},
-      "balanceTotal": {},
       "skipped": {}
     }
   },
-  "providerKeySaveSuccessEdit": "API Key saved, balance {balanceUpdated}/{balanceTotal}",
-  "@providerKeySaveSuccessEdit": {
-    "placeholders": {
-      "balanceUpdated": {},
-      "balanceTotal": {}
-    }
-  },
+  "providerKeySaveSuccessEdit": "API Key saved",
   "providerKeySaveFailedToast": "Failed to save API Key: {error}",
   "@providerKeySaveFailedToast": {
     "placeholders": {
@@ -2077,30 +2034,6 @@
       "max": {}
     }
   },
-  "providerKeyFetchCompleteToastNoBalance": "Model fetch complete: {modelSuccess}/{total} keys succeeded, {fetchedCount} models merged, failed items {failedCount}",
-  "@providerKeyFetchCompleteToastNoBalance": {
-    "placeholders": {
-      "modelSuccess": {},
-      "total": {},
-      "fetchedCount": {},
-      "failedCount": {}
-    }
-  },
-  "providerKeyProgressFetchCompleteMessageNoBalance": "Models {modelSuccess}/{total}",
-  "@providerKeyProgressFetchCompleteMessageNoBalance": {
-    "placeholders": {
-      "modelSuccess": {},
-      "total": {}
-    }
-  },
-  "providerKeySaveSuccessNewNoBalance": "Imported {saved} API keys, skipped {skipped} duplicate keys",
-  "@providerKeySaveSuccessNewNoBalance": {
-    "placeholders": {
-      "saved": {},
-      "skipped": {}
-    }
-  },
-  "providerKeySaveSuccessEditNoBalance": "API Key saved",
   "settingCurrentValue": "Current: {value}",
   "@settingCurrentValue": {
     "placeholders": {

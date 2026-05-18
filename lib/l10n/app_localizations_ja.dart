@@ -2826,9 +2826,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get providerEditApiKey => 'API Key を編集';
 
   @override
-  String get providerFetchModelsAndBalance => 'モデルと残高を取得';
-
-  @override
   String get actionSaving => '保存中';
 
   @override
@@ -2850,12 +2847,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get providerNoApiKeys => 'API Key はありません。';
-
-  @override
-  String get balanceEndpointNone => '照会しない';
-
-  @override
-  String get balanceEndpointSub2api => 'sub2api（/v1/usage）';
 
   @override
   String get segmentEntryLogHint => '長押しでテキストを選択するか、コピーを押してまとめてコピーします。';
@@ -3585,9 +3576,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get providerKeyProgressFetchModels => 'モデルを取得';
 
   @override
-  String get providerKeyProgressFetchBalance => '残高を取得';
-
-  @override
   String get providerKeyProgressScanKeys => 'Key をスキャン';
 
   @override
@@ -3598,9 +3586,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get providerKeyProgressSaveKey => 'Key を保存';
-
-  @override
-  String get providerKeyProgressSaveBalance => '残高を保存';
 
   @override
   String get providerKeyProgressSaveFailed => '保存失敗';
@@ -3616,27 +3601,9 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String providerKeyProgressFetchingBalance(Object label) {
-    return '$label の残高を取得中...';
-  }
-
-  @override
   String providerKeyProgressModelFetchFailed(Object label, Object error) {
     return '$label のモデル取得に失敗しました：$error';
   }
-
-  @override
-  String providerKeyProgressBalanceFetchFailed(Object label, Object error) {
-    return '$label の残高取得に失敗しました：$error';
-  }
-
-  @override
-  String providerKeyProgressBalanceDisplay(Object display) {
-    return '、残高：$display';
-  }
-
-  @override
-  String get providerKeyProgressBalanceFailedShort => '、残高取得失敗';
 
   @override
   String providerKeyProgressModelsCount(Object count) {
@@ -3651,11 +3618,9 @@ class AppLocalizationsJa extends AppLocalizations {
     Object modelSuccess,
     Object total,
     Object fetchedCount,
-    Object balanceSuccess,
-    Object balanceTotal,
     Object failedCount,
   ) {
-    return 'モデル取得完了：$modelSuccess/$total 個の Key が成功、$fetchedCount 個のモデルを統合、残高 $balanceSuccess/$balanceTotal、失敗項目 $failedCount';
+    return 'モデル取得完了：$modelSuccess/$total 個の Key が成功、$fetchedCount 個のモデルを統合、失敗項目 $failedCount';
   }
 
   @override
@@ -3666,10 +3631,8 @@ class AppLocalizationsJa extends AppLocalizations {
   String providerKeyProgressFetchCompleteMessage(
     Object modelSuccess,
     Object total,
-    Object balanceSuccess,
-    Object balanceTotal,
   ) {
-    return 'モデル $modelSuccess/$total、残高 $balanceSuccess/$balanceTotal';
+    return 'モデル $modelSuccess/$total';
   }
 
   @override
@@ -3681,27 +3644,12 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String providerKeyProgressSavingBalance(Object label) {
-    return '$label の残高を保存中...';
+  String providerKeySaveSuccessNew(Object saved, Object skipped) {
+    return '$saved 個の API Key を取り込みました。重複 $skipped 個をスキップ';
   }
 
   @override
-  String providerKeySaveSuccessNew(
-    Object saved,
-    Object balanceUpdated,
-    Object balanceTotal,
-    Object skipped,
-  ) {
-    return '$saved 個の API Key を取り込みました。残高 $balanceUpdated/$balanceTotal、重複 $skipped 個をスキップ';
-  }
-
-  @override
-  String providerKeySaveSuccessEdit(
-    Object balanceUpdated,
-    Object balanceTotal,
-  ) {
-    return 'API Key を保存しました。残高 $balanceUpdated/$balanceTotal';
-  }
+  String get providerKeySaveSuccessEdit => 'API Key を保存しました';
 
   @override
   String providerKeySaveFailedToast(Object error) {
@@ -3766,32 +3714,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String promptAddonTooLongError(Object max) {
     return '補足説明は $max 文字以内にしてください。';
   }
-
-  @override
-  String providerKeyFetchCompleteToastNoBalance(
-    Object modelSuccess,
-    Object total,
-    Object fetchedCount,
-    Object failedCount,
-  ) {
-    return 'モデル取得完了：$modelSuccess/$total 個の Key が成功、$fetchedCount 個のモデルを統合、失敗項目 $failedCount';
-  }
-
-  @override
-  String providerKeyProgressFetchCompleteMessageNoBalance(
-    Object modelSuccess,
-    Object total,
-  ) {
-    return 'モデル $modelSuccess/$total';
-  }
-
-  @override
-  String providerKeySaveSuccessNewNoBalance(Object saved, Object skipped) {
-    return '$saved 個の API Key を取り込みました。重複 $skipped 個をスキップ';
-  }
-
-  @override
-  String get providerKeySaveSuccessEditNoBalance => 'API Key を保存しました';
 
   @override
   String settingCurrentValue(Object value) {

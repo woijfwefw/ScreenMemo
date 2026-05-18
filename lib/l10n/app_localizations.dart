@@ -5148,12 +5148,6 @@ abstract class AppLocalizations {
   /// **'Edit API Key'**
   String get providerEditApiKey;
 
-  /// No description provided for @providerFetchModelsAndBalance.
-  ///
-  /// In en, this message translates to:
-  /// **'Fetch models and balance'**
-  String get providerFetchModelsAndBalance;
-
   /// No description provided for @actionSaving.
   ///
   /// In en, this message translates to:
@@ -5195,18 +5189,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No API Keys.'**
   String get providerNoApiKeys;
-
-  /// No description provided for @balanceEndpointNone.
-  ///
-  /// In en, this message translates to:
-  /// **'Do not query'**
-  String get balanceEndpointNone;
-
-  /// No description provided for @balanceEndpointSub2api.
-  ///
-  /// In en, this message translates to:
-  /// **'sub2api (/v1/usage)'**
-  String get balanceEndpointSub2api;
 
   /// No description provided for @segmentEntryLogHint.
   ///
@@ -6454,12 +6436,6 @@ abstract class AppLocalizations {
   /// **'Fetch models'**
   String get providerKeyProgressFetchModels;
 
-  /// No description provided for @providerKeyProgressFetchBalance.
-  ///
-  /// In en, this message translates to:
-  /// **'Fetch balance'**
-  String get providerKeyProgressFetchBalance;
-
   /// No description provided for @providerKeyProgressScanKeys.
   ///
   /// In en, this message translates to:
@@ -6484,12 +6460,6 @@ abstract class AppLocalizations {
   /// **'Save key'**
   String get providerKeyProgressSaveKey;
 
-  /// No description provided for @providerKeyProgressSaveBalance.
-  ///
-  /// In en, this message translates to:
-  /// **'Save balance'**
-  String get providerKeyProgressSaveBalance;
-
   /// No description provided for @providerKeyProgressSaveFailed.
   ///
   /// In en, this message translates to:
@@ -6508,35 +6478,11 @@ abstract class AppLocalizations {
   /// **'Fetching models for {label}...'**
   String providerKeyProgressFetchingModels(Object label);
 
-  /// No description provided for @providerKeyProgressFetchingBalance.
-  ///
-  /// In en, this message translates to:
-  /// **'Fetching balance for {label}...'**
-  String providerKeyProgressFetchingBalance(Object label);
-
   /// No description provided for @providerKeyProgressModelFetchFailed.
   ///
   /// In en, this message translates to:
   /// **'{label} model fetch failed: {error}'**
   String providerKeyProgressModelFetchFailed(Object label, Object error);
-
-  /// No description provided for @providerKeyProgressBalanceFetchFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'{label} balance fetch failed: {error}'**
-  String providerKeyProgressBalanceFetchFailed(Object label, Object error);
-
-  /// No description provided for @providerKeyProgressBalanceDisplay.
-  ///
-  /// In en, this message translates to:
-  /// **', balance: {display}'**
-  String providerKeyProgressBalanceDisplay(Object display);
-
-  /// No description provided for @providerKeyProgressBalanceFailedShort.
-  ///
-  /// In en, this message translates to:
-  /// **', balance failed'**
-  String get providerKeyProgressBalanceFailedShort;
 
   /// No description provided for @providerKeyProgressModelsCount.
   ///
@@ -6553,13 +6499,11 @@ abstract class AppLocalizations {
   /// No description provided for @providerKeyFetchCompleteToast.
   ///
   /// In en, this message translates to:
-  /// **'Model fetch complete: {modelSuccess}/{total} keys succeeded, {fetchedCount} models merged, balance {balanceSuccess}/{balanceTotal}, failed items {failedCount}'**
+  /// **'Model fetch complete: {modelSuccess}/{total} keys succeeded, {fetchedCount} models merged, failed items {failedCount}'**
   String providerKeyFetchCompleteToast(
     Object modelSuccess,
     Object total,
     Object fetchedCount,
-    Object balanceSuccess,
-    Object balanceTotal,
     Object failedCount,
   );
 
@@ -6572,12 +6516,10 @@ abstract class AppLocalizations {
   /// No description provided for @providerKeyProgressFetchCompleteMessage.
   ///
   /// In en, this message translates to:
-  /// **'Models {modelSuccess}/{total}, balances {balanceSuccess}/{balanceTotal}'**
+  /// **'Models {modelSuccess}/{total}'**
   String providerKeyProgressFetchCompleteMessage(
     Object modelSuccess,
     Object total,
-    Object balanceSuccess,
-    Object balanceTotal,
   );
 
   /// No description provided for @providerKeyProgressPreparingSave.
@@ -6592,28 +6534,17 @@ abstract class AppLocalizations {
   /// **'Saving {label}...'**
   String providerKeyProgressSaving(Object label);
 
-  /// No description provided for @providerKeyProgressSavingBalance.
-  ///
-  /// In en, this message translates to:
-  /// **'Saving balance for {label}...'**
-  String providerKeyProgressSavingBalance(Object label);
-
   /// No description provided for @providerKeySaveSuccessNew.
   ///
   /// In en, this message translates to:
-  /// **'Imported {saved} API keys, balance {balanceUpdated}/{balanceTotal}, skipped {skipped} duplicate keys'**
-  String providerKeySaveSuccessNew(
-    Object saved,
-    Object balanceUpdated,
-    Object balanceTotal,
-    Object skipped,
-  );
+  /// **'Imported {saved} API keys, skipped {skipped} duplicate keys'**
+  String providerKeySaveSuccessNew(Object saved, Object skipped);
 
   /// No description provided for @providerKeySaveSuccessEdit.
   ///
   /// In en, this message translates to:
-  /// **'API Key saved, balance {balanceUpdated}/{balanceTotal}'**
-  String providerKeySaveSuccessEdit(Object balanceUpdated, Object balanceTotal);
+  /// **'API Key saved'**
+  String get providerKeySaveSuccessEdit;
 
   /// No description provided for @providerKeySaveFailedToast.
   ///
@@ -6710,38 +6641,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Extra instructions cannot exceed {max} characters.'**
   String promptAddonTooLongError(Object max);
-
-  /// No description provided for @providerKeyFetchCompleteToastNoBalance.
-  ///
-  /// In en, this message translates to:
-  /// **'Model fetch complete: {modelSuccess}/{total} keys succeeded, {fetchedCount} models merged, failed items {failedCount}'**
-  String providerKeyFetchCompleteToastNoBalance(
-    Object modelSuccess,
-    Object total,
-    Object fetchedCount,
-    Object failedCount,
-  );
-
-  /// No description provided for @providerKeyProgressFetchCompleteMessageNoBalance.
-  ///
-  /// In en, this message translates to:
-  /// **'Models {modelSuccess}/{total}'**
-  String providerKeyProgressFetchCompleteMessageNoBalance(
-    Object modelSuccess,
-    Object total,
-  );
-
-  /// No description provided for @providerKeySaveSuccessNewNoBalance.
-  ///
-  /// In en, this message translates to:
-  /// **'Imported {saved} API keys, skipped {skipped} duplicate keys'**
-  String providerKeySaveSuccessNewNoBalance(Object saved, Object skipped);
-
-  /// No description provided for @providerKeySaveSuccessEditNoBalance.
-  ///
-  /// In en, this message translates to:
-  /// **'API Key saved'**
-  String get providerKeySaveSuccessEditNoBalance;
 
   /// No description provided for @settingCurrentValue.
   ///

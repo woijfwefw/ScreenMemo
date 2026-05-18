@@ -17,12 +17,18 @@ extension _ProviderEditStatePart on _ProviderEditPageState {
   Future<void> _reloadKeys() async {
     final id = _loaded?.id;
     if (id == null) return;
+    unawaited(_logKeyFlow('edit.reload_keys.start provider=$id'));
     final keys = await _svc.listProviderKeys(id);
     if (!mounted) return;
     _providerEditSetState(() {
       _keys = keys;
       _models = _aggregateKeyModels(keys);
     });
+    unawaited(
+      _logKeyFlow(
+        'edit.reload_keys.done provider=$id keyCount=${keys.length} models=${_models.length} keys=${_debugKeyList(keys)}',
+      ),
+    );
     unawaited(_loadModelMetadataFor(_models));
   }
 
@@ -62,20 +68,6 @@ extension _ProviderEditStatePart on _ProviderEditPageState {
     final list = List<AIProviderKey>.from(_keys);
     switch (_keySortMode) {
       case _ProviderKeySortMode.runtime:
-        return list;
-      case _ProviderKeySortMode.balanceDesc:
-        list.sort((a, b) {
-          final int balance = _compareKeyBalance(a, b, descending: true);
-          if (balance != 0) return balance;
-          return _compareDefaultKeyOrder(a, b);
-        });
-        return list;
-      case _ProviderKeySortMode.balanceAsc:
-        list.sort((a, b) {
-          final int balance = _compareKeyBalance(a, b, descending: false);
-          if (balance != 0) return balance;
-          return _compareDefaultKeyOrder(a, b);
-        });
         return list;
       case _ProviderKeySortMode.successDesc:
         list.sort((a, b) {
@@ -129,24 +121,6 @@ extension _ProviderEditStatePart on _ProviderEditPageState {
     }
   }
 
-  int _compareKeyBalance(
-    AIProviderKey a,
-    AIProviderKey b, {
-    required bool descending,
-  }) {
-    final bool aKnown = a.balanceTotal != null;
-    final bool bKnown = b.balanceTotal != null;
-    if (aKnown != bKnown) return aKnown ? -1 : 1;
-    if (!aKnown && !bKnown) {
-      final int display = (a.balanceDisplay ?? '').compareTo(
-        b.balanceDisplay ?? '',
-      );
-      return descending ? -display : display;
-    }
-    final int value = a.balanceTotal!.compareTo(b.balanceTotal!);
-    return descending ? -value : value;
-  }
-
   int _compareDefaultKeyOrder(AIProviderKey a, AIProviderKey b) {
     final int enabled = (b.enabled ? 1 : 0).compareTo(a.enabled ? 1 : 0);
     if (enabled != 0) return enabled;
@@ -157,51 +131,10 @@ extension _ProviderEditStatePart on _ProviderEditPageState {
     return (a.id ?? 0).compareTo(b.id ?? 0);
   }
 
-  String _formatBalanceTotal(double value) {
-    final rounded = value.toStringAsFixed(value.abs() >= 100 ? 2 : 4);
-    return rounded
-        .replaceFirst(RegExp(r'0+$'), '')
-        .replaceFirst(RegExp(r'\.$'), '');
-  }
-
-  String? _keysBalanceSummary() {
-    if (_loaded == null ||
-        !AIBalanceEndpointTypes.isQueryable(_balanceEndpointType) ||
-        _keys.isEmpty) {
-      return null;
-    }
-    final known = _keys.where((key) => key.hasBalance).toList();
-    if (known.isEmpty) return '总余额 —';
-    final numeric = known.where((key) => key.balanceTotal != null).toList();
-    if (numeric.isEmpty) {
-      if (known.length == 1) {
-        return '余额 ${known.first.balanceDisplay ?? '已获取'}';
-      }
-      return '余额已获取 ${known.length}/${_keys.length}';
-    }
-    final double total = numeric.fold<double>(
-      0,
-      (sum, key) => sum + (key.balanceTotal ?? 0),
-    );
-    final currencies = numeric
-        .map((key) => (key.balanceCurrency ?? '').trim())
-        .where((currency) => currency.isNotEmpty)
-        .toSet();
-    final currency = currencies.length == 1 ? ' ${currencies.first}' : '';
-    final partial = numeric.length < _keys.length
-        ? '（${numeric.length}/${_keys.length}）'
-        : '';
-    return '总余额 ${_formatBalanceTotal(total)}$currency$partial';
-  }
-
   String _keySortModeLabel(_ProviderKeySortMode mode) {
     switch (mode) {
       case _ProviderKeySortMode.runtime:
         return '默认顺序';
-      case _ProviderKeySortMode.balanceDesc:
-        return '余额从高到低';
-      case _ProviderKeySortMode.balanceAsc:
-        return '余额从低到高';
       case _ProviderKeySortMode.successDesc:
         return '成功次数';
       case _ProviderKeySortMode.recentSuccessDesc:
@@ -236,8 +169,6 @@ extension _ProviderEditStatePart on _ProviderEditPageState {
       models: List<String>.from(_models),
       extra: _buildExtra(),
       orderIndex: _loaded?.orderIndex ?? 0,
-      balanceEndpointType: _balanceEndpointType,
-      balanceAutoDeleteZeroKey: _balanceAutoDeleteZeroKey,
     );
   }
 
@@ -372,7 +303,6 @@ extension _ProviderEditStatePart on _ProviderEditPageState {
     _providerEditSetState(() => _fetching = true);
     final List<String> fetchedModelPool = <String>[];
     int successCount = 0;
-    int balanceSuccessCount = 0;
     final List<String> failureHints = <String>[];
     try {
       for (final key in enabledKeys) {
@@ -381,12 +311,9 @@ extension _ProviderEditStatePart on _ProviderEditPageState {
             providerId: providerId,
             keyId: key.id!,
             providerOverride: provider,
-            awaitBalance: true,
           );
           fetchedModelPool.addAll(models);
           successCount++;
-          final latestKey = await _svc.getProviderKey(key.id!);
-          if (latestKey?.hasBalance ?? false) balanceSuccessCount++;
         } catch (e) {
           failureHints.add(
             '${key.name}: ${_clipDialogText(e.toString(), 120)}',
@@ -399,15 +326,12 @@ extension _ProviderEditStatePart on _ProviderEditPageState {
         final fetchedCount = _mergeModelNames(<Iterable<String>>[
           fetchedModelPool,
         ]).length;
-        final balanceHint = provider.hasBalanceQuery
-            ? ', balance $balanceSuccessCount/$successCount'
-            : '';
         final failedHint = failureHints.isNotEmpty
             ? ', failed ${failureHints.length} keys'
             : '';
         UINotifier.success(
           context,
-          'Model refresh complete: $successCount/${enabledKeys.length} keys, $fetchedCount models$balanceHint$failedHint',
+          'Model refresh complete: $successCount/${enabledKeys.length} keys, $fetchedCount models$failedHint',
         );
       } else {
         UINotifier.error(

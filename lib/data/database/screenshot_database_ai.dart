@@ -336,6 +336,19 @@ class SegmentTimelineBatch {
 
 // 将 AI 配置、消息、会话、提供商与上下文相关方法拆分为扩展
 extension ScreenshotDatabaseAI on ScreenshotDatabase {
+  String _debugProviderApiKeyFingerprint(String? value) {
+    final key = (value ?? '').trim();
+    if (key.isEmpty) return 'empty';
+    final suffix = key.length <= 4 ? key : key.substring(key.length - 4);
+    return 'len=${key.length},last4=$suffix';
+  }
+
+  Future<void> _logProviderKeyDb(String message) async {
+    try {
+      await FlutterLogger.nativeInfo('AI_KEY', message);
+    } catch (_) {}
+  }
+
   Future<void> _createAiProviderKeysTable(DatabaseExecutor db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS ai_provider_keys (
@@ -355,14 +368,10 @@ extension ScreenshotDatabaseAI on ScreenshotDatabase {
         last_error_message TEXT,
         last_failed_at INTEGER,
         last_success_at INTEGER,
-        balance_display TEXT,
-        balance_total REAL,
-        balance_currency TEXT,
-        balance_raw TEXT,
-        balance_updated_at INTEGER,
         created_at INTEGER DEFAULT (strftime('%s','now') * 1000)
       )
     ''');
+    await _ensureAiProviderKeyCoreColumns(db);
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_ai_provider_keys_provider ON ai_provider_keys(provider_id, enabled, priority, order_index, id)',
     );
@@ -370,59 +379,138 @@ extension ScreenshotDatabaseAI on ScreenshotDatabase {
       'CREATE INDEX IF NOT EXISTS idx_ai_provider_keys_cooldown ON ai_provider_keys(cooldown_until_ms)',
     );
     await _ensureAiProviderKeyStatsColumns(db);
-    await _ensureAiProviderKeyBalanceColumns(db);
   }
 
-  /// 保证 ai_provider_keys 表拥有余额相关列（增量迁移、幂等）。
-  Future<void> _ensureAiProviderKeyBalanceColumns(DatabaseExecutor db) async {
+  /// 保证 ai_provider_keys 表拥有读写 API Key 所需的基础列。
+  Future<void> _ensureAiProviderKeyCoreColumns(DatabaseExecutor db) async {
     try {
       await db.execute(
-        'ALTER TABLE ai_provider_keys ADD COLUMN balance_display TEXT',
+        'ALTER TABLE ai_provider_keys ADD COLUMN provider_id INTEGER NOT NULL DEFAULT 0',
       );
     } catch (_) {}
     try {
       await db.execute(
-        'ALTER TABLE ai_provider_keys ADD COLUMN balance_total REAL',
+        "ALTER TABLE ai_provider_keys ADD COLUMN name TEXT NOT NULL DEFAULT 'Key'",
       );
     } catch (_) {}
     try {
       await db.execute(
-        'ALTER TABLE ai_provider_keys ADD COLUMN balance_currency TEXT',
+        "ALTER TABLE ai_provider_keys ADD COLUMN api_key TEXT NOT NULL DEFAULT ''",
       );
     } catch (_) {}
     try {
       await db.execute(
-        'ALTER TABLE ai_provider_keys ADD COLUMN balance_raw TEXT',
+        'ALTER TABLE ai_provider_keys ADD COLUMN models_json TEXT',
       );
     } catch (_) {}
     try {
       await db.execute(
-        'ALTER TABLE ai_provider_keys ADD COLUMN balance_updated_at INTEGER',
+        'ALTER TABLE ai_provider_keys ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1',
+      );
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE ai_provider_keys ADD COLUMN priority INTEGER NOT NULL DEFAULT 100',
+      );
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE ai_provider_keys ADD COLUMN order_index INTEGER NOT NULL DEFAULT 0',
+      );
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE ai_provider_keys ADD COLUMN failure_count INTEGER NOT NULL DEFAULT 0',
+      );
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE ai_provider_keys ADD COLUMN cooldown_until_ms INTEGER',
+      );
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE ai_provider_keys ADD COLUMN last_error_type TEXT',
+      );
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE ai_provider_keys ADD COLUMN last_error_message TEXT',
+      );
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE ai_provider_keys ADD COLUMN last_failed_at INTEGER',
+      );
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE ai_provider_keys ADD COLUMN last_success_at INTEGER',
+      );
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE ai_provider_keys ADD COLUMN created_at INTEGER',
       );
     } catch (_) {}
   }
 
-  /// 保证 ai_providers 表拥有余额相关列（增量迁移、幂等）。
-  ///
-  /// 存在两个列：
-  /// - balance_endpoint_type: 余额查询接口类型（'none' / 'sub2api'）
-  /// - balance_auto_delete_zero_key: 余额为 0 时是否自动删除该 key（0/1）
-  ///
-  /// 另保留一个历史字段 balance_path（早期实现预留、当前未使用）。
-  Future<void> _ensureAiProvidersBalanceColumns(DatabaseExecutor db) async {
-    try {
-      await db.execute('ALTER TABLE ai_providers ADD COLUMN balance_path TEXT');
-    } catch (_) {}
+  /// 保证 ai_providers 表拥有提供商与旧版 API Key 回退所需的基础列。
+  Future<void> _ensureAiProviderCoreColumns(DatabaseExecutor db) async {
     try {
       await db.execute(
-        'ALTER TABLE ai_providers ADD COLUMN balance_endpoint_type TEXT',
+        "ALTER TABLE ai_providers ADD COLUMN name TEXT NOT NULL DEFAULT ''",
       );
     } catch (_) {}
     try {
       await db.execute(
-        'ALTER TABLE ai_providers ADD COLUMN balance_auto_delete_zero_key INTEGER NOT NULL DEFAULT 0',
+        "ALTER TABLE ai_providers ADD COLUMN type TEXT NOT NULL DEFAULT 'openai'",
       );
     } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE ai_providers ADD COLUMN base_url TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE ai_providers ADD COLUMN chat_path TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE ai_providers ADD COLUMN models_path TEXT');
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE ai_providers ADD COLUMN use_response_api INTEGER NOT NULL DEFAULT 0',
+      );
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE ai_providers ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1',
+      );
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE ai_providers ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0',
+      );
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE ai_providers ADD COLUMN api_key TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE ai_providers ADD COLUMN models_json TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE ai_providers ADD COLUMN extra_json TEXT');
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE ai_providers ADD COLUMN order_index INTEGER NOT NULL DEFAULT 0',
+      );
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE ai_providers ADD COLUMN created_at INTEGER',
+      );
+    } catch (_) {}
+    await _ensureAiProviderKeySummaryColumns(db);
   }
 
   Future<void> _ensureAiProviderKeySummaryColumns(DatabaseExecutor db) async {
@@ -461,28 +549,39 @@ extension ScreenshotDatabaseAI on ScreenshotDatabase {
     } catch (_) {}
   }
 
-  Future<void> _migrateLegacyProviderKeys(DatabaseExecutor db) async {
+  Future<int> _migrateLegacyProviderKeys(
+    DatabaseExecutor db, {
+    int? onlyProviderId,
+  }) async {
+    var inserted = 0;
     try {
+      await _ensureAiProviderCoreColumns(db);
+      await _createAiProviderKeysTable(db);
+      await _logProviderKeyDb(
+        'db.keys.migrate_legacy.start provider=${onlyProviderId?.toString() ?? 'all'}',
+      );
       final providers = await db.query(
         'ai_providers',
         columns: ['id', 'api_key', 'models_json'],
+        where: onlyProviderId == null ? null : 'id = ?',
+        whereArgs: onlyProviderId == null ? null : <Object?>[onlyProviderId],
       );
       final int now = DateTime.now().millisecondsSinceEpoch;
       for (final row in providers) {
-        final int? providerId = row['id'] as int?;
-        if (providerId == null) continue;
+        final int? rowProviderId = row['id'] as int?;
+        if (rowProviderId == null) continue;
         final existing = await db.query(
           'ai_provider_keys',
           columns: ['id'],
           where: 'provider_id = ?',
-          whereArgs: <Object?>[providerId],
+          whereArgs: <Object?>[rowProviderId],
           limit: 1,
         );
         if (existing.isNotEmpty) continue;
         final String key = ((row['api_key'] as String?) ?? '').trim();
         if (key.isEmpty) continue;
         await db.insert('ai_provider_keys', <String, Object?>{
-          'provider_id': providerId,
+          'provider_id': rowProviderId,
           'name': 'Default key',
           'api_key': key,
           'models_json': (row['models_json'] as String?) ?? '[]',
@@ -494,8 +593,20 @@ extension ScreenshotDatabaseAI on ScreenshotDatabase {
           'failure_total_count': 0,
           'created_at': now,
         }, conflictAlgorithm: ConflictAlgorithm.ignore);
+        inserted++;
+        await _logProviderKeyDb(
+          'db.keys.migrate_legacy.insert provider=$rowProviderId key=${_debugProviderApiKeyFingerprint(key)}',
+        );
       }
-    } catch (_) {}
+      await _logProviderKeyDb(
+        'db.keys.migrate_legacy.done provider=${onlyProviderId?.toString() ?? 'all'} inserted=$inserted',
+      );
+    } catch (e) {
+      await _logProviderKeyDb(
+        'db.keys.migrate_legacy.error provider=${onlyProviderId?.toString() ?? 'all'} inserted=$inserted error=$e',
+      );
+    }
+    return inserted;
   }
 
   Map<String, Object?> _buildEmptyAIProviderKeySummary() {
@@ -507,11 +618,6 @@ extension ScreenshotDatabaseAI on ScreenshotDatabase {
       'errorCount': 0,
       'successTotal': 0,
       'failureTotal': 0,
-      'knownBalanceCount': 0,
-      'numericBalanceCount': 0,
-      'balanceTotal': null,
-      'balanceDisplay': null,
-      'balanceCurrency': null,
       'latestSuccessAt': null,
       'latestFailedAt': null,
       'updatedAt': DateTime.now().millisecondsSinceEpoch,
@@ -529,13 +635,8 @@ extension ScreenshotDatabaseAI on ScreenshotDatabase {
     var errorCount = 0;
     var successTotal = 0;
     var failureTotal = 0;
-    var knownBalanceCount = 0;
-    var numericBalanceCount = 0;
-    var balanceTotal = 0.0;
     var latestSuccessAt = 0;
     var latestFailedAt = 0;
-    final currencies = <String>{};
-    String? singleBalanceDisplay;
 
     for (final row in rows) {
       final enabled = ((row['enabled'] as int?) ?? 1) != 0;
@@ -546,16 +647,6 @@ extension ScreenshotDatabaseAI on ScreenshotDatabase {
       final failureTotalCount = (row['failure_total_count'] as int?) ?? 0;
       final successAt = (row['last_success_at'] as int?) ?? 0;
       final failedAt = (row['last_failed_at'] as int?) ?? 0;
-      final balanceDisplay = ((row['balance_display'] as String?) ?? '').trim();
-      final balanceCurrency = ((row['balance_currency'] as String?) ?? '')
-          .trim();
-      final balanceRaw = row['balance_total'];
-      double? numericBalance;
-      if (balanceRaw is num) {
-        numericBalance = balanceRaw.toDouble();
-      } else if (balanceRaw is String) {
-        numericBalance = double.tryParse(balanceRaw);
-      }
 
       if (enabled) enabledCount++;
       if (cooling) coolingCount++;
@@ -565,17 +656,6 @@ extension ScreenshotDatabaseAI on ScreenshotDatabase {
       failureTotal += failureTotalCount;
       if (successAt > latestSuccessAt) latestSuccessAt = successAt;
       if (failedAt > latestFailedAt) latestFailedAt = failedAt;
-      if (balanceDisplay.isNotEmpty || numericBalance != null) {
-        knownBalanceCount++;
-      }
-      if (numericBalance != null) {
-        numericBalanceCount++;
-        balanceTotal += numericBalance;
-      }
-      if (balanceCurrency.isNotEmpty) currencies.add(balanceCurrency);
-      if (rows.length == 1 && balanceDisplay.isNotEmpty) {
-        singleBalanceDisplay = balanceDisplay;
-      }
     }
 
     return <String, Object?>{
@@ -586,11 +666,6 @@ extension ScreenshotDatabaseAI on ScreenshotDatabase {
       'errorCount': errorCount,
       'successTotal': successTotal,
       'failureTotal': failureTotal,
-      'knownBalanceCount': knownBalanceCount,
-      'numericBalanceCount': numericBalanceCount,
-      'balanceTotal': numericBalanceCount == 0 ? null : balanceTotal,
-      'balanceDisplay': singleBalanceDisplay,
-      'balanceCurrency': currencies.length == 1 ? currencies.first : null,
       'latestSuccessAt': latestSuccessAt == 0 ? null : latestSuccessAt,
       'latestFailedAt': latestFailedAt == 0 ? null : latestFailedAt,
       'updatedAt': now,
@@ -603,9 +678,8 @@ extension ScreenshotDatabaseAI on ScreenshotDatabase {
   }) async {
     final db = executor ?? await database;
     try {
-      await _ensureAiProviderKeyStatsColumns(db);
-      await _ensureAiProviderKeyBalanceColumns(db);
-      await _ensureAiProviderKeySummaryColumns(db);
+      await _ensureAiProviderCoreColumns(db);
+      await _createAiProviderKeysTable(db);
       final rows = await db.query(
         'ai_provider_keys',
         where: 'provider_id = ?',
@@ -632,7 +706,8 @@ extension ScreenshotDatabaseAI on ScreenshotDatabase {
   }) async {
     final db = executor ?? await database;
     try {
-      await _ensureAiProviderKeySummaryColumns(db);
+      await _ensureAiProviderCoreColumns(db);
+      await _createAiProviderKeysTable(db);
       final providers = await db.query('ai_providers', columns: <String>['id']);
       for (final provider in providers) {
         final id = provider['id'] as int?;
@@ -922,8 +997,6 @@ extension ScreenshotDatabaseAI on ScreenshotDatabase {
         base_url TEXT,
         chat_path TEXT,
         models_path TEXT,
-        balance_endpoint_type TEXT,                               -- 余额接口类型：none | sub2api
-        balance_auto_delete_zero_key INTEGER NOT NULL DEFAULT 0,  -- 余额=0 时自动删除 key
         use_response_api INTEGER NOT NULL DEFAULT 0,              -- OpenAI Response API 兼容
         enabled INTEGER NOT NULL DEFAULT 1,
         is_default INTEGER NOT NULL DEFAULT 0,
@@ -936,8 +1009,6 @@ extension ScreenshotDatabaseAI on ScreenshotDatabase {
         created_at INTEGER DEFAULT (strftime('%s','now') * 1000)
       )
     ''');
-    // 老库增量迁移：补上余额相关列
-    await _ensureAiProvidersBalanceColumns(db);
     await _ensureAiProviderKeySummaryColumns(db);
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_ai_providers_enabled ON ai_providers(enabled, order_index, id)',
@@ -2283,12 +2354,15 @@ ORDER BY day ASC
   Future<List<Map<String, dynamic>>> listAIProviders() async {
     final db = await database;
     try {
+      await _ensureAiProviderCoreColumns(db);
       final rows = await db.query(
         'ai_providers',
         orderBy: 'enabled DESC, order_index ASC, id ASC',
       );
+      await _logProviderKeyDb('db.providers.list count=${rows.length}');
       return rows;
-    } catch (_) {
+    } catch (e) {
+      await _logProviderKeyDb('db.providers.list.error error=$e');
       return <Map<String, dynamic>>[];
     }
   }
@@ -2296,6 +2370,7 @@ ORDER BY day ASC
   Future<Map<String, dynamic>?> getAIProviderById(int id) async {
     final db = await database;
     try {
+      await _ensureAiProviderCoreColumns(db);
       final rows = await db.query(
         'ai_providers',
         where: 'id = ?',
@@ -2303,8 +2378,10 @@ ORDER BY day ASC
         limit: 1,
       );
       if (rows.isEmpty) return null;
+      await _logProviderKeyDb('db.providers.get id=$id found=true');
       return rows.first;
-    } catch (_) {
+    } catch (e) {
+      await _logProviderKeyDb('db.providers.get.error id=$id error=$e');
       return null;
     }
   }
@@ -2315,8 +2392,6 @@ ORDER BY day ASC
     String? baseUrl,
     String? chatPath,
     String? modelsPath,
-    String? balanceEndpointType,
-    bool? balanceAutoDeleteZeroKey,
     bool useResponseApi = false,
     bool enabled = true,
     bool isDefault = false,
@@ -2327,17 +2402,17 @@ ORDER BY day ASC
   }) async {
     final db = await database;
     try {
-      await _ensureAiProvidersBalanceColumns(db);
+      await _ensureAiProviderCoreColumns(db);
+      final trimmedName = name.trim();
+      await _logProviderKeyDb(
+        'db.providers.insert.start name=$trimmedName type=$type hasApiKey=${apiKey?.trim().isNotEmpty == true} modelsJsonLen=${modelsJson?.length ?? 0}',
+      );
       final id = await db.insert('ai_providers', {
-        'name': name.trim(),
+        'name': trimmedName,
         'type': type.trim(),
         'base_url': baseUrl?.trim(),
         'chat_path': chatPath?.trim(),
         'models_path': modelsPath?.trim(),
-        'balance_endpoint_type': balanceEndpointType?.trim(),
-        'balance_auto_delete_zero_key': (balanceAutoDeleteZeroKey ?? false)
-            ? 1
-            : 0,
         'use_response_api': useResponseApi ? 1 : 0,
         'enabled': enabled ? 1 : 0,
         'is_default': isDefault ? 1 : 0,
@@ -2347,12 +2422,31 @@ ORDER BY day ASC
         'order_index': orderIndex ?? 0,
         'created_at': DateTime.now().millisecondsSinceEpoch,
       }, conflictAlgorithm: ConflictAlgorithm.abort);
-
-      if (isDefault) {
-        await setDefaultAIProvider(id);
+      var resolvedId = id;
+      if (resolvedId <= 0) {
+        final rows = await db.query(
+          'ai_providers',
+          columns: const <String>['id'],
+          where: 'name = ?',
+          whereArgs: <Object?>[trimmedName],
+          orderBy: 'id DESC',
+          limit: 1,
+        );
+        resolvedId = (rows.isEmpty ? null : rows.first['id'] as int?) ?? id;
+        await _logProviderKeyDb(
+          'db.providers.insert.resolve_id inserted=$id resolved=$resolvedId name=$trimmedName',
+        );
       }
-      return id;
-    } catch (_) {
+
+      if (isDefault && resolvedId > 0) {
+        await setDefaultAIProvider(resolvedId);
+      }
+      await _logProviderKeyDb(
+        'db.providers.insert.done id=$resolvedId rawId=$id name=$trimmedName',
+      );
+      return resolvedId <= 0 ? null : resolvedId;
+    } catch (e) {
+      await _logProviderKeyDb('db.providers.insert.error name=$name error=$e');
       return null;
     }
   }
@@ -2365,9 +2459,6 @@ ORDER BY day ASC
     String? chatPath,
     String? modelsPath,
     bool setModelsPath = false,
-    String? balanceEndpointType,
-    bool setBalanceEndpointType = false,
-    bool? balanceAutoDeleteZeroKey,
     bool? useResponseApi,
     bool? enabled,
     bool? isDefault,
@@ -2378,20 +2469,13 @@ ORDER BY day ASC
   }) async {
     final db = await database;
     try {
-      await _ensureAiProvidersBalanceColumns(db);
+      await _ensureAiProviderCoreColumns(db);
       final data = <String, Object?>{};
       if (name != null) data['name'] = name.trim();
       if (type != null) data['type'] = type.trim();
       if (baseUrl != null) data['base_url'] = baseUrl.trim();
       if (chatPath != null) data['chat_path'] = chatPath.trim();
       if (setModelsPath) data['models_path'] = modelsPath?.trim();
-      if (setBalanceEndpointType) {
-        final t = balanceEndpointType?.trim();
-        data['balance_endpoint_type'] = (t == null || t.isEmpty) ? null : t;
-      }
-      if (balanceAutoDeleteZeroKey != null) {
-        data['balance_auto_delete_zero_key'] = balanceAutoDeleteZeroKey ? 1 : 0;
-      }
       if (useResponseApi != null)
         data['use_response_api'] = useResponseApi ? 1 : 0;
       if (enabled != null) data['enabled'] = enabled ? 1 : 0;
@@ -2422,6 +2506,9 @@ ORDER BY day ASC
         if (isDefault == true) {
           await setDefaultAIProvider(id);
         }
+        await _logProviderKeyDb(
+          'db.providers.update.done id=$id count=$count fields=${data.keys.join(',')}',
+        );
         return true;
       }
 
@@ -2432,8 +2519,12 @@ ORDER BY day ASC
       if (isDefault == true) {
         await setDefaultAIProvider(id);
       }
+      await _logProviderKeyDb(
+        'db.providers.update.no_change id=$id fields=${data.keys.join(',')}',
+      );
       return true;
-    } catch (_) {
+    } catch (e) {
+      await _logProviderKeyDb('db.providers.update.error id=$id error=$e');
       return false;
     }
   }
@@ -2441,6 +2532,7 @@ ORDER BY day ASC
   Future<bool> deleteAIProvider(int id) async {
     final db = await database;
     try {
+      await _ensureAiProviderCoreColumns(db);
       final count = await db.delete(
         'ai_providers',
         where: 'id = ?',
@@ -2455,6 +2547,7 @@ ORDER BY day ASC
   Future<bool> setDefaultAIProvider(int id) async {
     final db = await database;
     try {
+      await _ensureAiProviderCoreColumns(db);
       await db.transaction((txn) async {
         await txn.update('ai_providers', {
           'is_default': 0,
@@ -2475,6 +2568,7 @@ ORDER BY day ASC
   Future<Map<String, dynamic>?> getDefaultAIProvider() async {
     final db = await database;
     try {
+      await _ensureAiProviderCoreColumns(db);
       final rows = await db.query(
         'ai_providers',
         where: 'is_default = 1',
@@ -2493,6 +2587,7 @@ ORDER BY day ASC
   }) async {
     final db = await database;
     try {
+      await _ensureAiProviderCoreColumns(db);
       final count = await db.update(
         'ai_providers',
         {'models_json': modelsJson},
@@ -2509,6 +2604,7 @@ ORDER BY day ASC
   Future<String?> getAIProviderApiKey(int id) async {
     final db = await database;
     try {
+      await _ensureAiProviderCoreColumns(db);
       final rows = await db.query(
         'ai_providers',
         columns: ['api_key'],
@@ -2517,8 +2613,15 @@ ORDER BY day ASC
         limit: 1,
       );
       if (rows.isEmpty) return null;
-      return (rows.first['api_key'] as String?);
-    } catch (_) {
+      final value = rows.first['api_key'] as String?;
+      await _logProviderKeyDb(
+        'db.providers.api_key.get provider=$id value=${_debugProviderApiKeyFingerprint(value)}',
+      );
+      return value;
+    } catch (e) {
+      await _logProviderKeyDb(
+        'db.providers.api_key.get.error provider=$id error=$e',
+      );
       return null;
     }
   }
@@ -2526,7 +2629,8 @@ ORDER BY day ASC
   Future<void> setAIProviderApiKey({required int id, String? apiKey}) async {
     final db = await database;
     try {
-      await db.update(
+      await _ensureAiProviderCoreColumns(db);
+      final count = await db.update(
         'ai_providers',
         {
           'api_key': (apiKey == null || apiKey.trim().isEmpty)
@@ -2536,7 +2640,14 @@ ORDER BY day ASC
         where: 'id = ?',
         whereArgs: [id],
       );
-    } catch (_) {}
+      await _logProviderKeyDb(
+        'db.providers.api_key.set provider=$id count=$count value=${_debugProviderApiKeyFingerprint(apiKey)}',
+      );
+    } catch (e) {
+      await _logProviderKeyDb(
+        'db.providers.api_key.set.error provider=$id error=$e',
+      );
+    }
   }
 
   // ===================== AI 上下文选中（chat / segments） =====================
@@ -2575,14 +2686,28 @@ ORDER BY day ASC
   Future<List<Map<String, dynamic>>> listAIProviderKeys(int providerId) async {
     final db = await database;
     try {
-      await _ensureAiProviderKeyStatsColumns(db);
-      return await db.query(
+      await _createAiProviderKeysTable(db);
+      final migrated = await _migrateLegacyProviderKeys(
+        db,
+        onlyProviderId: providerId,
+      );
+      if (migrated > 0) {
+        await refreshAIProviderKeySummary(providerId, executor: db);
+      }
+      final rows = await db.query(
         'ai_provider_keys',
         where: 'provider_id = ?',
         whereArgs: <Object?>[providerId],
         orderBy: 'enabled DESC, priority ASC, order_index ASC, id ASC',
       );
-    } catch (_) {
+      await _logProviderKeyDb(
+        'db.keys.list provider=$providerId rows=${rows.length} migrated=$migrated',
+      );
+      return rows;
+    } catch (e) {
+      await _logProviderKeyDb(
+        'db.keys.list.error provider=$providerId error=$e',
+      );
       return <Map<String, dynamic>>[];
     }
   }
@@ -2590,14 +2715,17 @@ ORDER BY day ASC
   Future<Map<String, dynamic>?> getAIProviderKeyById(int id) async {
     final db = await database;
     try {
+      await _createAiProviderKeysTable(db);
       final rows = await db.query(
         'ai_provider_keys',
         where: 'id = ?',
         whereArgs: <Object?>[id],
         limit: 1,
       );
+      await _logProviderKeyDb('db.keys.get keyId=$id found=${rows.isNotEmpty}');
       return rows.isEmpty ? null : rows.first;
-    } catch (_) {
+    } catch (e) {
+      await _logProviderKeyDb('db.keys.get.error keyId=$id error=$e');
       return null;
     }
   }
@@ -2613,10 +2741,17 @@ ORDER BY day ASC
   }) async {
     final db = await database;
     try {
-      return await db.insert('ai_provider_keys', <String, Object?>{
+      await _createAiProviderKeysTable(db);
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final trimmedKey = apiKey.trim();
+      final trimmedName = name.trim();
+      await _logProviderKeyDb(
+        'db.keys.insert.start provider=$providerId name=$trimmedName key=${_debugProviderApiKeyFingerprint(trimmedKey)} modelsJsonLen=${modelsJson?.length ?? 0} enabled=$enabled priority=$priority order=${orderIndex ?? 0}',
+      );
+      final id = await db.insert('ai_provider_keys', <String, Object?>{
         'provider_id': providerId,
-        'name': name.trim(),
-        'api_key': apiKey.trim(),
+        'name': trimmedName,
+        'api_key': trimmedKey,
         'models_json': modelsJson ?? '[]',
         'enabled': enabled ? 1 : 0,
         'priority': priority,
@@ -2624,9 +2759,37 @@ ORDER BY day ASC
         'failure_count': 0,
         'success_count': 0,
         'failure_total_count': 0,
-        'created_at': DateTime.now().millisecondsSinceEpoch,
+        'created_at': now,
       });
-    } catch (_) {
+      var resolvedId = id;
+      if (resolvedId <= 0) {
+        final rows = await db.query(
+          'ai_provider_keys',
+          columns: const <String>['id'],
+          where: 'provider_id = ? AND api_key = ?',
+          whereArgs: <Object?>[providerId, trimmedKey],
+          orderBy: 'id DESC',
+          limit: 1,
+        );
+        resolvedId = (rows.isEmpty ? null : rows.first['id'] as int?) ?? id;
+        await _logProviderKeyDb(
+          'db.keys.insert.resolve_id provider=$providerId inserted=$id resolved=$resolvedId key=${_debugProviderApiKeyFingerprint(trimmedKey)}',
+        );
+      }
+      final rows = await db.query(
+        'ai_provider_keys',
+        columns: const <String>['id'],
+        where: 'provider_id = ?',
+        whereArgs: <Object?>[providerId],
+      );
+      await _logProviderKeyDb(
+        'db.keys.insert.done provider=$providerId keyId=$resolvedId rawId=$id providerRows=${rows.length}',
+      );
+      return resolvedId <= 0 ? null : resolvedId;
+    } catch (e) {
+      await _logProviderKeyDb(
+        'db.keys.insert.error provider=$providerId key=${_debugProviderApiKeyFingerprint(apiKey)} error=$e',
+      );
       return null;
     }
   }
@@ -2643,6 +2806,7 @@ ORDER BY day ASC
   }) async {
     final db = await database;
     try {
+      await _createAiProviderKeysTable(db);
       final data = <String, Object?>{};
       if (name != null) data['name'] = name.trim();
       if (apiKey != null) data['api_key'] = apiKey.trim();
@@ -2664,8 +2828,13 @@ ORDER BY day ASC
         where: 'id = ?',
         whereArgs: <Object?>[id],
       );
-      return count > 0 || (await getAIProviderKeyById(id)) != null;
-    } catch (_) {
+      final ok = count > 0 || (await getAIProviderKeyById(id)) != null;
+      await _logProviderKeyDb(
+        'db.keys.update keyId=$id count=$count ok=$ok fields=${data.keys.join(',')}',
+      );
+      return ok;
+    } catch (e) {
+      await _logProviderKeyDb('db.keys.update.error keyId=$id error=$e');
       return false;
     }
   }
@@ -2673,13 +2842,16 @@ ORDER BY day ASC
   Future<bool> deleteAIProviderKey(int id) async {
     final db = await database;
     try {
+      await _createAiProviderKeysTable(db);
       final count = await db.delete(
         'ai_provider_keys',
         where: 'id = ?',
         whereArgs: <Object?>[id],
       );
+      await _logProviderKeyDb('db.keys.delete keyId=$id count=$count');
       return count > 0;
-    } catch (_) {
+    } catch (e) {
+      await _logProviderKeyDb('db.keys.delete.error keyId=$id error=$e');
       return false;
     }
   }
@@ -2687,12 +2859,20 @@ ORDER BY day ASC
   Future<int> deleteAIProviderKeysForProvider(int providerId) async {
     final db = await database;
     try {
-      return await db.delete(
+      await _createAiProviderKeysTable(db);
+      final count = await db.delete(
         'ai_provider_keys',
         where: 'provider_id = ?',
         whereArgs: <Object?>[providerId],
       );
-    } catch (_) {
+      await _logProviderKeyDb(
+        'db.keys.delete_all provider=$providerId count=$count',
+      );
+      return count;
+    } catch (e) {
+      await _logProviderKeyDb(
+        'db.keys.delete_all.error provider=$providerId error=$e',
+      );
       return 0;
     }
   }
@@ -2700,7 +2880,7 @@ ORDER BY day ASC
   Future<void> markAIProviderKeySuccess(int keyId) async {
     final db = await database;
     try {
-      await _ensureAiProviderKeyStatsColumns(db);
+      await _createAiProviderKeysTable(db);
       await db.rawUpdate(
         '''
         UPDATE ai_provider_keys
@@ -2728,7 +2908,7 @@ ORDER BY day ASC
   }) async {
     final db = await database;
     try {
-      await _ensureAiProviderKeyStatsColumns(db);
+      await _createAiProviderKeysTable(db);
       final row = await getAIProviderKeyById(keyId);
       final int current = (row?['failure_count'] as int?) ?? 0;
       final int nextCount = resetFailureCount
@@ -2755,63 +2935,6 @@ ORDER BY day ASC
           DateTime.now().millisecondsSinceEpoch,
           keyId,
         ],
-      );
-    } catch (_) {}
-  }
-
-  /// 更新某个 key 的余额信息（display/total/currency/raw + updated_at）。
-  ///
-  /// - 任意字段为 null 时表示不修改对应列。
-  /// - 仅当至少一项非 null 时才发起 UPDATE。
-  Future<void> updateAIProviderKeyBalance({
-    required int keyId,
-    String? balanceDisplay,
-    double? balanceTotal,
-    String? balanceCurrency,
-    String? balanceRaw,
-    int? balanceUpdatedAt,
-  }) async {
-    final db = await database;
-    try {
-      await _ensureAiProviderKeyBalanceColumns(db);
-      final data = <String, Object?>{};
-      if (balanceDisplay != null) data['balance_display'] = balanceDisplay;
-      if (balanceTotal != null) data['balance_total'] = balanceTotal;
-      if (balanceCurrency != null) data['balance_currency'] = balanceCurrency;
-      if (balanceRaw != null) {
-        data['balance_raw'] = balanceRaw.length > 1000
-            ? balanceRaw.substring(0, 1000)
-            : balanceRaw;
-      }
-      if (balanceUpdatedAt != null) {
-        data['balance_updated_at'] = balanceUpdatedAt;
-      }
-      if (data.isEmpty) return;
-      await db.update(
-        'ai_provider_keys',
-        data,
-        where: 'id = ?',
-        whereArgs: <Object?>[keyId],
-      );
-    } catch (_) {}
-  }
-
-  /// 清空某个 key 的余额信息。
-  Future<void> clearAIProviderKeyBalance(int keyId) async {
-    final db = await database;
-    try {
-      await _ensureAiProviderKeyBalanceColumns(db);
-      await db.update(
-        'ai_provider_keys',
-        <String, Object?>{
-          'balance_display': null,
-          'balance_total': null,
-          'balance_currency': null,
-          'balance_raw': null,
-          'balance_updated_at': null,
-        },
-        where: 'id = ?',
-        whereArgs: <Object?>[keyId],
       );
     } catch (_) {}
   }
@@ -3321,9 +3444,9 @@ ORDER BY day ASC
       );
     } catch (e) {
       try {
-        await FlutterLogger.nativeError(
+        await FlutterLogger.nativeWarn(
           'DB',
-          'listSegmentsEx failed err=${e.toString()} onlyNoSummary=$onlyNoSummary requireSamples=$requireSamples startMillis=${startMillis?.toString() ?? 'null'} endMillis=${endMillis?.toString() ?? 'null'} limit=$limit offset=$offset',
+          'listSegmentsEx primary query failed, retrying with truncated result columns err=${e.toString()} onlyNoSummary=$onlyNoSummary requireSamples=$requireSamples startMillis=${startMillis?.toString() ?? 'null'} endMillis=${endMillis?.toString() ?? 'null'} limit=$limit offset=$offset',
         );
       } catch (_) {}
 
@@ -3331,9 +3454,9 @@ ORDER BY day ASC
       // selecting large TEXT columns (output_text / structured_json) across many rows.
       // Retry with truncated result columns so the timeline won't go empty.
       try {
-        const int maxOutputTextChars = 4096;
-        const int maxStructuredJsonChars = 204800;
-        const int maxCategoriesChars = 4096;
+        const int maxOutputTextChars = 2048;
+        const int maxStructuredJsonChars = 32768;
+        const int maxCategoriesChars = 2048;
         final String fallbackSql =
             '''
         SELECT
@@ -3639,6 +3762,138 @@ ORDER BY day ASC
       return rows.first;
     } catch (_) {
       return null;
+    }
+  }
+
+  bool _isBlankDynamicResultText(String? value) {
+    final String v = (value ?? '').trim();
+    return v.isEmpty || v.toLowerCase() == 'null';
+  }
+
+  bool _isTruthyJsonFlag(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value.toInt() != 0;
+    if (value is String) {
+      final String v = value.trim().toLowerCase();
+      return v == 'true' || v == '1' || v == 'yes';
+    }
+    return false;
+  }
+
+  bool _isDynamicStructuredJsonCompliantForBackfill(String? value) {
+    final String sj = (value ?? '').trim();
+    if (sj.isEmpty || sj.toLowerCase() == 'null') return false;
+    try {
+      final dynamic decoded = jsonDecode(sj);
+      if (decoded is! Map) return false;
+      final dynamic meta = decoded['_meta'];
+      if (meta is Map && _isTruthyJsonFlag(meta['needs_manual_retry'])) {
+        return false;
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  bool _needsDynamicSummaryRepairForBackfill({
+    required String? outputText,
+    required String? structuredJson,
+  }) {
+    if (_isBlankDynamicResultText(outputText) &&
+        _isBlankDynamicResultText(structuredJson)) {
+      return true;
+    }
+    return !_isDynamicStructuredJsonCompliantForBackfill(structuredJson);
+  }
+
+  Future<Map<String, dynamic>?> getDynamicBackfillEligibility(
+    int segmentId,
+  ) async {
+    if (segmentId <= 0) return null;
+    final db = await database;
+    try {
+      final rows = await db.rawQuery(
+        '''
+        SELECT
+          s.id,
+          s.status,
+          s.segment_kind,
+          s.merged_into_id,
+          CASE
+            WHEN s.merged_into_id IS NULL OR s.merged_into_id <= 0
+              OR NOT EXISTS (SELECT 1 FROM segments root WHERE root.id = s.merged_into_id)
+            THEN 1 ELSE 0
+          END AS is_root,
+          r.output_text,
+          r.structured_json
+        FROM segments s
+        LEFT JOIN segment_results r ON r.segment_id = s.id
+        WHERE s.id = ?
+        LIMIT 1
+        ''',
+        <Object?>[segmentId],
+      );
+      if (rows.isEmpty) {
+        return <String, dynamic>{
+          'segment_id': segmentId,
+          'exists': false,
+          'would_queue': false,
+          'reason': '动态不存在，补全队列无法选中。',
+        };
+      }
+
+      final row = rows.first;
+      final String status = (row['status'] as String?)?.trim() ?? '';
+      final String segmentKind = (row['segment_kind'] as String?)?.trim() ?? '';
+      final bool isGlobalKind = segmentKind.isEmpty || segmentKind == 'global';
+      final bool isRoot = ((row['is_root'] as int?) ?? 0) != 0;
+      final String? outputText = row['output_text'] as String?;
+      final String? structuredJson = row['structured_json'] as String?;
+      final bool outputBlank = _isBlankDynamicResultText(outputText);
+      final bool structuredCompliant =
+          _isDynamicStructuredJsonCompliantForBackfill(structuredJson);
+      final bool needsRepair = _needsDynamicSummaryRepairForBackfill(
+        outputText: outputText,
+        structuredJson: structuredJson,
+      );
+      final bool wouldQueue =
+          status == 'completed' && isGlobalKind && isRoot && needsRepair;
+
+      String reason;
+      if (wouldQueue) {
+        reason = '当前数据库状态符合手动“补全”的队列条件，会被加入待补全清单。';
+      } else if (status != 'completed') {
+        reason = '当前动态状态为 $status，不是 completed，手动补全队列会跳过。';
+      } else if (!isGlobalKind) {
+        reason = '当前动态不是 global 顶层动态类型，手动补全队列会跳过。';
+      } else if (!isRoot) {
+        reason = '当前动态已合并到其它动态，手动补全只处理顶层动态。';
+      } else if (!needsRepair) {
+        reason = '当前结果已存在且 structured_json 合规，手动补全会认为无需重跑。';
+      } else {
+        reason = '当前数据库状态不符合手动补全队列条件。';
+      }
+
+      return <String, dynamic>{
+        'segment_id': segmentId,
+        'exists': true,
+        'would_queue': wouldQueue,
+        'reason': reason,
+        'status': status,
+        'segment_kind': segmentKind,
+        'is_root': isRoot,
+        'output_blank': outputBlank,
+        'structured_json_compliant': structuredCompliant,
+        'needs_repair': needsRepair,
+      };
+    } catch (e) {
+      return <String, dynamic>{
+        'segment_id': segmentId,
+        'exists': null,
+        'would_queue': null,
+        'reason': '读取补全队列状态失败：$e',
+      };
     }
   }
 

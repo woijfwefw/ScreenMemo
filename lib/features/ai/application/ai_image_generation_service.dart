@@ -559,15 +559,6 @@ class AIImageGenerationService {
     final int? keyId = endpoint.providerKeyId;
     if (keyId == null) return;
     await AIProvidersService.instance.markProviderKeySuccess(keyId);
-    final int? providerId = endpoint.providerId;
-    if (providerId != null) {
-      unawaited(
-        AIProvidersService.instance.refreshBalanceForKey(
-          providerId: providerId,
-          keyId: keyId,
-        ),
-      );
-    }
   }
 
   Future<void> _markEndpointFailure({

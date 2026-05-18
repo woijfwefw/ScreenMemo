@@ -45,6 +45,9 @@ extension _ProviderEditSavePart on _ProviderEditPageState {
 
     _providerEditSetState(() => _saving = true);
     try {
+      await _logKeyFlow(
+        'edit.save.start mode=${_loaded == null ? 'create' : 'update'} loaded=${_loaded?.id ?? 'new'} localKeys=${_keys.length} localModels=${_models.length} keys=${_debugKeyList(_keys)}',
+      );
       if (_loaded == null) {
         final id = await _svc.createProvider(
           name: name,
@@ -57,20 +60,27 @@ extension _ProviderEditSavePart on _ProviderEditPageState {
           isDefault: false,
           extra: _buildExtra(),
           models: _models,
-          balanceEndpointType: _balanceEndpointType,
-          balanceAutoDeleteZeroKey: _balanceAutoDeleteZeroKey,
         );
         if (id == null) {
           throw Exception('Insert failed');
         }
-        await _svc.updateProvider(id: id, models: _models);
+        await _logKeyFlow(
+          'edit.save.provider_created id=$id localKeys=${_keys.length} localModels=${_models.length}',
+        );
         final pendingKeys = _keys
             .where((key) => key.id == null && key.apiKey.trim().isNotEmpty)
             .toList(growable: false);
+        final createdKeys = <AIProviderKey>[];
+        await _logKeyFlow(
+          'edit.save.pending_keys provider=$id pending=${pendingKeys.length} allLocal=${_keys.length} keys=${_debugKeyList(pendingKeys)}',
+        );
         if (pendingKeys.isNotEmpty) {
           try {
             for (var i = 0; i < pendingKeys.length; i++) {
               final key = pendingKeys[i];
+              await _logKeyFlow(
+                'edit.save.create_key.start provider=$id index=$i key=${_debugApiKeyFingerprint(key.apiKey)} models=${key.models.length} enabled=${key.enabled} priority=${key.priority} order=${key.orderIndex}',
+              );
               final created = await _svc.createProviderKey(
                 providerId: id,
                 name: key.name,
@@ -83,36 +93,45 @@ extension _ProviderEditSavePart on _ProviderEditPageState {
               if (created == null) {
                 throw Exception('Create provider key failed');
               }
-              final balance = _pendingKeyBalances[key.apiKey.trim()];
-              if (balance != null) {
-                await _svc.saveFetchedBalanceForKey(
-                  providerId: id,
-                  keyId: created,
-                  balance: balance,
-                  providerOverride: AIProvider(
-                    id: id,
-                    name: name,
-                    type: _type,
-                    baseUrl: base.isEmpty ? null : base,
-                    chatPath: chatPath,
-                    modelsPath: modelsPathValue ?? '',
-                    useResponseApi: _useResponseApi,
-                    enabled: true,
-                    isDefault: false,
-                    models: _models,
-                    extra: _buildExtra(),
-                    orderIndex: null,
-                    balanceEndpointType: _balanceEndpointType,
-                    balanceAutoDeleteZeroKey: _balanceAutoDeleteZeroKey,
-                  ),
-                );
-              }
+              await _logKeyFlow(
+                'edit.save.create_key.done provider=$id index=$i keyId=$created key=${_debugApiKeyFingerprint(key.apiKey)}',
+              );
+              createdKeys.add(key);
             }
           } catch (e) {
+            await _logKeyFlow(
+              'edit.save.create_keys.error provider=$id createdExpected=${createdKeys.length} error=$e',
+            );
             await _svc.deleteProvider(id);
             rethrow;
           }
           await _svc.syncProviderModelsFromKeys(id);
+          await _logKeyFlow(
+            'edit.save.sync_models.done provider=$id expectedCreated=${createdKeys.length}',
+          );
+          final savedKeys = await _svc.listProviderKeys(id);
+          await _logKeyFlow(
+            'edit.save.readback provider=$id saved=${savedKeys.length} expected=${createdKeys.length} savedKeys=${_debugKeyList(savedKeys)}',
+          );
+          final savedKeyValues = savedKeys
+              .map((key) => key.apiKey.trim())
+              .where((apiKey) => apiKey.isNotEmpty)
+              .toSet();
+          final missingKeys = createdKeys
+              .where((key) => !savedKeyValues.contains(key.apiKey.trim()))
+              .toList(growable: false);
+          if (savedKeys.length < createdKeys.length || missingKeys.isNotEmpty) {
+            await _logKeyFlow(
+              'edit.save.readback.missing provider=$id saved=${savedKeys.length} expected=${createdKeys.length} missing=${missingKeys.map((key) => _debugApiKeyFingerprint(key.apiKey)).join(',')}',
+            );
+            await _svc.deleteProvider(id);
+            throw Exception('Provider keys were not saved correctly');
+          }
+        } else {
+          await _logKeyFlow(
+            'edit.save.no_pending_keys provider=$id localKeys=${_keys.length} localModels=${_models.length}',
+          );
+          await _svc.updateProvider(id: id, models: _models);
         }
       } else {
         final ok = await _svc.updateProvider(
@@ -127,18 +146,24 @@ extension _ProviderEditSavePart on _ProviderEditPageState {
           isDefault: false,
           extra: _buildExtra(),
           models: _models,
-          balanceEndpointType: _balanceEndpointType,
-          setBalanceEndpointType: true,
-          balanceAutoDeleteZeroKey: _balanceAutoDeleteZeroKey,
         );
         if (!ok) {
           throw Exception('Update failed');
         }
+        await _logKeyFlow(
+          'edit.save.update_provider.done provider=${_loaded!.id} localKeys=${_keys.length} localModels=${_models.length}',
+        );
       }
       if (!mounted) return;
+      await _logKeyFlow(
+        'edit.save.success loaded=${_loaded?.id ?? 'new'} localKeys=${_keys.length}',
+      );
       UINotifier.success(context, AppLocalizations.of(context).saveSuccess);
       Navigator.of(context).pop(true);
     } catch (e) {
+      await _logKeyFlow(
+        'edit.save.error loaded=${_loaded?.id ?? 'new'} localKeys=${_keys.length} error=$e',
+      );
       try {
         await FlutterLogger.nativeError(
           'AI',

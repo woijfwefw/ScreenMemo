@@ -8,7 +8,9 @@ import 'package:screen_memo/features/ai/application/models_dev_catalog_service.d
 import 'package:screen_memo/features/ai/application/provider_key_batch_maintenance_service.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
 import 'package:screen_memo/core/widgets/model_logo.dart';
+import 'package:screen_memo/core/widgets/ui_action_menu.dart';
 import 'package:screen_memo/core/widgets/ui_dialog.dart';
+import 'package:screen_memo/core/widgets/ui_select_field.dart';
 import 'package:screen_memo/core/logging/flutter_logger.dart';
 import 'package:screen_memo/models/models_dev_limits.dart';
 
@@ -21,8 +23,6 @@ part 'provider_edit_page_form_part.dart';
 
 enum _ProviderKeySortMode {
   runtime,
-  balanceDesc,
-  balanceAsc,
   successDesc,
   recentSuccessDesc,
   failureDesc,
@@ -64,12 +64,6 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
   String _type = AIProviderTypes.openai;
   bool _useResponseApi = false;
 
-  /// 余额查询接口类型，'none' / 'sub2api'。
-  String _balanceEndpointType = AIBalanceEndpointTypes.none;
-
-  /// 余额为 0 时自动删除该 key。
-  bool _balanceAutoDeleteZeroKey = false;
-
   bool _loading = true;
   bool _saving = false;
   bool _fetching = false;
@@ -81,14 +75,35 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
   List<String> _models = <String>[];
   final Map<String, ModelsDevModelInfo> _modelInfoByName =
       <String, ModelsDevModelInfo>{};
-  final Map<String, ProviderKeyBalance> _pendingKeyBalances =
-      <String, ProviderKeyBalance>{};
   List<AIProviderKey> _keys = <AIProviderKey>[];
   AIProvider? _loaded;
   bool _geminiNoticeShown = false;
   int _modelInfoLoadSeq = 0;
 
   void _providerEditSetState(VoidCallback fn) => setState(fn);
+
+  String _debugApiKeyFingerprint(String value) {
+    final key = value.trim();
+    if (key.isEmpty) return 'empty';
+    final suffix = key.length <= 4 ? key : key.substring(key.length - 4);
+    return 'len=${key.length},last4=$suffix';
+  }
+
+  String _debugKeyList(List<AIProviderKey> keys) {
+    if (keys.isEmpty) return '[]';
+    return keys
+        .map(
+          (key) =>
+              '#${key.id ?? 'draft'}:${_debugApiKeyFingerprint(key.apiKey)} models=${key.models.length} enabled=${key.enabled}',
+        )
+        .join('; ');
+  }
+
+  Future<void> _logKeyFlow(String message) async {
+    try {
+      await FlutterLogger.nativeInfo('AI_KEY', message);
+    } catch (_) {}
+  }
 
   Future<void> _showGeminiRegionDialog() async {
     if (!mounted) return;
@@ -122,9 +137,17 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
 
   Future<void> _initLoad() async {
     try {
+      unawaited(
+        _logKeyFlow(
+          'edit.init.start providerId=${widget.providerId?.toString() ?? 'new'}',
+        ),
+      );
       if (widget.providerId != null) {
         final p = await _svc.getProvider(widget.providerId!);
         if (p == null) {
+          unawaited(
+            _logKeyFlow('edit.init.provider_missing id=${widget.providerId}'),
+          );
           if (mounted) {
             UINotifier.error(
               context,
@@ -136,6 +159,11 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
         }
         _loaded = p;
         _keys = await _svc.listProviderKeys(p.id!);
+        unawaited(
+          _logKeyFlow(
+            'edit.init.loaded provider=${p.id} keyCount=${_keys.length} modelsFromProvider=${p.models.length} keySummaryTotal=${p.keySummary.totalCount} keys=${_debugKeyList(_keys)}',
+          ),
+        );
         _nameCtrl.text = p.name;
         _type = p.type;
         _baseUrlCtrl.text = p.baseUrl ?? '';
@@ -147,8 +175,6 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
           _modelsPathCtrl.text = path;
         }
         _useResponseApi = p.useResponseApi;
-        _balanceEndpointType = p.balanceEndpointType;
-        _balanceAutoDeleteZeroKey = p.balanceAutoDeleteZeroKey;
         _models = _aggregateKeyModels(_keys);
         if (_models.isEmpty) _models = List<String>.from(p.models);
         if (p.type == AIProviderTypes.azureOpenAI) {
@@ -160,9 +186,13 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
         }
       } else {
         _applyTypeDefaults(AIProviderTypes.openai, initial: true);
+        unawaited(_logKeyFlow('edit.init.new_provider defaults_type=$_type'));
       }
       unawaited(_loadModelMetadataFor(_models));
     } catch (e) {
+      unawaited(
+        _logKeyFlow('edit.init.error providerId=${widget.providerId} error=$e'),
+      );
       if (mounted) {
         UINotifier.error(context, AppLocalizations.of(context).pleaseTryAgain);
       }

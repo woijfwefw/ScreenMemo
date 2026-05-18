@@ -1491,7 +1491,6 @@
   "providerOnlyOneApiKeyCanEdit": "一度に編集できる API Key は 1 つだけです",
   "providerAddApiKey": "API Key を追加",
   "providerEditApiKey": "API Key を編集",
-  "providerFetchModelsAndBalance": "モデルと残高を取得",
   "actionSaving": "保存中",
   "providerFetchModelsFailedManual": "モデルの取得に失敗しました。手動で追加できます。",
   "providerDeletedApiKeys": "{count} 個の API Key を削除しました",
@@ -1504,8 +1503,6 @@
   "providerBatchTestButton": "一括テスト",
   "providerDeleteAllKeys": "すべて削除",
   "providerNoApiKeys": "API Key はありません。",
-  "balanceEndpointNone": "照会しない",
-  "balanceEndpointSub2api": "sub2api（/v1/usage）",
   "segmentEntryLogHint": "長押しでテキストを選択するか、コピーを押してまとめてコピーします。",
   "segmentEntryLogCopied": "動的エントリーログをコピーしました",
   "copyLogAction": "ログをコピー",
@@ -1937,12 +1934,10 @@
   "providerKeyPriorityLabel": "優先度（100 = 動的割り当て）",
   "providerKeyModelsLabel": "対応モデル（1行に1つ）",
   "providerKeyProgressFetchModels": "モデルを取得",
-  "providerKeyProgressFetchBalance": "残高を取得",
   "providerKeyProgressScanKeys": "Key をスキャン",
   "providerKeyProgressFetchComplete": "取得完了",
   "providerKeyProgressSaveKeys": "Key を保存",
   "providerKeyProgressSaveKey": "Key を保存",
-  "providerKeyProgressSaveBalance": "残高を保存",
   "providerKeyProgressSaveFailed": "保存失敗",
   "providerKeyProgressPreparingScan": "{count} 個の API Key をスキャンする準備中...",
   "@providerKeyProgressPreparingScan": {
@@ -1956,12 +1951,6 @@
       "label": {}
     }
   },
-  "providerKeyProgressFetchingBalance": "{label} の残高を取得中...",
-  "@providerKeyProgressFetchingBalance": {
-    "placeholders": {
-      "label": {}
-    }
-  },
   "providerKeyProgressModelFetchFailed": "{label} のモデル取得に失敗しました：{error}",
   "@providerKeyProgressModelFetchFailed": {
     "placeholders": {
@@ -1969,20 +1958,6 @@
       "error": {}
     }
   },
-  "providerKeyProgressBalanceFetchFailed": "{label} の残高取得に失敗しました：{error}",
-  "@providerKeyProgressBalanceFetchFailed": {
-    "placeholders": {
-      "label": {},
-      "error": {}
-    }
-  },
-  "providerKeyProgressBalanceDisplay": "、残高：{display}",
-  "@providerKeyProgressBalanceDisplay": {
-    "placeholders": {
-      "display": {}
-    }
-  },
-  "providerKeyProgressBalanceFailedShort": "、残高取得失敗",
   "providerKeyProgressModelsCount": "{count} 個のモデル",
   "@providerKeyProgressModelsCount": {
     "placeholders": {
@@ -1990,25 +1965,21 @@
     }
   },
   "providerKeyProgressModelFailedSkipped": "モデル取得に失敗したためスキップしました",
-  "providerKeyFetchCompleteToast": "モデル取得完了：{modelSuccess}/{total} 個の Key が成功、{fetchedCount} 個のモデルを統合、残高 {balanceSuccess}/{balanceTotal}、失敗項目 {failedCount}",
+  "providerKeyFetchCompleteToast": "モデル取得完了：{modelSuccess}/{total} 個の Key が成功、{fetchedCount} 個のモデルを統合、失敗項目 {failedCount}",
   "@providerKeyFetchCompleteToast": {
     "placeholders": {
       "modelSuccess": {},
       "total": {},
       "fetchedCount": {},
-      "balanceSuccess": {},
-      "balanceTotal": {},
       "failedCount": {}
     }
   },
   "providerKeyNoModelsFetchedToast": "モデルを返した Key がありません。現在の手動モデル一覧は変更されません。",
-  "providerKeyProgressFetchCompleteMessage": "モデル {modelSuccess}/{total}、残高 {balanceSuccess}/{balanceTotal}",
+  "providerKeyProgressFetchCompleteMessage": "モデル {modelSuccess}/{total}",
   "@providerKeyProgressFetchCompleteMessage": {
     "placeholders": {
       "modelSuccess": {},
-      "total": {},
-      "balanceSuccess": {},
-      "balanceTotal": {}
+      "total": {}
     }
   },
   "providerKeyProgressPreparingSave": "保存の準備中...",
@@ -2018,28 +1989,14 @@
       "label": {}
     }
   },
-  "providerKeyProgressSavingBalance": "{label} の残高を保存中...",
-  "@providerKeyProgressSavingBalance": {
-    "placeholders": {
-      "label": {}
-    }
-  },
-  "providerKeySaveSuccessNew": "{saved} 個の API Key を取り込みました。残高 {balanceUpdated}/{balanceTotal}、重複 {skipped} 個をスキップ",
+  "providerKeySaveSuccessNew": "{saved} 個の API Key を取り込みました。重複 {skipped} 個をスキップ",
   "@providerKeySaveSuccessNew": {
     "placeholders": {
       "saved": {},
-      "balanceUpdated": {},
-      "balanceTotal": {},
       "skipped": {}
     }
   },
-  "providerKeySaveSuccessEdit": "API Key を保存しました。残高 {balanceUpdated}/{balanceTotal}",
-  "@providerKeySaveSuccessEdit": {
-    "placeholders": {
-      "balanceUpdated": {},
-      "balanceTotal": {}
-    }
-  },
+  "providerKeySaveSuccessEdit": "API Key を保存しました",
   "providerKeySaveFailedToast": "API Key の保存に失敗しました：{error}",
   "@providerKeySaveFailedToast": {
     "placeholders": {
@@ -2077,30 +2034,6 @@
       "max": {}
     }
   },
-  "providerKeyFetchCompleteToastNoBalance": "モデル取得完了：{modelSuccess}/{total} 個の Key が成功、{fetchedCount} 個のモデルを統合、失敗項目 {failedCount}",
-  "@providerKeyFetchCompleteToastNoBalance": {
-    "placeholders": {
-      "modelSuccess": {},
-      "total": {},
-      "fetchedCount": {},
-      "failedCount": {}
-    }
-  },
-  "providerKeyProgressFetchCompleteMessageNoBalance": "モデル {modelSuccess}/{total}",
-  "@providerKeyProgressFetchCompleteMessageNoBalance": {
-    "placeholders": {
-      "modelSuccess": {},
-      "total": {}
-    }
-  },
-  "providerKeySaveSuccessNewNoBalance": "{saved} 個の API Key を取り込みました。重複 {skipped} 個をスキップ",
-  "@providerKeySaveSuccessNewNoBalance": {
-    "placeholders": {
-      "saved": {},
-      "skipped": {}
-    }
-  },
-  "providerKeySaveSuccessEditNoBalance": "API Key を保存しました",
   "settingCurrentValue": "現在：{value}",
   "@settingCurrentValue": {
     "placeholders": {
