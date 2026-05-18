@@ -840,9 +840,41 @@ extension _SegmentStatusDynamicTaskPart on _SegmentStatusPageState {
     }
   }
 
+  Future<void> _confirmStartSelectedDayDynamicBackfill() async {
+    final String dateKey = (_selectedDateKey ?? '').trim();
+    if (dateKey.isEmpty || _startingDynamicRebuild) return;
+    if (_dynamicRebuildTaskStatus.isActive) {
+      await UIDialogs.showInfo(
+        context,
+        title: '已有动态任务运行中',
+        message: '请先在“动态任务”面板停止当前任务，再补全 $dateKey 的动态。',
+      );
+      return;
+    }
+    if (_dynamicRebuildTaskStatus.canContinue) {
+      await UIDialogs.showInfo(
+        context,
+        title: '存在未完成动态任务',
+        message: '请先在“动态任务”面板继续或退出旧任务，再补全 $dateKey 的动态，避免误恢复其他任务进度。',
+      );
+      return;
+    }
+    final bool ok = await UIDialogs.showConfirm(
+      context,
+      title: '补全当天动态',
+      message:
+          '只补全 $dateKey 缺失动态和缺失总结，不会清空或覆盖已有动态。每条补全结果生成后，仍会检查是否能与上一条动态合并。确定开始吗？',
+      confirmText: '补全当天',
+      cancelText: '取消',
+    );
+    if (!ok || !mounted) return;
+    await _startDynamicRebuild(taskMode: 'backfill', targetDayKey: dateKey);
+  }
+
   Future<void> _startDynamicRebuild({
     bool resumeExisting = false,
     String taskMode = 'rebuild',
+    String? targetDayKey,
   }) async {
     if (_startingDynamicRebuild) return;
     _segmentStatusSetState(() => _startingDynamicRebuild = true);
@@ -855,6 +887,7 @@ extension _SegmentStatusDynamicTaskPart on _SegmentStatusPageState {
         taskMode: resumeExisting
             ? _dynamicRebuildTaskStatus.taskMode
             : taskMode,
+        targetDayKey: resumeExisting ? null : targetDayKey,
       );
       if (!mounted) return;
       _segmentStatusSetState(() {
@@ -870,7 +903,9 @@ extension _SegmentStatusDynamicTaskPart on _SegmentStatusPageState {
       if (status.isCompleted && status.totalSegments == 0) {
         UINotifier.info(
           context,
-          status.isBackfillMode
+          status.isBackfillMode && status.targetDayKey.trim().isNotEmpty
+              ? '当天没有需要补全的动态'
+              : status.isBackfillMode
               ? '未发现需要补全的动态'
               : AppLocalizations.of(context).dynamicRebuildNoSegments,
         );
@@ -889,7 +924,9 @@ extension _SegmentStatusDynamicTaskPart on _SegmentStatusPageState {
       } else if (status.isActive && !previous.isActive) {
         UINotifier.info(
           context,
-          status.isBackfillMode
+          status.isBackfillMode && status.targetDayKey.trim().isNotEmpty
+              ? '已开始后台补全当天动态，可在通知栏查看进度'
+              : status.isBackfillMode
               ? '已开始后台补全，可在通知栏查看进度'
               : AppLocalizations.of(context).dynamicRebuildStartedInBackground,
         );

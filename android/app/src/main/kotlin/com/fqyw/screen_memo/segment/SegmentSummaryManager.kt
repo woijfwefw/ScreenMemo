@@ -5961,6 +5961,15 @@ object SegmentSummaryManager {
         return missing
     }
 
+    fun filterDynamicRebuildWindowsForDay(
+        windows: List<DynamicRebuildWindow>,
+        targetDayKey: String,
+    ): List<DynamicRebuildWindow> {
+        val normalizedTarget = targetDayKey.trim()
+        if (normalizedTarget.isBlank()) return windows
+        return windows.filter { dateKeyFromMillis(it.startTime) == normalizedTarget }
+    }
+
     fun rebuildWindowStrict(
         ctx: Context,
         windowStart: Long,

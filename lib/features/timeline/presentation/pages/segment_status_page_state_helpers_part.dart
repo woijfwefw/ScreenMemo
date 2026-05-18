@@ -290,7 +290,7 @@ extension _SegmentStatusStateHelpersPart on _SegmentStatusPageState {
     final bool showDailySummary = _selectedDateKey != null;
     double width = 0;
     if (canPop) width += 52;
-    if (showDailySummary) width += 52;
+    if (showDailySummary) width += 104;
     if (showDailySummary && _dynamicEntryLogIconEnabled) width += 52;
     return width;
   }
@@ -460,6 +460,13 @@ extension _SegmentStatusStateHelpersPart on _SegmentStatusPageState {
             icon: const Icon(Icons.event_note_outlined),
             tooltip: AppLocalizations.of(context).viewOrGenerateForDay,
             onPressed: _openSelectedDailySummary,
+          ),
+        if (showDailySummary)
+          IconButton(
+            style: IconButton.styleFrom(foregroundColor: actionColor),
+            icon: const Icon(Icons.auto_fix_high_rounded),
+            tooltip: '补全当天动态',
+            onPressed: _confirmStartSelectedDayDynamicBackfill,
           ),
         if (showDailySummary && _dynamicEntryLogIconEnabled)
           IconButton(

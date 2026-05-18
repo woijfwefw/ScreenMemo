@@ -586,11 +586,13 @@ class ExtractedMainMethodHandler(
             val resumeExisting = call.argument<Boolean>("resumeExisting") ?: false
             val dayConcurrency = call.argument<Int>("dayConcurrency")
             val taskMode = call.argument<String>("taskMode")
+            val targetDayKey = call.argument<String>("targetDayKey")
             val status = DynamicRebuildService.startOrResumeTask(
                 activity.applicationContext,
                 resumeExisting,
                 dayConcurrency,
                 taskMode,
+                targetDayKey,
             )
             result.success(status)
         } catch (e: Exception) {

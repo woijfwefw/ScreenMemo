@@ -61,9 +61,11 @@ class DynamicRebuildService : Service() {
             resumeExisting: Boolean = false,
             dayConcurrency: Int? = null,
             taskMode: String? = null,
+            targetDayKey: String? = null,
         ): Map<String, Any?> {
             val appCtx = try { context.applicationContext } catch (_: Exception) { context }
             val normalizedTaskMode = normalizeTaskMode(taskMode)
+            val normalizedTargetDayKey = normalizeTargetDayKey(targetDayKey)
             val normalizedConcurrency =
                 normalizeDayConcurrency(
                     dayConcurrency
@@ -84,6 +86,7 @@ class DynamicRebuildService : Service() {
             logBackfillDiag(
                 appCtx,
                 "startOrResumeTask requestedMode=$normalizedTaskMode resumeExisting=$resumeExisting " +
+                    "targetDayKey=${normalizedTargetDayKey.ifBlank { "none" }} " +
                     "requestedConcurrency=${dayConcurrency ?: "null"} normalizedConcurrency=$normalizedConcurrency " +
                     "currentTaskId=${current?.taskId ?: "null"} currentMode=${current?.taskMode ?: "null"} " +
                     "currentStatus=${current?.status ?: "null"} currentRecoverable=${current?.isRecoverable() ?: false} " +
@@ -186,13 +189,22 @@ class DynamicRebuildService : Service() {
                 processedSegments = 0,
                 failedSegments = 0,
                 currentDayKey = "",
+                targetDayKey = normalizedTargetDayKey,
                 timelineCutoffDayKey = "",
                 currentSegmentId = 0L,
                 currentRangeLabel = "",
                 currentStage = "queued",
-                currentStageLabel = if (normalizedTaskMode == TASK_MODE_BACKFILL) "等待补全启动" else "等待后台启动",
+                currentStageLabel = if (normalizedTaskMode == TASK_MODE_BACKFILL) {
+                    if (normalizedTargetDayKey.isNotBlank()) "等待当天补全启动" else "等待补全启动"
+                } else {
+                    "等待后台启动"
+                },
                 currentStageDetail = if (normalizedTaskMode == TASK_MODE_BACKFILL) {
-                    "补全任务已创建，等待后台服务扫描缺漏"
+                    if (normalizedTargetDayKey.isNotBlank()) {
+                        "补全任务已创建，等待后台服务扫描 $normalizedTargetDayKey 的缺漏"
+                    } else {
+                        "补全任务已创建，等待后台服务扫描缺漏"
+                    }
                 } else {
                     "任务已创建，等待后台服务开始准备"
                 },
@@ -207,9 +219,17 @@ class DynamicRebuildService : Service() {
                 aiProviderId = null,
                 recentLogs = mutableListOf(
                     buildStageLogLine(
-                        if (normalizedTaskMode == TASK_MODE_BACKFILL) "等待补全启动" else "等待后台启动",
                         if (normalizedTaskMode == TASK_MODE_BACKFILL) {
-                            "补全任务已创建，等待后台服务扫描缺漏"
+                            if (normalizedTargetDayKey.isNotBlank()) "等待当天补全启动" else "等待补全启动"
+                        } else {
+                            "等待后台启动"
+                        },
+                        if (normalizedTaskMode == TASK_MODE_BACKFILL) {
+                            if (normalizedTargetDayKey.isNotBlank()) {
+                                "补全任务已创建，等待后台服务扫描 $normalizedTargetDayKey 的缺漏"
+                            } else {
+                                "补全任务已创建，等待后台服务扫描缺漏"
+                            }
                         } else {
                             "任务已创建，等待后台服务开始准备"
                         },
@@ -227,7 +247,8 @@ class DynamicRebuildService : Service() {
             logBackfillDiag(
                 appCtx,
                 "startOrResumeTask createNew taskId=${next.taskId} mode=${next.taskMode} " +
-                    "status=${next.status} dayConcurrency=${next.dayConcurrency}",
+                    "status=${next.status} dayConcurrency=${next.dayConcurrency} " +
+                    "targetDayKey=${next.targetDayKey.ifBlank { "none" }}",
             )
             startService(context, ACTION_START)
             return next.toMap()
@@ -320,6 +341,12 @@ class DynamicRebuildService : Service() {
                 "fill_missing" -> TASK_MODE_BACKFILL
                 else -> TASK_MODE_REBUILD
             }
+        }
+
+        private fun normalizeTargetDayKey(raw: String?): String {
+            val value = raw?.trim().orEmpty()
+            if (!Regex("""\d{4}-\d{2}-\d{2}""").matches(value)) return ""
+            return value
         }
 
         private fun logBackfillDiag(context: Context, message: String) {
@@ -520,9 +547,11 @@ class DynamicRebuildService : Service() {
         val durationSec = readSegmentDurationSec()
         val sampleIntervalSec = readSegmentSampleIntervalSec()
         val backfillMode = state.isBackfillMode()
+        val targetDayKey = state.targetDayKey.trim()
         logBackfillDiag(
             this,
             "prepareWorkItems start taskId=${state.taskId} mode=${state.taskMode} backfill=$backfillMode " +
+                "targetDayKey=${targetDayKey.ifBlank { "none" }} " +
                 "status=${state.status} durationSec=$durationSec sampleIntervalSec=$sampleIntervalSec " +
                 "dayConcurrency=${state.dayConcurrency} existingDayWorks=${state.dayWorks.size} " +
                 "existingTotalSegments=${state.totalSegments}",
@@ -530,9 +559,19 @@ class DynamicRebuildService : Service() {
         recordStage(
             state = state,
             stage = "prepare_worklist",
-            label = if (backfillMode) "扫描缺漏清单" else "生成按天清单",
+            label = if (backfillMode && targetDayKey.isNotBlank()) {
+                "扫描当天缺漏"
+            } else if (backfillMode) {
+                "扫描缺漏清单"
+            } else {
+                "生成按天清单"
+            },
             detail = if (backfillMode) {
-                "按截图时间逐日扫描，跳过已有动态结果，仅收集缺失窗口"
+                if (targetDayKey.isNotBlank()) {
+                    "按截图时间扫描 $targetDayKey，跳过已有动态结果，仅收集当天缺失窗口"
+                } else {
+                    "按截图时间逐日扫描，跳过已有动态结果，仅收集缺失窗口"
+                }
             } else {
                 "按截图时间顺序计算全量重建范围，并按日期分组"
             },
@@ -562,15 +601,24 @@ class DynamicRebuildService : Service() {
                 )
             }
         }
-        val windows = if (backfillMode) {
+        val allWindows = if (backfillMode) {
             SegmentSummaryManager.buildMissingBackfillWorklist(this, durationSec)
         } else {
             SegmentSummaryManager.buildFullRebuildWorklist(this, durationSec)
         }
+        val windows = if (backfillMode && targetDayKey.isNotBlank()) {
+            SegmentSummaryManager.filterDynamicRebuildWindowsForDay(
+                allWindows,
+                targetDayKey,
+            )
+        } else {
+            allWindows
+        }
         logBackfillDiag(
             this,
             "prepareWorkItems worklistBuilt taskId=${state.taskId} mode=${state.taskMode} " +
-                "windows=${windows.size} preview=${windows.take(12).joinToString(";") { window -> windowDiag(window.startTime, window.endTime, window.existingSegmentId) }}",
+                "targetDayKey=${targetDayKey.ifBlank { "none" }} allWindows=${allWindows.size} windows=${windows.size} " +
+                "preview=${windows.take(12).joinToString(";") { window -> windowDiag(window.startTime, window.endTime, window.existingSegmentId) }}",
         )
         val dayWorks = buildDayWorkItems(windows).toMutableList()
         if (backfillMode) {
@@ -607,7 +655,11 @@ class DynamicRebuildService : Service() {
                 state = state,
                 stage = "prepare_keep_existing",
                 label = "保留现有动态",
-                detail = "补全模式不会清空已有动态，只处理扫描出的缺失窗口",
+                detail = if (targetDayKey.isNotBlank()) {
+                    "当天补全不会清空已有动态，只处理 $targetDayKey 扫描出的缺失窗口"
+                } else {
+                    "补全模式不会清空已有动态，只处理扫描出的缺失窗口"
+                },
             )
         }
 
@@ -1796,6 +1848,9 @@ class DynamicRebuildService : Service() {
         sb.appendLine("已处理段落: ${state.processedSegments}")
         sb.appendLine("失败段落: ${state.failedSegments}")
         sb.appendLine("待继续天数: ${state.failedDayCount()}/${state.totalDays()}")
+        if (state.targetDayKey.isNotBlank()) {
+            sb.appendLine("targetDayKey: ${state.targetDayKey}")
+        }
         if (state.aiModel.isNotBlank()) {
             sb.appendLine("model: ${state.aiModel}")
         }
@@ -2246,6 +2301,7 @@ private data class DynamicRebuildTaskState(
     var processedSegments: Int,
     var failedSegments: Int,
     var currentDayKey: String,
+    var targetDayKey: String,
     var timelineCutoffDayKey: String,
     var currentSegmentId: Long,
     var currentRangeLabel: String,
@@ -2288,6 +2344,7 @@ private data class DynamicRebuildTaskState(
                 processedSegments = 0,
                 failedSegments = 0,
                 currentDayKey = "",
+                targetDayKey = "",
                 timelineCutoffDayKey = "",
                 currentSegmentId = 0L,
                 currentRangeLabel = "",
@@ -2496,6 +2553,7 @@ private data class DynamicRebuildTaskState(
             "pendingDays" to pendingDayCount(),
             "failedDays" to failedDayCount(),
             "currentDayKey" to currentDayKey,
+            "targetDayKey" to targetDayKey,
             "timelineCutoffDayKey" to timelineCutoffDayKey,
             "currentSegmentId" to currentSegmentId,
             "currentRangeLabel" to currentRangeLabel,
@@ -2572,6 +2630,7 @@ private object DynamicRebuildTaskStore {
                 processedSegments = obj.optInt("processedSegments", 0),
                 failedSegments = obj.optInt("failedSegments", 0),
                 currentDayKey = obj.optString("currentDayKey", ""),
+                targetDayKey = obj.optString("targetDayKey", ""),
                 timelineCutoffDayKey = obj.optString("timelineCutoffDayKey", ""),
                 currentSegmentId = obj.optLong("currentSegmentId", 0L),
                 currentRangeLabel = obj.optString("currentRangeLabel", ""),
@@ -2632,6 +2691,7 @@ private object DynamicRebuildTaskStore {
             .put("processedSegments", state.processedSegments)
             .put("failedSegments", state.failedSegments)
             .put("currentDayKey", state.currentDayKey)
+            .put("targetDayKey", state.targetDayKey)
             .put("timelineCutoffDayKey", state.timelineCutoffDayKey)
             .put("currentSegmentId", state.currentSegmentId)
             .put("currentRangeLabel", state.currentRangeLabel)

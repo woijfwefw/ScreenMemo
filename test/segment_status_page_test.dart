@@ -28,6 +28,7 @@ Map<String, Object?> _mockDynamicRebuildStatus = <String, Object?>{
   'pendingDays': 0,
   'failedDays': 0,
   'currentDayKey': '',
+  'targetDayKey': '',
   'timelineCutoffDayKey': '',
   'currentSegmentId': 0,
   'currentRangeLabel': '',
@@ -137,6 +138,19 @@ void main() {
           switch (call.method) {
             case 'getDynamicRebuildTaskStatus':
               return _mockDynamicRebuildStatus;
+            case 'startDynamicRebuildTask':
+              final Map<dynamic, dynamic> args =
+                  call.arguments as Map<dynamic, dynamic>? ??
+                  const <dynamic, dynamic>{};
+              _mockDynamicRebuildStatus = <String, Object?>{
+                ..._mockDynamicRebuildStatus,
+                'taskId': 'dynamic_rebuild_started',
+                'taskMode': args['taskMode'] as String? ?? 'rebuild',
+                'status': 'running',
+                'targetDayKey': args['targetDayKey'] as String? ?? '',
+                'isActive': true,
+              };
+              return _mockDynamicRebuildStatus;
             case 'getOutputLogsDirToday':
               return _mockTodayLogsDir;
             case 'triggerSegmentTick':
@@ -163,6 +177,7 @@ void main() {
       'pendingDays': 0,
       'failedDays': 0,
       'currentDayKey': '',
+      'targetDayKey': '',
       'timelineCutoffDayKey': '',
       'currentSegmentId': 0,
       'currentRangeLabel': '',
@@ -281,6 +296,95 @@ void main() {
     }
   });
 
+  testWidgets('selected day action starts target day backfill', (
+    WidgetTester tester,
+  ) async {
+    final Directory tmp = await Directory.systemTemp.createTemp(
+      'screen_memo_segment_page_day_backfill_',
+    );
+    try {
+      final Directory root = Directory(p.join(tmp.path, 'root'));
+      await root.create(recursive: true);
+      await _prepareDesktopDbRoot(root);
+      final DateTime day = DateTime(2024, 4, 10);
+      await _seedTimelineDays(<DateTime>[day]);
+
+      await tester.pumpWidget(_buildHarness());
+      await _pumpUntilFound(tester, find.text(_summaryText(day)));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.byTooltip('补全当天动态'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('补全当天动态'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+      expect(find.text('补全当天动态'), findsOneWidget);
+      expect(
+        find.textContaining('只补全 ${_dateKey(day)} 缺失动态和缺失总结'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('补全当天'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(_mockDynamicRebuildStatus['taskMode'], 'backfill');
+      expect(_mockDynamicRebuildStatus['targetDayKey'], _dateKey(day));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    } finally {
+      if (await tmp.exists()) {
+        await tmp.delete(recursive: true);
+      }
+    }
+  });
+
+  testWidgets('selected day backfill shows conflict when task is active', (
+    WidgetTester tester,
+  ) async {
+    final Directory tmp = await Directory.systemTemp.createTemp(
+      'screen_memo_segment_page_day_backfill_conflict_',
+    );
+    try {
+      final Directory root = Directory(p.join(tmp.path, 'root'));
+      await root.create(recursive: true);
+      await _prepareDesktopDbRoot(root);
+      final DateTime day = DateTime(2024, 4, 10);
+      await _seedTimelineDays(<DateTime>[day]);
+      _mockDynamicRebuildStatus = <String, Object?>{
+        ..._mockDynamicRebuildStatus,
+        'taskId': 'dynamic_rebuild_running',
+        'taskMode': 'backfill',
+        'status': 'running',
+        'isActive': true,
+        'totalSegments': 3,
+        'processedSegments': 1,
+        'totalDays': 1,
+        'pendingDays': 1,
+      };
+
+      await tester.pumpWidget(_buildHarness());
+      await _pumpUntilFound(tester, find.text(_summaryText(day)));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      await tester.tap(find.byTooltip('补全当天动态'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+
+      expect(find.text('已有动态任务运行中'), findsOneWidget);
+      expect(find.textContaining('请先在“动态任务”面板停止当前任务'), findsOneWidget);
+      expect(_mockDynamicRebuildStatus['targetDayKey'], '');
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    } finally {
+      if (await tmp.exists()) {
+        await tmp.delete(recursive: true);
+      }
+    }
+  });
+
   testWidgets('paused rebuild hides newer unreconstructed tabs', (
     WidgetTester tester,
   ) async {
@@ -313,6 +417,7 @@ void main() {
         'pendingDays': 4,
         'failedDays': 0,
         'currentDayKey': _dateKey(cutoffDay),
+        'targetDayKey': '',
         'timelineCutoffDayKey': _dateKey(cutoffDay),
         'currentSegmentId': 0,
         'currentRangeLabel': '12:00:00-12:30:00',
@@ -389,6 +494,7 @@ void main() {
         'pendingDays': 1,
         'failedDays': 0,
         'currentDayKey': '2026-03-12',
+        'targetDayKey': '',
         'timelineCutoffDayKey': '2026-03-12',
         'currentSegmentId': 102,
         'currentRangeLabel': '09:05-09:35',
@@ -512,6 +618,7 @@ void main() {
         'pendingDays': 2,
         'failedDays': 0,
         'currentDayKey': '2026-03-12',
+        'targetDayKey': '',
         'timelineCutoffDayKey': '2026-03-12',
         'currentSegmentId': 302,
         'currentRangeLabel': '09:30:00-10:00:00',
@@ -596,6 +703,7 @@ void main() {
           'pendingDays': 3,
           'failedDays': 1,
           'currentDayKey': '2026-03-12',
+          'targetDayKey': '',
           'timelineCutoffDayKey': '2026-03-12',
           'currentSegmentId': 302,
           'currentRangeLabel': '09:30:00-10:00:00',

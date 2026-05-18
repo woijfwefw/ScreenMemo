@@ -97,6 +97,43 @@ class SegmentSummaryWindowPlanningTest {
     }
 
     @Test
+    fun filterDynamicRebuildWindowsForDay_keepsOnlyTargetDay() {
+        val windows = listOf(
+            SegmentSummaryManager.DynamicRebuildWindow(
+                startTime = 1_713_270_600_000L, // 2024-04-16 local/UTC daytime
+                endTime = 1_713_274_200_000L,
+            ),
+            SegmentSummaryManager.DynamicRebuildWindow(
+                startTime = 1_713_357_000_000L, // 2024-04-17 local/UTC daytime
+                endTime = 1_713_360_600_000L,
+            ),
+        )
+
+        val result = SegmentSummaryManager.filterDynamicRebuildWindowsForDay(
+            windows,
+            "2024-04-17",
+        )
+
+        assertEquals(1, result.size)
+        assertEquals(windows[1].startTime, result.first().startTime)
+    }
+
+    @Test
+    fun filterDynamicRebuildWindowsForDay_keepsAllWhenTargetBlank() {
+        val windows = listOf(
+            SegmentSummaryManager.DynamicRebuildWindow(10_000L, 130_000L),
+            SegmentSummaryManager.DynamicRebuildWindow(140_000L, 260_000L),
+        )
+
+        val result = SegmentSummaryManager.filterDynamicRebuildWindowsForDay(
+            windows,
+            "",
+        )
+
+        assertEquals(windows, result)
+    }
+
+    @Test
     fun planNonOverlappingWindows_skipsShortGapThenContinuesAfterExistingSegment() {
         val result = SegmentSummaryManager.planNonOverlappingWindows(
             shotTimes = listOf(100_000L, 160_000L, 200_000L, 320_000L),

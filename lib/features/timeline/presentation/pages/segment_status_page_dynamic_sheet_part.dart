@@ -13,11 +13,13 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
     final bool showTaskProgress = _shouldShowDynamicTaskProgress(status);
     final bool showWorkerProgress = _shouldShowDynamicWorkerProgress(status);
     final bool actualBackfill = hasTask && status.isBackfillMode;
+    final bool actualTargetDayBackfill =
+        actualBackfill && status.targetDayKey.trim().isNotEmpty;
     final String sheetTitle = hasTask
-        ? '${status.isActive ? '当前后台任务' : '最近任务'}：${_dynamicTaskModeName(backfill: actualBackfill)}'
+        ? '${status.isActive ? '当前后台任务' : '最近任务'}：${_dynamicTaskModeName(backfill: actualBackfill, targetDay: actualTargetDayBackfill)}'
         : '动态任务';
     final String statusBadge = hasTask
-        ? '${_dynamicTaskModeShortName(backfill: actualBackfill)} · ${_dynamicRebuildTaskLabel(status)}'
+        ? '${_dynamicTaskModeShortName(backfill: actualBackfill, targetDay: actualTargetDayBackfill)} · ${_dynamicRebuildTaskLabel(status)}'
         : _dynamicRebuildTaskLabel(status);
     final int dayConcurrency = _effectiveDynamicRebuildDayConcurrency(snapshot);
     final Color statusColor = _dynamicRebuildTaskColor(status);
@@ -249,7 +251,7 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
           ),
           const SizedBox(height: AppTheme.spacing2),
           Text(
-            '当前${_dynamicTaskModeName(backfill: status.isBackfillMode)}任务运行中，启动按钮已切换为停止按钮。',
+            '当前${_dynamicTaskModeName(backfill: status.isBackfillMode, targetDay: status.targetDayKey.trim().isNotEmpty)}任务运行中，启动按钮已切换为停止按钮。',
             style: theme.textTheme.bodySmall?.copyWith(
               color: cs.onSurfaceVariant,
               height: 1.35,
@@ -298,7 +300,10 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
 
     if (status.canContinue) {
       final bool backfill = status.isBackfillMode;
-      final String modeName = _dynamicTaskModeShortName(backfill: backfill);
+      final String modeName = _dynamicTaskModeShortName(
+        backfill: backfill,
+        targetDay: status.targetDayKey.trim().isNotEmpty,
+      );
       final Color accentColor = backfill ? _dynamicBackfillColor() : cs.error;
       final Color onAccentColor = backfill
           ? _dynamicBackfillOnColor()
@@ -365,11 +370,19 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
     return _hasVisibleDynamicTask(status) && status.isActive;
   }
 
-  String _dynamicTaskModeName({required bool backfill}) {
+  String _dynamicTaskModeName({
+    required bool backfill,
+    bool targetDay = false,
+  }) {
+    if (backfill && targetDay) return '当天动态补全';
     return backfill ? '动态补全' : '动态重建';
   }
 
-  String _dynamicTaskModeShortName({required bool backfill}) {
+  String _dynamicTaskModeShortName({
+    required bool backfill,
+    bool targetDay = false,
+  }) {
+    if (backfill && targetDay) return '当天补全';
     return backfill ? '补全' : '重建';
   }
 

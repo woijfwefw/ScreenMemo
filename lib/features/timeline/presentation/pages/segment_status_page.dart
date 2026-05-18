@@ -239,6 +239,7 @@ class _SegmentStatusPageState extends State<SegmentStatusPage>
         pendingDays: 0,
         failedDays: 0,
         currentDayKey: '',
+        targetDayKey: '',
         timelineCutoffDayKey: '',
         currentSegmentId: 0,
         currentRangeLabel: '',

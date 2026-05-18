@@ -98,6 +98,7 @@ class DynamicRebuildTaskStatus {
   final int pendingDays;
   final int failedDays;
   final String currentDayKey;
+  final String targetDayKey;
   final String timelineCutoffDayKey;
   final int currentSegmentId;
   final String currentRangeLabel;
@@ -127,6 +128,7 @@ class DynamicRebuildTaskStatus {
     required this.pendingDays,
     required this.failedDays,
     required this.currentDayKey,
+    required this.targetDayKey,
     required this.timelineCutoffDayKey,
     required this.currentSegmentId,
     required this.currentRangeLabel,
@@ -168,6 +170,7 @@ class DynamicRebuildTaskStatus {
       pendingDays: _safeTaskInt(data['pendingDays']),
       failedDays: _safeTaskInt(data['failedDays']),
       currentDayKey: (data['currentDayKey'] as String?) ?? '',
+      targetDayKey: (data['targetDayKey'] as String?) ?? '',
       timelineCutoffDayKey: (data['timelineCutoffDayKey'] as String?) ?? '',
       currentSegmentId: _safeTaskInt(data['currentSegmentId']),
       currentRangeLabel: (data['currentRangeLabel'] as String?) ?? '',
@@ -284,6 +287,9 @@ class DynamicRebuildTaskStatus {
     }
     if (timelineCutoffDayKey.isNotEmpty) {
       sb.writeln('timelineCutoffDayKey: $timelineCutoffDayKey');
+    }
+    if (targetDayKey.isNotEmpty) {
+      sb.writeln('targetDayKey: $targetDayKey');
     }
     if (currentSegmentId > 0) {
       sb.writeln('currentSegmentId: $currentSegmentId');
@@ -3588,12 +3594,16 @@ ORDER BY day ASC
     bool resumeExisting = false,
     int dayConcurrency = 1,
     String taskMode = 'rebuild',
+    String? targetDayKey,
   }) async {
+    final String normalizedTargetDayKey = (targetDayKey ?? '').trim();
     final dynamic raw = await ScreenshotDatabase._channel
         .invokeMethod('startDynamicRebuildTask', <String, dynamic>{
           'resumeExisting': resumeExisting,
           'dayConcurrency': dayConcurrency,
           'taskMode': taskMode,
+          if (normalizedTargetDayKey.isNotEmpty)
+            'targetDayKey': normalizedTargetDayKey,
         });
     if (raw is Map) {
       return DynamicRebuildTaskStatus.fromMap(raw);
