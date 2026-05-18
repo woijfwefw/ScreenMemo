@@ -1183,7 +1183,6 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
       height: 64,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.only(bottom: AppTheme.spacing2),
         itemCount: _composerImages.length + skeletonCount,
         separatorBuilder: (_, __) => const SizedBox(width: AppTheme.spacing2),
         itemBuilder: (context, index) {
@@ -1197,44 +1196,72 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
                 ? _basenameFromPath(item.path)
                 : item.name,
           );
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Material(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                  onTap: () => _showComposerImagePreview(previewImage),
-                  child: ClipRRect(
+          final String deleteTooltip = MaterialLocalizations.of(
+            context,
+          ).deleteButtonTooltip;
+          return SizedBox(
+            width: 64,
+            height: 64,
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  child: Material(
+                    color: Colors.transparent,
                     borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                    child: Container(
-                      width: 56,
-                      height: 56,
-                      color: theme.colorScheme.surfaceVariant,
-                      child: Image.file(File(item.path), fit: BoxFit.cover),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                      onTap: () => _showComposerImagePreview(previewImage),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                        child: Container(
+                          width: 56,
+                          height: 56,
+                          color: theme.colorScheme.surfaceVariant,
+                          child: Image.file(File(item.path), fit: BoxFit.cover),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Positioned(
-                top: -7,
-                right: -7,
-                child: Material(
-                  color: theme.colorScheme.inverseSurface,
-                  shape: const CircleBorder(),
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: () => _removeComposerImage(item.path),
-                    child: Icon(
-                      Icons.close_rounded,
-                      size: 16,
-                      color: theme.colorScheme.onInverseSurface,
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Semantics(
+                    button: true,
+                    label: deleteTooltip,
+                    child: Tooltip(
+                      message: deleteTooltip,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => _removeComposerImage(item.path),
+                        child: SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: Align(
+                            alignment: Alignment.topRight,
+                            child: SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: Material(
+                                color: theme.colorScheme.inverseSurface,
+                                shape: const CircleBorder(),
+                                child: Icon(
+                                  Icons.close_rounded,
+                                  size: 16,
+                                  color: theme.colorScheme.onInverseSurface,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           );
         },
       ),
@@ -1245,22 +1272,29 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
     final theme = Theme.of(context);
     final Color base = theme.colorScheme.surfaceVariant;
     final Color highlight = theme.colorScheme.surface;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-      child: _Shimmer(
-        active: true,
-        baseColor: base,
-        highlightColor: highlight,
-        period: const Duration(milliseconds: 1100),
-        child: Container(
-          width: 56,
-          height: 56,
-          color: base,
-          child: Center(
-            child: Icon(
-              Icons.image_outlined,
-              size: 20,
-              color: theme.colorScheme.onSurfaceVariant.withOpacity(0.45),
+    return SizedBox(
+      width: 64,
+      height: 64,
+      child: Align(
+        alignment: Alignment.topLeft,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+          child: _Shimmer(
+            active: true,
+            baseColor: base,
+            highlightColor: highlight,
+            period: const Duration(milliseconds: 1100),
+            child: Container(
+              width: 56,
+              height: 56,
+              color: base,
+              child: Center(
+                child: Icon(
+                  Icons.image_outlined,
+                  size: 20,
+                  color: theme.colorScheme.onSurfaceVariant.withOpacity(0.45),
+                ),
+              ),
             ),
           ),
         ),

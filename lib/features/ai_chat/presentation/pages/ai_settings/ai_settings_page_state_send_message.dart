@@ -37,6 +37,14 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
         return 'image/jpeg';
       case 'webp':
         return 'image/webp';
+      case 'gif':
+        return 'image/gif';
+      case 'bmp':
+        return 'image/bmp';
+      case 'heic':
+        return 'image/heic';
+      case 'heif':
+        return 'image/heif';
       case 'png':
         return 'image/png';
       default:
@@ -44,40 +52,43 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
     }
   }
 
-  Future<String> _copyComposerImageToTemp(String sourcePath) async {
+  String _extensionForComposerImagePath(String path) {
+    final String fileName = path
+        .replaceAll('\\', '/')
+        .split('/')
+        .last
+        .split('?')
+        .first;
+    final int dot = fileName.lastIndexOf('.');
+    if (dot < 0 || dot >= fileName.length - 1) return 'jpg';
+    final String ext = fileName.substring(dot + 1).toLowerCase();
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'webp':
+      case 'gif':
+      case 'bmp':
+      case 'heic':
+      case 'heif':
+        return ext;
+      default:
+        return 'jpg';
+    }
+  }
+
+  Future<String> _copyComposerImageToPrivate(String sourcePath) async {
     final File source = File(sourcePath);
     if (!await source.exists()) {
       throw Exception('Selected image file does not exist.');
     }
-    final Uint8List bytes = await source.readAsBytes();
-    if (bytes.isEmpty) {
+    if (await source.length() <= 0) {
       throw Exception('Selected image file is empty.');
     }
-    final img.Image? decoded = img.decodeImage(bytes);
-    if (decoded == null) {
-      throw Exception('Selected image format is not supported.');
-    }
-    img.Image normalized = img.bakeOrientation(decoded);
-    final int longest = normalized.width > normalized.height
-        ? normalized.width
-        : normalized.height;
-    if (longest > _maxComposerImageEdge) {
-      normalized = img.copyResize(
-        normalized,
-        width: normalized.width >= normalized.height
-            ? _maxComposerImageEdge
-            : null,
-        height: normalized.height > normalized.width
-            ? _maxComposerImageEdge
-            : null,
-        interpolation: img.Interpolation.average,
-      );
-    }
-    final Uint8List pngBytes = Uint8List.fromList(img.encodePng(normalized));
     final DateTime now = DateTime.now();
     final String month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-    final Directory? dir = await PathService.getInternalAppDir(
-      'output/ai/chat_attachments/$month',
+    final Directory? dir = await PathService.getPersistentPrivateDir(
+      'ai/chat_attachments/$month',
     );
     if (dir == null) {
       throw Exception('Failed to resolve chat attachment output directory.');
@@ -85,9 +96,11 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
     if (!await dir.exists()) {
       await dir.create(recursive: true);
     }
-    final String name = 'selected_${DateTime.now().microsecondsSinceEpoch}.png';
+    final String ext = _extensionForComposerImagePath(source.path);
+    final String name =
+        'selected_${DateTime.now().microsecondsSinceEpoch}.$ext';
     final File out = File('${dir.path}${Platform.pathSeparator}$name');
-    await out.writeAsBytes(pngBytes, flush: true);
+    await source.copy(out.path);
     return out.path;
   }
 
@@ -99,11 +112,13 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
     });
     final List<String> createdTempPaths = <String>[];
     bool committed = false;
-    final Stopwatch skeletonWatch = Stopwatch();
     try {
       final FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.image,
         allowMultiple: true,
+        // file_picker 在 Android 上默认压缩图片时会写入公共 Pictures 目录。
+        // 这里关闭插件压缩，避免仅选择附件就在系统相册生成副本。
+        allowCompression: false,
         withData: false,
       );
       if (result == null || result.files.isEmpty) return;
@@ -117,7 +132,6 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
         _processingComposerImages = true;
         _composerImageSkeletonCount = pendingCount;
       });
-      skeletonWatch.start();
       await WidgetsBinding.instance.endOfFrame;
       final List<_ComposerImageAttachment> next =
           List<_ComposerImageAttachment>.from(_composerImages);
@@ -127,7 +141,7 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
         if (next.length >= _maxComposerImages) break;
         final String? rawPath = file.path?.trim();
         if (rawPath == null || rawPath.isEmpty) continue;
-        final String tempPath = await _copyComposerImageToTemp(rawPath);
+        final String tempPath = await _copyComposerImageToPrivate(rawPath);
         createdTempPaths.add(tempPath);
         if (!existing.add(tempPath)) {
           unawaited(File(tempPath).delete().catchError((_) => File(tempPath)));
@@ -137,13 +151,9 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
           _ComposerImageAttachment(
             path: tempPath,
             name: file.name.trim().isEmpty ? 'image.png' : file.name.trim(),
-            mimeType: 'image/png',
+            mimeType: _mimeForComposerImagePath(tempPath),
           ),
         );
-      }
-      final int remainingSkeletonMs = 240 - skeletonWatch.elapsedMilliseconds;
-      if (remainingSkeletonMs > 0) {
-        await Future<void>.delayed(Duration(milliseconds: remainingSkeletonMs));
       }
       if (!mounted) return;
       _setState(() {
@@ -185,6 +195,11 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
         for (final String path in createdTempPaths) {
           unawaited(File(path).delete().catchError((_) => File(path)));
         }
+      }
+      if (Platform.isAndroid || Platform.isIOS) {
+        unawaited(
+          FilePicker.platform.clearTemporaryFiles().catchError((_) => false),
+        );
       }
     }
   }

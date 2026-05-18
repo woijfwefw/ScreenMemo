@@ -9,7 +9,6 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:image/image.dart' as img;
 import 'package:shimmer/shimmer.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
 import 'package:screen_memo/core/widgets/ui_action_menu.dart';
@@ -54,7 +53,6 @@ const Color _thinkingTextColor = Color(0xFF71717A);
 // Warm "platinum/white-gold" shimmer highlight used while thinking.
 const Color _thinkingShimmerHighlightColor = Color(0xFFFFFBEB);
 const int _maxComposerImages = 16;
-const int _maxComposerImageEdge = 2048;
 const double _composerInputRowHeight = 40.0;
 const int _composerInputMaxLines = 10;
 

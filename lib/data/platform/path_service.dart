@@ -9,6 +9,7 @@ class PathService {
   static const MethodChannel _channel = MethodChannel(
     'com.fqyw.screen_memo/accessibility',
   );
+  static const String persistentPrivateFilesDirName = 'persistent_private';
 
   static Directory? _debugInternalAppDirBaseOverride;
 
@@ -62,6 +63,17 @@ class PathService {
   @Deprecated('请改用 getInternalAppDir')
   static Future<Directory?> getExternalFilesDir([String? subDir]) =>
       getInternalAppDir(subDir);
+
+  /// 获取应用私有持久目录，用于保存不应出现在系统相册/媒体库中的业务文件。
+  static Future<Directory?> getPersistentPrivateDir([String? subDir]) async {
+    final String relativePath = subDir == null || subDir.trim().isEmpty
+        ? persistentPrivateFilesDirName
+        : '$persistentPrivateFilesDirName/${subDir.trim()}';
+    final Directory? dir = await getInternalAppDir(relativePath);
+    if (dir == null) return null;
+    await _ensureNoMediaMarker(dir);
+    return dir;
+  }
 
   /// 历史外部存储目录（仅用于迁移/日志）
   static Future<Directory?> getLegacyExternalFilesDir([String? subDir]) async {
@@ -306,5 +318,25 @@ class PathService {
       await dir.create(recursive: true);
     }
     return dir;
+  }
+
+  static Future<void> _ensureNoMediaMarker(Directory dir) async {
+    try {
+      final Directory parent = dir.parent;
+      if (!await parent.exists()) {
+        await parent.create(recursive: true);
+      }
+      final File marker = File('${dir.path}/.nomedia');
+      if (!await marker.exists()) {
+        await marker.writeAsBytes(const <int>[], flush: true);
+      }
+    } catch (e) {
+      try {
+        await FlutterLogger.nativeWarn(
+          'PathService',
+          '创建 .nomedia 失败：${dir.path} ${e.toString()}',
+        );
+      } catch (_) {}
+    }
   }
 }
