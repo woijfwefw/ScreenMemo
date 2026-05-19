@@ -30,6 +30,65 @@ void main() {
     expect(json['tool_calls'], isA<List<dynamic>>());
   });
 
+  test(
+    'OpenAI chat completions payload sends xhigh reasoning effort',
+    () async {
+      final HttpServer server = await HttpServer.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+      );
+      Map<String, dynamic>? captured;
+
+      final Future<void> serverDone = () async {
+        await for (final HttpRequest req in server) {
+          captured =
+              jsonDecode(await utf8.decoder.bind(req).join())
+                  as Map<String, dynamic>;
+          req.response.statusCode = HttpStatus.ok;
+          req.response.headers.contentType = ContentType.json;
+          req.response.write(
+            jsonEncode(<String, dynamic>{
+              'choices': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'message': <String, dynamic>{
+                    'role': 'assistant',
+                    'content': 'ok',
+                  },
+                },
+              ],
+            }),
+          );
+          await req.response.close();
+          break;
+        }
+      }();
+
+      final AIGatewayResult result = await AIRequestGateway.instance.complete(
+        endpoints: <AIEndpoint>[
+          AIEndpoint(
+            groupId: null,
+            providerType: 'openai',
+            baseUrl: 'http://127.0.0.1:${server.port}',
+            apiKey: 'test-key',
+            model: 'gpt-5.5',
+            chatPath: '/v1/chat/completions',
+          ),
+        ],
+        messages: <AIMessage>[AIMessage(role: 'user', content: 'hello')],
+        responseStartMarker: '',
+        preferStreaming: false,
+        reasoningLevel: AIReasoningLevel.xhigh,
+        trackKeyStats: false,
+      );
+
+      await serverDone;
+      await server.close(force: true);
+
+      expect(result.content, 'ok');
+      expect(captured!['reasoning_effort'], 'xhigh');
+    },
+  );
+
   test('DeepSeek chat completions payload preserves tool reasoning', () async {
     final HttpServer server = await HttpServer.bind(
       InternetAddress.loopbackIPv4,

@@ -1413,16 +1413,17 @@ class AIRequestGateway {
   }
 
   String _openAiChatReasoningEffort(AIReasoningLevel level) {
-    // Chat Completions 官方 reasoning_effort 不支持 none/auto/xhigh；
-    // off 只能尽量降到 low，xhigh 则按 high 发送。
+    // Chat Completions 的 reasoning_effort 支持 low/medium/high/xhigh；
+    // off 没有等价取值，只能尽量降到 low。
     switch (level) {
       case AIReasoningLevel.low:
         return 'low';
       case AIReasoningLevel.medium:
         return 'medium';
       case AIReasoningLevel.high:
-      case AIReasoningLevel.xhigh:
         return 'high';
+      case AIReasoningLevel.xhigh:
+        return 'xhigh';
       case AIReasoningLevel.off:
       case AIReasoningLevel.auto:
         return 'low';
