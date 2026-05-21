@@ -8,7 +8,7 @@
 
 「屏幕无痕，记忆有痕」
 
-[![Dart](https://img.shields.io/badge/Dart-3.8.1+-0175C2?logo=dart)](https://dart.dev) [![Android](https://img.shields.io/badge/Android-3DDC84?logo=android)](https://www.android.com) [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE) [<img src="https://gh-down-badges.linkof.link/297709457/ScreenMemo" alt="Downloads" />](https://github.com/woijfwefw/ScreenMemo/releases)
+[![Dart](https://img.shields.io/badge/Dart-3.8.1+-0175C2?logo=dart)](https://dart.dev) [![Android](https://img.shields.io/badge/Android-3DDC84?logo=android)](https://www.android.com) [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE) [<img src="https://gh-down-badges.linkof.link/woijfwefw/ScreenMemo" alt="Downloads" />](https://github.com/woijfwefw/ScreenMemo/releases)
 
 </div>
 
@@ -135,7 +135,6 @@ ScreenMemo 是一款在本地运行的智能截屏备忘与检索工具：自动
 - 当前内置提供商类型包括 `OpenAI`、`Azure OpenAI`、`Claude`、`Gemini` 和 `Custom`
 - `Custom` 适合接入兼容 OpenAI 风格接口的自建或第三方中转服务
 - 不同 AI 上下文可以分别绑定不同的提供商与模型
-- AI 对话支持本轮图片附件分析，并可在输入栏主动切换画图模式；选择的图片附件会保存到应用私有目录，不会写入系统相册；画图结果会进入对话历史，后续聊天可继续引用生成图上下文
 </details>
 
 <details>
@@ -191,16 +190,6 @@ ScreenMemo 是一款在本地运行的智能截屏备忘与检索工具：自动
    flutter run
    ```
 
-### 开发调试：强制显示引导页
-
-如果本机已有数据且已经完成引导，但需要调试引导页样式，可以使用调试开关启动：
-
-```bash
-flutter run --dart-define=FORCE_ONBOARDING=true
-```
-
-该开关只在非 Release 构建生效，不会清空现有截图、数据库或设置数据。
-
 ### 在电脑上通过 Android 模拟器测试
 
 1. 在 Android Studio 的 **Device Manager** 中创建 Android 11+ 模拟器
@@ -212,13 +201,6 @@ flutter run --dart-define=FORCE_ONBOARDING=true
    ```
 
 更多维护者开发说明见 [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)。
-
-### 自定义底部导航
-
-- 底部导航默认显示“首页、收藏、AI、时间线、设置”，并为每个图标显示文字标签。
-- 长按任意非首页底部菜单可进入“自定义底部导航”页面；首页固定在第一位，不能移除或拖动。
-- 可添加到菜单的额外页面包括“动态”和“存储”，底部菜单数量限制为 3 到 6 个。
-- 在自定义页面中可通过加号添加页面、减号移除页面，并长按拖拽已添加菜单调整顺序。
 
 ### 开发与验证命令
 

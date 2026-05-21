@@ -8,7 +8,7 @@ Local-first smart screenshot memo and retrieval for Android: automatic capture, 
 
 "Trace-free screen, traceable memory"
 
-[![Dart](https://img.shields.io/badge/Dart-3.8.1+-0175C2?logo=dart)](https://dart.dev) [![Android](https://img.shields.io/badge/Android-3DDC84?logo=android)](https://www.android.com) [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE) [<img src="https://gh-down-badges.linkof.link/297709457/ScreenMemo" alt="Downloads" />](https://github.com/woijfwefw/ScreenMemo/releases)
+[![Dart](https://img.shields.io/badge/Dart-3.8.1+-0175C2?logo=dart)](https://dart.dev) [![Android](https://img.shields.io/badge/Android-3DDC84?logo=android)](https://www.android.com) [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE) [<img src="https://gh-down-badges.linkof.link/woijfwefw/ScreenMemo" alt="Downloads" />](https://github.com/woijfwefw/ScreenMemo/releases)
 
 </div>
 
@@ -119,6 +119,7 @@ The screenshots below cover some of the pages people use most often. More detail
 - Example: if your compressed image size is about 50 KB and you capture one screenshot per minute, 30 days is about 43,200 images, or roughly 2.1 GB / month
 - Formula: Monthly usage (GB) ≈ `(60 ÷ interval seconds) × 60 × 24 × 30 × image size(KB) ÷ 1024 ÷ 1024`
 - To reduce usage: increase the capture interval, enable target-size compression, enable expiration cleanup, and only capture the apps you actually care about
+- Existing historical screenshots can be globally compressed by target size from "Settings → Screenshot Settings → Global History Compression"; canceling immediately stops starting new image-processing tasks
 </details>
 
 <details>
@@ -137,17 +138,11 @@ The screenshots below cover some of the pages people use most often. More detail
 </details>
 
 <details>
-<summary>Does the main app support iOS or desktop capture?</summary>
-
-- Not today. The main capture pipeline is built around Android Accessibility screenshot APIs
-- The desktop target in this repo is a backup-merger tool, not a full cross-platform capture client
-</details>
-
-<details>
 <summary>How do I back up or migrate data?</summary>
 
 - Use the “Data & backup” section to export a ZIP backup; ScreenMemo scans the scope first, writes a manifest, and shows categorized progress before and during export
 - Import supports both overwrite and merge modes; merge tries to deduplicate while preserving existing data
+- Merge import only merges screenshots, indexes, and database data under `output`; runtime configuration roots in full backups such as `shared_prefs`, `app_flutter`, and `no_backup` are skipped automatically
 - For very large or multiple backups, use the desktop merger on your computer first, then move the merged result back to Android
 - If imported data is missing OCR or index state, use Import Diagnostics to inspect and repair it
 - Backups intentionally exclude cache, code cache, temporary thumbnails, and external logs
@@ -205,6 +200,8 @@ The screenshots below cover some of the pages people use most often. More detail
    flutter run -d <device_id>
    ```
 
+More maintainer development notes are available in [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
+
 ### Development and Verification Commands
 
 ```bash
@@ -223,6 +220,10 @@ flutter build apk --debug
 # Release APKs (split per ABI)
 flutter build apk --release --split-per-abi --tree-shake-icons --obfuscate --split-debug-info=build/symbols
 ```
+
+> Local development builds use the default version `999.999.999+999999999` from `pubspec.yaml` unless `--build-name` is passed explicitly.
+> This prevents self-built packages from triggering cloud update prompts simply because their version is lower than the latest GitHub Release.
+> The official release workflow parses the real version from the Git tag and overrides this default with `--build-name` / `--build-number`. Android upgrade checks compare `versionCode` (the build number after `+`), not the user-facing `versionName`.
 
 Android JVM unit tests:
 
@@ -304,12 +305,6 @@ dart run tool/i18n_audit.dart --update-baseline
 
 `flutter test` automatically runs `test/i18n_audit_test.dart` to prevent localization regressions.
 
-## Sponsor Thanks
-
-| Sponsor | Public Link |
-| --- | --- |
-| None yet | None yet |
-
 ## Contributing
 
 Contributions, bug reports, and suggestions are welcome.
@@ -325,10 +320,3 @@ Before sending a change, it is recommended to run:
 - `flutter analyze`
 - `flutter test`
 - `dart run tool/i18n_audit.dart --check`
-
-## Acknowledgements
-
-- [Flutter](https://flutter.dev)
-- [Google ML Kit](https://developers.google.com/ml-kit)
-- [SQLite](https://www.sqlite.org/)
-- All contributors and dependency maintainers

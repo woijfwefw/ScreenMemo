@@ -8,7 +8,7 @@
 
 "화면엔 흔적 없이, 기억엔 흔적을"
 
-[![Dart](https://img.shields.io/badge/Dart-3.8.1+-0175C2?logo=dart)](https://dart.dev) [![Android](https://img.shields.io/badge/Android-3DDC84?logo=android)](https://www.android.com) [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE) [<img src="https://gh-down-badges.linkof.link/297709457/ScreenMemo" alt="Downloads" />](https://github.com/woijfwefw/ScreenMemo/releases)
+[![Dart](https://img.shields.io/badge/Dart-3.8.1+-0175C2?logo=dart)](https://dart.dev) [![Android](https://img.shields.io/badge/Android-3DDC84?logo=android)](https://www.android.com) [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE) [<img src="https://gh-down-badges.linkof.link/woijfwefw/ScreenMemo" alt="Downloads" />](https://github.com/woijfwefw/ScreenMemo/releases)
 
 </div>
 
@@ -119,6 +119,7 @@ ScreenMemo는 로컬에서 동작하는 스마트 스크린샷 기록 및 검색
 - 예시: 압축된 이미지가 약 50 KB이고 1분마다 1장을 캡처하면, 30일 기준 약 43,200장, 약 2.1 GB / 월 정도입니다
 - 계산식: 월 사용량(GB) ≈ `(60 ÷ 간격 초) × 60 × 24 × 30 × 이미지 크기(KB) ÷ 1024 ÷ 1024`
 - 절감 방법: 캡처 간격 늘리기, 목표 크기 압축 사용, 만료 정리 활성화, 필요한 앱만 기록하기
+- 기존 과거 스크린샷은 "설정 → 스크린샷 설정 → 전역 기록 압축"에서 목표 크기로 일괄 압축할 수 있습니다. 취소하면 새 이미지 처리 작업 시작이 즉시 중단됩니다
 </details>
 
 <details>
@@ -137,17 +138,11 @@ ScreenMemo는 로컬에서 동작하는 스마트 스크린샷 기록 및 검색
 </details>
 
 <details>
-<summary>iOS나 데스크톱에서 자동 캡처를 지원하나요?</summary>
-
-- 현재는 아닙니다. 메인 캡처 파이프라인은 Android Accessibility 스크린샷 API를 전제로 합니다
-- 데스크톱 타깃은 백업 병합 도구이며, 완전한 크로스플랫폼 캡처 클라이언트는 아닙니다
-</details>
-
-<details>
 <summary>백업이나 마이그레이션은 어떻게 하나요?</summary>
 
 - 백업 기능에서 ZIP 백업을 내보낼 수 있으며, 먼저 범위를 스캔하고 manifest를 만든 뒤 진행률을 보여 줍니다
 - 가져오기는 덮어쓰기 / 병합 모드를 모두 지원하며, 병합 모드는 기존 데이터를 유지하면서 중복 제거를 시도합니다
+- 병합 가져오기는 `output` 아래의 스크린샷, 인덱스, 데이터베이스 데이터만 병합합니다. 전체 백업의 `shared_prefs`, `app_flutter`, `no_backup` 같은 런타임 설정 루트는 자동으로 건너뜁니다
 - 큰 백업이나 여러 백업은 먼저 데스크톱 병합 도구로 합친 뒤 Android로 가져오는 것이 실용적입니다
 - OCR 또는 인덱스 상태가 빠졌다면 가져오기 진단 기능에서 진단과 복구를 실행할 수 있습니다
 - 백업에는 cache, code cache, 임시 썸네일, 외부 로그가 포함되지 않습니다
@@ -205,6 +200,8 @@ ScreenMemo는 로컬에서 동작하는 스마트 스크린샷 기록 및 검색
    flutter run -d <device_id>
    ```
 
+관리자용 개발 메모는 [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)를 참고하세요.
+
 ### 개발 및 검증 명령
 
 ```bash
@@ -223,6 +220,10 @@ flutter build apk --debug
 # Release APK (ABI 분할)
 flutter build apk --release --split-per-abi --tree-shake-icons --obfuscate --split-debug-info=build/symbols
 ```
+
+> 로컬 개발 빌드에서 `--build-name` 을 명시하지 않으면 `pubspec.yaml` 의 기본 버전 `999.999.999+999999999` 이 사용됩니다.
+> 이렇게 하면 직접 빌드한 패키지가 GitHub Releases 최신 버전보다 낮다는 이유만으로 클라우드 업데이트 알림을 띄우는 일을 피할 수 있습니다.
+> 공식 릴리스 워크플로는 Git tag 에서 실제 버전을 파싱하고 `--build-name` / `--build-number` 로 이 기본값을 덮어씁니다. Android 덮어쓰기 설치에서 실제로 비교하는 값은 화면에 표시되는 `versionName` 이 아니라 `versionCode`(`+` 뒤의 build number)입니다.
 
 Android JVM 단위 테스트:
 
@@ -304,12 +305,6 @@ dart run tool/i18n_audit.dart --update-baseline
 
 `flutter test` 는 `test/i18n_audit_test.dart` 를 자동 실행해 다국어 회귀를 막습니다.
 
-## 후원 감사
-
-| 후원자 | 공개 링크 |
-| --- | --- |
-| 아직 없음 | 아직 없음 |
-
 ## 기여하기
 
 버그 제보, 제안, 코드 기여를 환영합니다.
@@ -325,10 +320,3 @@ dart run tool/i18n_audit.dart --update-baseline
 - `flutter analyze`
 - `flutter test`
 - `dart run tool/i18n_audit.dart --check`
-
-## 감사의 말
-
-- [Flutter](https://flutter.dev)
-- [Google ML Kit](https://developers.google.com/ml-kit)
-- [SQLite](https://www.sqlite.org/)
-- 모든 기여자와 의존성 유지관리자

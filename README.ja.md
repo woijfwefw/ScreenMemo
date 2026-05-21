@@ -8,7 +8,7 @@
 
 「画面に跡は残さず、記憶に刻む」
 
-[![Dart](https://img.shields.io/badge/Dart-3.8.1+-0175C2?logo=dart)](https://dart.dev) [![Android](https://img.shields.io/badge/Android-3DDC84?logo=android)](https://www.android.com) [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE) [<img src="https://gh-down-badges.linkof.link/297709457/ScreenMemo" alt="Downloads" />](https://github.com/woijfwefw/ScreenMemo/releases)
+[![Dart](https://img.shields.io/badge/Dart-3.8.1+-0175C2?logo=dart)](https://dart.dev) [![Android](https://img.shields.io/badge/Android-3DDC84?logo=android)](https://www.android.com) [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE) [<img src="https://gh-down-badges.linkof.link/woijfwefw/ScreenMemo" alt="Downloads" />](https://github.com/woijfwefw/ScreenMemo/releases)
 
 </div>
 
@@ -119,6 +119,7 @@ ScreenMemo はローカルで動作するスマートなスクリーンショッ
 - 例：1 枚あたり約 50 KB、1 分ごとに 1 枚取得する場合、30 日で約 43,200 枚、約 2.1 GB / 月です
 - 目安式：月間使用量（GB）≈ `(60 ÷ 間隔秒) × 60 × 24 × 30 × 画像サイズ(KB) ÷ 1024 ÷ 1024`
 - 削減策：取得間隔を長くする、目標サイズ圧縮を使う、期限切れ削除を有効にする、必要なアプリだけ取得する
+- 既存の過去スクリーンショットは「設定 → スクリーンショット設定 → グローバル履歴圧縮」から目標サイズで一括圧縮できます。キャンセルすると新しい画像処理の開始はすぐ停止します
 </details>
 
 <details>
@@ -137,17 +138,11 @@ ScreenMemo はローカルで動作するスマートなスクリーンショッ
 </details>
 
 <details>
-<summary>iOS やデスクトップで自動取得できますか？</summary>
-
-- 現時点ではできません。メインの取得パイプラインは Android の Accessibility スクリーンショット API を前提にしています
-- デスクトップ側はバックアップ統合ツールであり、完全なクロスプラットフォーム取得クライアントではありません
-</details>
-
-<details>
 <summary>バックアップや移行はどう行いますか？</summary>
 
 - バックアップ機能から ZIP バックアップをエクスポートできます。事前に範囲をスキャンし、manifest を生成してから進捗を表示します
 - インポートは上書き / マージの両方に対応し、マージでは既存データを残しつつ重複排除を試みます
+- マージインポートでは `output` 配下のスクリーンショット、索引、データベースデータのみを統合します。フルバックアップ内の `shared_prefs`、`app_flutter`、`no_backup` などの実行時設定ルートは自動的にスキップされます
 - 大きなバックアップや複数バックアップは、先にデスクトップ統合ツールでまとめてから Android に戻すのが実用的です
 - OCR や索引が欠けている場合はインポート診断機能で診断と修復ができます
 - バックアップには cache、code cache、一時サムネイル、外部ログは含まれません
@@ -205,6 +200,8 @@ ScreenMemo はローカルで動作するスマートなスクリーンショッ
    flutter run -d <device_id>
    ```
 
+メンテナ向けの開発メモは [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) を参照してください。
+
 ### 開発・検証コマンド
 
 ```bash
@@ -223,6 +220,10 @@ flutter build apk --debug
 # Release APK（ABI 分割）
 flutter build apk --release --split-per-abi --tree-shake-icons --obfuscate --split-debug-info=build/symbols
 ```
+
+> ローカル開発ビルドで `--build-name` を明示しない場合、`pubspec.yaml` の既定バージョン `999.999.999+999999999` が使われます。
+> これにより、自分でビルドしたパッケージが GitHub Releases の最新バージョンより低いという理由だけでクラウド更新通知を出すことを避けられます。
+> 正式リリースのワークフローでは Git tag から実際のバージョンを解析し、`--build-name` / `--build-number` でこの既定値を上書きします。Android の上書きインストールで比較されるのは `versionCode`（`+` の後ろの build number）であり、画面表示用の `versionName` ではありません。
 
 Android JVM 単体テスト：
 
@@ -304,12 +305,6 @@ dart run tool/i18n_audit.dart --update-baseline
 
 `flutter test` では `test/i18n_audit_test.dart` が自動実行され、多言語回帰を防ぎます。
 
-## スポンサー謝辞
-
-| スポンサー | 公開リンク |
-| --- | --- |
-| まだありません | まだありません |
-
 ## コントリビュート
 
 バグ報告、提案、コード提供を歓迎します。
@@ -325,10 +320,3 @@ dart run tool/i18n_audit.dart --update-baseline
 - `flutter analyze`
 - `flutter test`
 - `dart run tool/i18n_audit.dart --check`
-
-## 謝辞
-
-- [Flutter](https://flutter.dev)
-- [Google ML Kit](https://developers.google.com/ml-kit)
-- [SQLite](https://www.sqlite.org/)
-- すべてのコントリビュータと依存パッケージのメンテナ
