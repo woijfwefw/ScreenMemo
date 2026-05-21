@@ -1,38 +1,6 @@
 part of '../ai_settings_page.dart';
 
 extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
-  List<int> _decodeSegmentLengthsFromUiJson(String raw) {
-    final String t = raw.trim();
-    if (t.isEmpty) return const <int>[];
-
-    int asInt(dynamic v) {
-      if (v is int) return v;
-      if (v is double) return v.toInt();
-      if (v is String) return int.tryParse(v.trim()) ?? 0;
-      return 0;
-    }
-
-    dynamic decoded;
-    try {
-      decoded = jsonDecode(t);
-    } catch (_) {
-      return const <int>[];
-    }
-    if (decoded is! Map) return const <int>[];
-    final Map<String, dynamic> obj = Map<String, dynamic>.from(decoded as Map);
-    final int ver = asInt(obj['v']);
-    if (ver != 2) return const <int>[];
-
-    final dynamic lens0 = obj['seg_lens'];
-    if (lens0 is! List) return const <int>[];
-    final List<int> lens = <int>[];
-    for (final dynamic it in lens0) {
-      final int n = asInt(it);
-      if (n > 0) lens.add(n);
-    }
-    return lens;
-  }
-
   String? _encodeThinkingBlocksForIndex(int assistantIdx) {
     final List<_ThinkingBlock>? blocks0 = _thinkingBlocksByIndex[assistantIdx];
     if (blocks0 == null || blocks0.isEmpty) return null;
@@ -101,25 +69,7 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
       });
     }
 
-    // Persist content segment boundaries so we can restore the same
-    // 思考块/正文 interleaving order after reload/copy.
-    List<int> segLens = <int>[];
-    final List<String>? segs0 = _contentSegmentsByIndex[assistantIdx];
-    if (segs0 != null && segs0.length > 1) {
-      segLens = <int>[for (final s in segs0) s.length];
-    } else if (assistantIdx >= 0 && assistantIdx < _messages.length) {
-      final String? existingUi = _messages[assistantIdx].uiThinkingJson;
-      if (existingUi != null && existingUi.trim().isNotEmpty) {
-        final List<int> fromUi = _decodeSegmentLengthsFromUiJson(existingUi);
-        if (fromUi.length > 1) segLens = fromUi;
-      }
-    }
-
-    return jsonEncode(<String, dynamic>{
-      'v': 2,
-      'blocks': blocks,
-      if (segLens.length > 1) 'seg_lens': segLens,
-    });
+    return jsonEncode(<String, dynamic>{'v': 2, 'blocks': blocks});
   }
 
   List<_ThinkingBlock> _decodeThinkingBlocks(String raw) {
@@ -1684,41 +1634,6 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
       final String t = m.content;
       if (t.trim().isEmpty) return const <String>[];
 
-      // Restore streaming segment boundaries (if recorded) so the bubble/copy
-      // order matches the original model/tool interleaving.
-      final String uiJson = (m.uiThinkingJson ?? '').trim();
-      if (uiJson.isNotEmpty) {
-        final List<int> lens = _decodeSegmentLengthsFromUiJson(uiJson);
-        if (lens.length > 1) {
-          int offset = 0;
-          final List<String> out = <String>[];
-          bool invalid = false;
-          for (final int len in lens) {
-            final int end = offset + len;
-            if (len <= 0 || end > t.length) {
-              invalid = true;
-              break;
-            }
-            out.add(t.substring(offset, end));
-            offset = end;
-          }
-          if (!invalid) {
-            if (offset < t.length) {
-              // Preserve any tail text if content changed (best-effort).
-              if (out.isEmpty) {
-                out.add(t.substring(offset));
-              } else {
-                out[out.length - 1] = out.last + t.substring(offset);
-              }
-            }
-            if (out.length > 1) {
-              _contentSegmentsByIndex[messageIndex] = out;
-              return out;
-            }
-          }
-        }
-      }
-
       return <String>[t];
     }
     return const <String>[];
@@ -1764,26 +1679,20 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
 
     if (!isAssistant) return _stripComposerImageMarkers(m.content).trim();
 
-    // Interleave blocks/segs in the same order as the bubble UI.
-    final List<_ThinkingBlock> blocks = _blocksForMessageIndex(messageIndex);
-    final List<String> segs = _contentSegmentsForMessageIndex(messageIndex);
-    final int n = (blocks.length > segs.length) ? blocks.length : segs.length;
-
     final List<String> parts = <String>[];
-    for (int i = 0; i < n; i++) {
-      if (i < blocks.length) {
-        final String t = _buildThinkingBlockTextForCopy(blocks[i]).trim();
-        if (t.isNotEmpty) parts.add(t);
-      }
-      if (i < segs.length) {
-        final String s = segs[i].trim();
-        if (s.isNotEmpty) parts.add(s);
-      }
+    final String thinkingText = _buildThinkingTimelineTextForCopy(messageIndex);
+    if (thinkingText.isNotEmpty) parts.add(thinkingText);
+    final String content = m.content.trim().isNotEmpty
+        ? m.content.trim()
+        : _contentSegmentsForMessageIndex(messageIndex).join().trim();
+    if (content.isNotEmpty) {
+      parts.add(content);
     }
 
     // Only include legacy reasoning while any thinking block is still loading
     // (matches the UI, which hides legacy logs after completion).
     if (parts.isEmpty) {
+      final List<_ThinkingBlock> blocks = _blocksForMessageIndex(messageIndex);
       final bool anyLoading = blocks.any((b) => b.finishedAt == null);
       if (anyLoading) {
         final String legacy =

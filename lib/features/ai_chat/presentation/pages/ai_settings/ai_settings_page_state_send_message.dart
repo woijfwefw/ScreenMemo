@@ -29,6 +29,108 @@ String _filterReasoningChunkForUi(String raw) {
 }
 
 extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
+  bool _shouldAnalyzeIntentForConversation(
+    String cid, {
+    required bool isFirstUserTurn,
+  }) {
+    if (!isFirstUserTurn) return false;
+    final String key = cid.trim().isEmpty ? 'default' : cid.trim();
+    return !_intentAnalyzedConversationCids.contains(key);
+  }
+
+  void _markIntentAnalyzedForConversation(String cid) {
+    final String key = cid.trim().isEmpty ? 'default' : cid.trim();
+    _intentAnalyzedConversationCids.add(key);
+  }
+
+  bool _sameAssistantDisplayMetadata(AIMessage a, AIMessage b) {
+    return a.content == b.content &&
+        a.reasoningContent == b.reasoningContent &&
+        a.reasoningDuration == b.reasoningDuration &&
+        a.uiThinkingJson == b.uiThinkingJson &&
+        a.usagePromptTokens == b.usagePromptTokens &&
+        a.usageCompletionTokens == b.usageCompletionTokens &&
+        a.usageTotalTokens == b.usageTotalTokens &&
+        a.usageCacheHitTokens == b.usageCacheHitTokens &&
+        a.usageCacheMissTokens == b.usageCacheMissTokens &&
+        a.responseDuration == b.responseDuration;
+  }
+
+  AIMessage _mergeCompletedAssistantForDisplay(
+    AIMessage target,
+    AIMessage completed,
+  ) {
+    final String completedContent = completed.content.trim();
+    final String? targetUi = (target.uiThinkingJson ?? '').trim().isEmpty
+        ? null
+        : target.uiThinkingJson;
+    final String? completedUi = (completed.uiThinkingJson ?? '').trim().isEmpty
+        ? null
+        : completed.uiThinkingJson;
+
+    return AIMessage(
+      role: 'assistant',
+      content: completedContent.isNotEmpty ? completed.content : target.content,
+      createdAt: target.createdAt,
+      reasoningContent: completed.reasoningContent ?? target.reasoningContent,
+      reasoningDuration:
+          completed.reasoningDuration ?? target.reasoningDuration,
+      uiThinkingJson: targetUi ?? completedUi,
+      usagePromptTokens:
+          completed.usagePromptTokens ?? target.usagePromptTokens,
+      usageCompletionTokens:
+          completed.usageCompletionTokens ?? target.usageCompletionTokens,
+      usageTotalTokens: completed.usageTotalTokens ?? target.usageTotalTokens,
+      usageCacheHitTokens:
+          completed.usageCacheHitTokens ?? target.usageCacheHitTokens,
+      usageCacheMissTokens:
+          completed.usageCacheMissTokens ?? target.usageCacheMissTokens,
+      responseDuration: completed.responseDuration ?? target.responseDuration,
+    );
+  }
+
+  bool _mergeCompletedAssistantIntoCurrentBubble(AIMessage completed) {
+    bool changed = false;
+    _setState(() {
+      final int? currentIdx = _currentAssistantIndex;
+      final int fallbackIdx = _messages.length - 1;
+      final int targetIdx =
+          (currentIdx != null &&
+              currentIdx >= 0 &&
+              currentIdx < _messages.length)
+          ? currentIdx
+          : fallbackIdx;
+      if (targetIdx < 0 || targetIdx >= _messages.length) {
+        return;
+      }
+
+      final AIMessage target = _messages[targetIdx];
+      if (target.role != 'assistant') return;
+
+      final AIMessage updated = _mergeCompletedAssistantForDisplay(
+        target,
+        completed,
+      );
+      if (_sameAssistantDisplayMetadata(target, updated)) return;
+
+      final List<AIMessage> newList = List<AIMessage>.from(_messages);
+      newList[targetIdx] = updated;
+      _messages = newList;
+      changed = true;
+
+      if (currentIdx != null && completed.content.trim().isNotEmpty) {
+        if (_replaceAssistantContentOnNextToken) {
+          _finishActiveThinkingBlock(currentIdx);
+          _appendContentChunk(currentIdx, completed.content);
+        } else {
+          _syncContentSegmentsForFullContent(currentIdx, updated.content);
+        }
+        _replaceAssistantContentOnNextToken = false;
+      }
+    });
+    return changed;
+  }
+
   String _mimeForComposerImagePath(String path) {
     final String ext = path.split('.').last.toLowerCase();
     switch (ext) {
@@ -421,7 +523,6 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
       _contentSegmentsByIndex[assistantIdx] = loadingContent.trim().isEmpty
           ? <String>[]
           : <String>[loadingContent];
-      _nextContentStartsNewSegmentByIndex[assistantIdx] = false;
       if (userAttachments.isNotEmpty) {
         _attachmentsByIndex[assistantIdx - 1] = userAttachments;
         _sentComposerImagePaths.addAll(images.map((e) => e.path));
@@ -533,9 +634,6 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
       _messages = trimmedMessages;
       _thinkingBlocksByIndex.removeWhere((key, _) => key >= userIndex);
       _contentSegmentsByIndex.removeWhere((key, _) => key >= userIndex);
-      _nextContentStartsNewSegmentByIndex.removeWhere(
-        (key, _) => key >= userIndex,
-      );
       _reasoningByIndex.removeWhere((key, _) => key >= userIndex);
       _gatewayLogsByIndex.removeWhere((key, _) => key >= userIndex);
       _gatewayLogFilePathByIndex.removeWhere((key, _) => key >= userIndex);
@@ -597,6 +695,11 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
       }
       requestCid = requestCid.trim();
       _inFlightConversationCid = requestCid.isEmpty ? null : requestCid;
+      final bool shouldAnalyzeInitialIntent =
+          _shouldAnalyzeIntentForConversation(
+            requestCid,
+            isFirstUserTurn: !_messages.any((m) => m.role == 'user'),
+          );
       if (_imageDrawMode && override == null) {
         await _sendImageGenerationMessage(
           text: text,
@@ -672,7 +775,6 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
             icon: Icons.autorenew_rounded,
           );
           _contentSegmentsByIndex[assistantIdx] = <String>[];
-          _nextContentStartsNewSegmentByIndex[assistantIdx] = true;
         });
         _markInFlightHistoryDirty();
         // Mirror gateway logs to a dedicated file (best-effort) so it's easier
@@ -703,24 +805,7 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
           bullet: false,
         );
 
-        // 阶段 1/4：意图分析
         try {
-          await FlutterLogger.nativeInfo(
-            'ChatFlow',
-            'phase1 intent begin text="${text.length > 200 ? (text.substring(0, 200) + '…') : text}"',
-          );
-          _appendAgentLog(
-            _isZhLocale() ? '阶段 1/4：意图分析' : 'Phase 1/4: intent analysis',
-            bullet: false,
-          );
-          setStateIfActive(() {
-            _setTransientThinkingStep(
-              assistantIdx,
-              title: _isZhLocale() ? '正在分析问题' : 'Analyzing request',
-              icon: Icons.search_outlined,
-            );
-          });
-
           IntentResult? intent;
           String userQuestionForFinal = text;
           bool localOnlyResponse = false;
@@ -838,7 +923,24 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
               analyzeInput = _composeClarifyIntentInput(clarifyAsk);
             }
 
-            if (!localOnlyResponse) {
+            final bool shouldAnalyzeIntent =
+                clarifyAsk != null || shouldAnalyzeInitialIntent;
+            if (!localOnlyResponse && shouldAnalyzeIntent) {
+              await FlutterLogger.nativeInfo(
+                'ChatFlow',
+                'phase1 intent begin text="${text.length > 200 ? (text.substring(0, 200) + '…') : text}"',
+              );
+              _appendAgentLog(
+                _isZhLocale() ? '阶段 1/4：意图分析' : 'Phase 1/4: intent analysis',
+                bullet: false,
+              );
+              setStateIfActive(() {
+                _setTransientThinkingStep(
+                  assistantIdx,
+                  title: _isZhLocale() ? '正在分析问题' : 'Analyzing request',
+                  icon: Icons.search_outlined,
+                );
+              });
               final String preview = _clipOneLine(analyzeInput, 80);
               _appendAgentLog(
                 _isZhLocale()
@@ -865,6 +967,7 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
                       ),
                 previousUserQueries: _extractPreviousUserQueries(maxCount: 3),
               );
+              _markIntentAnalyzedForConversation(requestCid);
               swIntent.stop();
               final String range = intent!.hasValidRange
                   ? '[${intent!.startMs}-${intent!.endMs}]'
@@ -932,7 +1035,7 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
             session = null;
             unawaited(_stopGatewayLogsFileMirror(assistantIdx));
           } else {
-            final IntentResult resolvedIntent = intent!;
+            final IntentResult? resolvedIntent = intent;
 
             // 清理澄清状态，避免污染下一轮
             if (_clarifyState != null) {
@@ -944,29 +1047,35 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
               _clarifyState = null;
             }
 
-            await FlutterLogger.nativeInfo(
-              'ChatFlow',
-              'phase1 intent ok (no-preset-window) intent=${resolvedIntent.intent} summary=${resolvedIntent.intentSummary}',
-            );
-            _appendAgentLog(
-              _isZhLocale()
-                  ? '意图已确认：${resolvedIntent.intentSummary}（不预设时间窗，由模型按需检索）'
-                  : 'Intent confirmed: ${resolvedIntent.intentSummary} (no preset time window; model retrieves as needed)',
-            );
-            setStateIfActive(() {
-              _setTransientThinkingStep(
-                assistantIdx,
-                title: _isZhLocale() ? '正在更新对话标题' : 'Updating chat title',
-                subtitle: _formatIntentSubtitle(resolvedIntent),
-                icon: Icons.drive_file_rename_outline_rounded,
+            if (resolvedIntent != null) {
+              await FlutterLogger.nativeInfo(
+                'ChatFlow',
+                'phase1 intent ok (no-preset-window) intent=${resolvedIntent.intent} summary=${resolvedIntent.intentSummary}',
               );
-            });
-            _renameActiveConversationTo(
-              resolvedIntent.intentSummary,
-              conversationCid: requestCid,
-            );
+              _appendAgentLog(
+                _isZhLocale()
+                    ? '意图已确认：${resolvedIntent.intentSummary}（不预设时间窗，由模型按需检索）'
+                    : 'Intent confirmed: ${resolvedIntent.intentSummary} (no preset time window; model retrieves as needed)',
+              );
+              setStateIfActive(() {
+                _setTransientThinkingStep(
+                  assistantIdx,
+                  title: _isZhLocale() ? '正在更新对话标题' : 'Updating chat title',
+                  subtitle: _formatIntentSubtitle(resolvedIntent),
+                  icon: Icons.drive_file_rename_outline_rounded,
+                );
+              });
+              _renameActiveConversationTo(
+                resolvedIntent.intentSummary,
+                conversationCid: requestCid,
+              );
+            }
             _appendAgentLog(
-              _isZhLocale() ? '阶段 3/4：生成回答' : 'Phase 3/4: generating answer',
+              resolvedIntent == null
+                  ? (_isZhLocale() ? '生成回答' : 'Generating answer')
+                  : (_isZhLocale()
+                        ? '阶段 3/4：生成回答'
+                        : 'Phase 3/4: generating answer'),
               bullet: false,
             );
             setStateIfActive(() {
@@ -1112,7 +1221,6 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
                     _replaceAssistantContentOnNextToken = false;
 
                     if (currentIdx != null && incoming.isNotEmpty) {
-                      _finishActiveThinkingBlock(currentIdx);
                       _appendContentChunk(currentIdx, incoming);
                     }
                   }
@@ -1168,142 +1276,10 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
               );
             } catch (_) {}
 
-            // Safety net: some providers/models only emit Responses/ChatCompletions "done" events
-            // (or we may filter out empty deltas). If we never saw any content token, replace the
-            // phase placeholder with the final completed content so the UI doesn't look "stuck".
-            if (_replaceAssistantContentOnNextToken &&
-                completed.content.trim().isNotEmpty) {
-              _setState(() {
-                final int? currentIdx = _currentAssistantIndex;
-                final int fallbackIdx = _messages.length - 1;
-                final int targetIdx =
-                    (currentIdx != null &&
-                        currentIdx >= 0 &&
-                        currentIdx < _messages.length)
-                    ? currentIdx
-                    : fallbackIdx;
-                if (targetIdx < 0 || targetIdx >= _messages.length) {
-                  return;
-                }
-                final AIMessage target = _messages[targetIdx];
-                if (target.role != 'assistant') return;
-
-                final updated = AIMessage(
-                  role: 'assistant',
-                  content: completed.content,
-                  createdAt: target.createdAt,
-                  reasoningContent:
-                      completed.reasoningContent ?? target.reasoningContent,
-                  reasoningDuration:
-                      completed.reasoningDuration ?? target.reasoningDuration,
-                  uiThinkingJson: target.uiThinkingJson,
-                  usagePromptTokens:
-                      completed.usagePromptTokens ?? target.usagePromptTokens,
-                  usageCompletionTokens:
-                      completed.usageCompletionTokens ??
-                      target.usageCompletionTokens,
-                  usageTotalTokens:
-                      completed.usageTotalTokens ?? target.usageTotalTokens,
-                  usageCacheHitTokens:
-                      completed.usageCacheHitTokens ??
-                      target.usageCacheHitTokens,
-                  usageCacheMissTokens:
-                      completed.usageCacheMissTokens ??
-                      target.usageCacheMissTokens,
-                  responseDuration:
-                      completed.responseDuration ?? target.responseDuration,
-                );
-                final newList = List<AIMessage>.from(_messages);
-                newList[targetIdx] = updated;
-                _messages = newList;
-                _replaceAssistantContentOnNextToken = false;
-
-                if (currentIdx != null && completed.content.isNotEmpty) {
-                  _finishActiveThinkingBlock(currentIdx);
-                  _appendContentChunk(currentIdx, completed.content);
-                }
-              });
-              _scheduleAutoScroll();
-              _markInFlightHistoryDirty();
-            }
-
-            // Stream providers may emit overlapping terminal events; ensure the final
-            // assistant bubble always converges to completed.content exactly.
-            if (completed.content.trim().isNotEmpty) {
-              _setState(() {
-                final int? currentIdx = _currentAssistantIndex;
-                final int fallbackIdx = _messages.length - 1;
-                final int targetIdx =
-                    (currentIdx != null &&
-                        currentIdx >= 0 &&
-                        currentIdx < _messages.length)
-                    ? currentIdx
-                    : fallbackIdx;
-                if (targetIdx < 0 || targetIdx >= _messages.length) {
-                  return;
-                }
-                final AIMessage target = _messages[targetIdx];
-                if (target.role != 'assistant') return;
-                final bool metadataChanged =
-                    (completed.reasoningContent ?? target.reasoningContent) !=
-                        target.reasoningContent ||
-                    (completed.reasoningDuration ?? target.reasoningDuration) !=
-                        target.reasoningDuration ||
-                    (completed.usagePromptTokens ?? target.usagePromptTokens) !=
-                        target.usagePromptTokens ||
-                    (completed.usageCompletionTokens ??
-                            target.usageCompletionTokens) !=
-                        target.usageCompletionTokens ||
-                    (completed.usageTotalTokens ?? target.usageTotalTokens) !=
-                        target.usageTotalTokens ||
-                    (completed.usageCacheHitTokens ??
-                            target.usageCacheHitTokens) !=
-                        target.usageCacheHitTokens ||
-                    (completed.usageCacheMissTokens ??
-                            target.usageCacheMissTokens) !=
-                        target.usageCacheMissTokens ||
-                    (completed.responseDuration ?? target.responseDuration) !=
-                        target.responseDuration;
-                if (target.content == completed.content && !metadataChanged) {
-                  return;
-                }
-
-                final updated = AIMessage(
-                  role: 'assistant',
-                  content: completed.content,
-                  createdAt: target.createdAt,
-                  reasoningContent:
-                      completed.reasoningContent ?? target.reasoningContent,
-                  reasoningDuration:
-                      completed.reasoningDuration ?? target.reasoningDuration,
-                  uiThinkingJson: target.uiThinkingJson,
-                  usagePromptTokens:
-                      completed.usagePromptTokens ?? target.usagePromptTokens,
-                  usageCompletionTokens:
-                      completed.usageCompletionTokens ??
-                      target.usageCompletionTokens,
-                  usageTotalTokens:
-                      completed.usageTotalTokens ?? target.usageTotalTokens,
-                  usageCacheHitTokens:
-                      completed.usageCacheHitTokens ??
-                      target.usageCacheHitTokens,
-                  usageCacheMissTokens:
-                      completed.usageCacheMissTokens ??
-                      target.usageCacheMissTokens,
-                  responseDuration:
-                      completed.responseDuration ?? target.responseDuration,
-                );
-                final newList = List<AIMessage>.from(_messages);
-                newList[targetIdx] = updated;
-                _messages = newList;
-
-                if (currentIdx != null) {
-                  _contentSegmentsByIndex[currentIdx] = <String>[
-                    completed.content,
-                  ];
-                  _nextContentStartsNewSegmentByIndex[currentIdx] = false;
-                }
-              });
+            // Providers usually return usage only in the terminal response. Merge
+            // final metadata independently from final text so input/output/tok/s
+            // stats are not lost when the text has already streamed into the UI.
+            if (_mergeCompletedAssistantIntoCurrentBubble(completed)) {
               _scheduleAutoScroll();
               _markInFlightHistoryDirty();
             }
@@ -1382,10 +1358,12 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
             if (mounted) {
               _setState(() {
                 _messages = merged;
-                // After completion, render directly from the persisted `content`
-                // so re-entering the page shows the exact same UI.
-                _contentSegmentsByIndex.clear();
-                _nextContentStartsNewSegmentByIndex.clear();
+                if (assistantIdx >= 0 && assistantIdx < _messages.length) {
+                  _syncContentSegmentsForFullContent(
+                    assistantIdx,
+                    _messages[assistantIdx].content,
+                  );
+                }
               });
             }
             await _enqueueChatHistorySaveByCid(requestCid, merged);
@@ -1426,32 +1404,14 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
             icon: Icons.autorenew_rounded,
           );
           _contentSegmentsByIndex[assistantIdx] = <String>[];
-          _nextContentStartsNewSegmentByIndex[assistantIdx] = true;
         });
         _appendAgentLog(
           _isZhLocale() ? '开始处理本次请求' : 'Start handling request',
           assistantIndex: assistantIdx,
           bullet: false,
         );
-        _appendAgentLog(
-          _isZhLocale() ? '阶段 1/4：意图分析' : 'Phase 1/4: intent analysis',
-          assistantIndex: assistantIdx,
-          bullet: false,
-        );
-        setStateIfActive(() {
-          _setTransientThinkingStep(
-            assistantIdx,
-            title: _isZhLocale() ? '正在分析问题' : 'Analyzing request',
-            icon: Icons.search_outlined,
-          );
-        });
 
         try {
-          await FlutterLogger.nativeInfo(
-            'ChatFlow',
-            'phase1 intent(begin, non-stream)',
-          );
-
           IntentResult? intent;
           String userQuestionForFinal = text;
           bool localOnlyResponse = false;
@@ -1570,7 +1530,25 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
               analyzeInput = _composeClarifyIntentInput(clarifyAsk);
             }
 
-            if (!localOnlyResponse) {
+            final bool shouldAnalyzeIntent =
+                clarifyAsk != null || shouldAnalyzeInitialIntent;
+            if (!localOnlyResponse && shouldAnalyzeIntent) {
+              _appendAgentLog(
+                _isZhLocale() ? '阶段 1/4：意图分析' : 'Phase 1/4: intent analysis',
+                assistantIndex: assistantIdx,
+                bullet: false,
+              );
+              setStateIfActive(() {
+                _setTransientThinkingStep(
+                  assistantIdx,
+                  title: _isZhLocale() ? '正在分析问题' : 'Analyzing request',
+                  icon: Icons.search_outlined,
+                );
+              });
+              await FlutterLogger.nativeInfo(
+                'ChatFlow',
+                'phase1 intent(begin, non-stream)',
+              );
               final String preview = _clipOneLine(analyzeInput, 80);
               _appendAgentLog(
                 _isZhLocale()
@@ -1598,6 +1576,7 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
                       ),
                 previousUserQueries: _extractPreviousUserQueries(maxCount: 3),
               );
+              _markIntentAnalyzedForConversation(requestCid);
               swIntent.stop();
               final String range = intent!.hasValidRange
                   ? '[${intent!.startMs}-${intent!.endMs}]'
@@ -1661,6 +1640,10 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
                 content: localAssistantText,
                 createdAt: last.createdAt,
               );
+              _syncContentSegmentsForFullContent(
+                assistantIdx,
+                localAssistantText,
+              );
             });
             _scheduleAutoScroll();
             try {
@@ -1672,7 +1655,7 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
             return;
           }
 
-          final IntentResult resolvedIntent = intent!;
+          final IntentResult? resolvedIntent = intent;
 
           // 清理澄清状态，避免污染下一轮
           if (_clarifyState != null) {
@@ -1685,30 +1668,36 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
             _clarifyState = null;
           }
 
-          await FlutterLogger.nativeInfo(
-            'ChatFlow',
-            'phase1 intent ok (no-preset-window, non-stream) intent=${resolvedIntent.intent} summary=${resolvedIntent.intentSummary}',
-          );
-          _appendAgentLog(
-            _isZhLocale()
-                ? '意图已确认：${resolvedIntent.intentSummary}（不预设时间窗，由模型按需检索）'
-                : 'Intent confirmed: ${resolvedIntent.intentSummary} (no preset time window; model retrieves as needed)',
-            assistantIndex: assistantIdx,
-          );
-          setStateIfActive(() {
-            _setTransientThinkingStep(
-              assistantIdx,
-              title: _isZhLocale() ? '正在更新对话标题' : 'Updating chat title',
-              subtitle: _formatIntentSubtitle(resolvedIntent),
-              icon: Icons.drive_file_rename_outline_rounded,
+          if (resolvedIntent != null) {
+            await FlutterLogger.nativeInfo(
+              'ChatFlow',
+              'phase1 intent ok (no-preset-window, non-stream) intent=${resolvedIntent.intent} summary=${resolvedIntent.intentSummary}',
             );
-          });
-          _renameActiveConversationTo(
-            resolvedIntent.intentSummary,
-            conversationCid: requestCid,
-          );
+            _appendAgentLog(
+              _isZhLocale()
+                  ? '意图已确认：${resolvedIntent.intentSummary}（不预设时间窗，由模型按需检索）'
+                  : 'Intent confirmed: ${resolvedIntent.intentSummary} (no preset time window; model retrieves as needed)',
+              assistantIndex: assistantIdx,
+            );
+            setStateIfActive(() {
+              _setTransientThinkingStep(
+                assistantIdx,
+                title: _isZhLocale() ? '正在更新对话标题' : 'Updating chat title',
+                subtitle: _formatIntentSubtitle(resolvedIntent),
+                icon: Icons.drive_file_rename_outline_rounded,
+              );
+            });
+            _renameActiveConversationTo(
+              resolvedIntent.intentSummary,
+              conversationCid: requestCid,
+            );
+          }
           _appendAgentLog(
-            _isZhLocale() ? '阶段 3/4：生成回答' : 'Phase 3/4: generating answer',
+            resolvedIntent == null
+                ? (_isZhLocale() ? '生成回答' : 'Generating answer')
+                : (_isZhLocale()
+                      ? '阶段 3/4：生成回答'
+                      : 'Phase 3/4: generating answer'),
             assistantIndex: assistantIdx,
             bullet: false,
           );
@@ -1795,9 +1784,12 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
               usageCacheMissTokens: assistant.usageCacheMissTokens,
               responseDuration: assistant.responseDuration,
             );
+            _syncContentSegmentsForFullContent(assistantIdx, assistant.content);
           });
           _scheduleAutoScroll();
-          _lastIntent = resolvedIntent;
+          if (resolvedIntent != null) {
+            _lastIntent = resolvedIntent;
+          }
           try {
             final List<AIMessage> toSave = _mergeReasoningForPersistence(
               List<AIMessage>.from(_messages),

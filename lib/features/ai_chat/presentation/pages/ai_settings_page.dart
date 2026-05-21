@@ -242,6 +242,7 @@ class _AISettingsPageState extends State<AISettingsPage>
   // Controlled by Settings > Advanced. Defaults to hidden to avoid noisy UI.
   bool _showPerfOverlay = false;
   final Set<String> _perfLoggedMarkdownMsgKeys = <String>{};
+  final Set<String> _usageStatsUiLoggedKeys = <String>{};
   Map<String, Uint8List?> _chatAppIconByPackage = <String, Uint8List?>{};
   Map<String, Uint8List?> _chatAppIconByNameLower = <String, Uint8List?>{};
   Map<String, String> _chatAppNameByPackage = <String, String>{};
@@ -331,10 +332,8 @@ class _AISettingsPageState extends State<AISettingsPage>
   // 每条助手消息的思考块（索引 -> blocks）
   final Map<int, List<_ThinkingBlock>> _thinkingBlocksByIndex =
       <int, List<_ThinkingBlock>>{};
-  // 每条助手消息的正文分段（用于 思考块/正文 交替展示）
+  // 每条助手消息的正文缓存。思考过程统一显示在正文之前，正文只保留连续文本。
   final Map<int, List<String>> _contentSegmentsByIndex = <int, List<String>>{};
-  // 标记下一次 content 增量是否需要开启一个新分段
-  final Map<int, bool> _nextContentStartsNewSegmentByIndex = <int, bool>{};
   // 每条助手消息附带的证据图片（索引 -> 附件列表）
   final Map<int, List<EvidenceImageAttachment>> _attachmentsByIndex =
       <int, List<EvidenceImageAttachment>>{};
@@ -352,6 +351,7 @@ class _AISettingsPageState extends State<AISettingsPage>
   bool _evidenceRebuildScheduled = false;
   // 上一轮意图结果（用于为下一轮提供 prev hint）
   IntentResult? _lastIntent;
+  final Set<String> _intentAnalyzedConversationCids = <String>{};
   // 澄清推进：当时间缺失/范围过大时，先温和追问 + 再做探测检索候选
   _ClarifyState? _clarifyState;
   // 提示词管理
@@ -535,10 +535,10 @@ class _AISettingsPageState extends State<AISettingsPage>
                 _reasoningDurationByIndex.clear();
                 _thinkingBlocksByIndex.clear();
                 _contentSegmentsByIndex.clear();
-                _nextContentStartsNewSegmentByIndex.clear();
                 _currentAssistantIndex = null;
                 _inStreaming = false;
                 _sending = false;
+                _lastIntent = null;
                 _clarifyState = null;
               });
               _stopInFlightHistoryPersistence();
@@ -551,6 +551,10 @@ class _AISettingsPageState extends State<AISettingsPage>
         }
         // 若是删除事件，先立即清空当前对话UI，避免等待重载造成的"空白延迟"
         if (ctx == 'chat:deleted' || ctx == 'chat:cleared') {
+          final String clearedCid = (_activeConversationCid ?? '').trim();
+          if (clearedCid.isNotEmpty) {
+            _intentAnalyzedConversationCids.remove(clearedCid);
+          }
           // Close any open log writers tied to the previous conversation.
           try {
             final writers = List<_GatewayLogFileWriter>.from(
@@ -578,10 +582,10 @@ class _AISettingsPageState extends State<AISettingsPage>
             _reasoningDurationByIndex.clear();
             _thinkingBlocksByIndex.clear();
             _contentSegmentsByIndex.clear();
-            _nextContentStartsNewSegmentByIndex.clear();
             _currentAssistantIndex = null;
             _inStreaming = false;
             _sending = false;
+            _lastIntent = null;
             _clarifyState = null;
           });
           _stopInFlightHistoryPersistence();
@@ -735,10 +739,7 @@ class _AISettingsPageState extends State<AISettingsPage>
       () => <_ThinkingBlock>[],
     );
     if (blocks.isEmpty || !blocks.last.isLoading) {
-      final DateTime createdAt = DateTime.now();
-      blocks.add(_ThinkingBlock(createdAt: createdAt));
-      // 新思考块开启后，下一次 content 应当进入一个新分段（用于 思考块/正文 交替）
-      _nextContentStartsNewSegmentByIndex[assistantIdx] = true;
+      blocks.add(_ThinkingBlock(createdAt: DateTime.now()));
     }
     return blocks.last;
   }

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:screen_memo/features/ai/application/chat_context_service.dart';
+import 'package:screen_memo/features/ai/application/codex_style_token_usage.dart';
 import 'package:screen_memo/data/database/screenshot_database.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -87,6 +88,26 @@ void main() {
       expect(totals.totalTokens, 392); // 112(est) + 280(usage)
       expect(totals.cacheHitTokens, 120);
       expect(totals.cacheMissTokens, 80);
+
+      final CodexStyleTokenUsageInfo codexUsage = await ChatContextService
+          .instance
+          .getCodexStyleTokenUsageInfo(
+            cid: 'usage-cid',
+            modelContextWindow: 128000,
+          );
+      expect(codexUsage.eventsCount, 2);
+      expect(codexUsage.usageBackedCount, 1);
+      expect(codexUsage.modelContextWindow, 128000);
+      expect(codexUsage.lastTokenUsage.inputTokens, 200);
+      expect(codexUsage.lastTokenUsage.cachedInputTokens, 120);
+      expect(codexUsage.lastTokenUsage.nonCachedInputTokens, 80);
+      expect(codexUsage.lastTokenUsage.outputTokens, 80);
+      expect(codexUsage.lastTokenUsage.blendedTotalTokens, 160);
+      expect(codexUsage.lastTokenUsage.tokensInContextWindow, 280);
+      expect(codexUsage.totalTokenUsage.inputTokens, 300);
+      expect(codexUsage.totalTokenUsage.outputTokens, 92);
+      expect(codexUsage.totalTokenUsage.blendedTotalTokens, 272);
+      expect(codexUsage.lastTokenUsage.contextUsedRatio(128000), 0);
     } finally {
       try {
         await ScreenshotDatabase.instance.disposeDesktop();

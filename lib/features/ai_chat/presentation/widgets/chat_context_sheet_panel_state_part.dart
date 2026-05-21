@@ -37,6 +37,18 @@ extension _ChatContextPanelStatePart on _ChatContextPanelState {
                 _cachedLatestUsage = latest;
               });
             } catch (_) {}
+            try {
+              final CodexStyleTokenUsageInfo info = await ChatContextService
+                  .instance
+                  .getCodexStyleTokenUsageInfo(
+                    cid: s.cid,
+                    modelContextWindow: _activeModelContextTokens,
+                  );
+              if (!mounted) return;
+              _panelSetState(() {
+                _cachedCodexUsageInfo = info;
+              });
+            } catch (_) {}
           }());
           try {
             final String raw = s.lastPromptBreakdownJson.trim();

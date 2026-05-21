@@ -919,6 +919,8 @@ class _ToolCallDetailSheet extends StatefulWidget {
 
 class _ToolCallDetailSheetState extends State<_ToolCallDetailSheet> {
   final Set<String> _expandedSections = <String>{};
+  Future<List<_ToolImagePreviewItem>>? _imagePreviewFuture;
+  String _imagePreviewFutureKey = '';
 
   String _loc(String zh, String en) => _isZhLocaleUi(context) ? zh : en;
 
@@ -950,6 +952,38 @@ class _ToolCallDetailSheetState extends State<_ToolCallDetailSheet> {
     return raw?.toString().trim() ?? '';
   }
 
+  Object? _decodeJsonOrNull(String raw) {
+    final String t = raw.trim();
+    if (t.isEmpty) return null;
+    try {
+      return jsonDecode(t);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Map<String, dynamic>? _decodeJsonMapOrNull(String raw) {
+    final Object? decoded = _decodeJsonOrNull(raw);
+    if (decoded is Map) {
+      return Map<String, dynamic>.from(decoded);
+    }
+    return null;
+  }
+
+  List<String> _stringListFromJsonValue(Object? raw) {
+    final List<String> out = <String>[];
+    if (raw is List) {
+      for (final Object? item in raw) {
+        final String value = (item ?? '').toString().trim();
+        if (value.isNotEmpty) out.add(value);
+      }
+    } else if (raw is String) {
+      final String value = raw.trim();
+      if (value.isNotEmpty) out.add(value);
+    }
+    return out;
+  }
+
   int? _detailInt(Map<String, dynamic>? detail, String key) {
     final Object? raw = detail?[key];
     if (raw is int) return raw;
@@ -961,6 +995,85 @@ class _ToolCallDetailSheetState extends State<_ToolCallDetailSheet> {
     final String summary = (widget.chip.resultSummary ?? '').trim();
     if (summary.isNotEmpty) return summary;
     return _loc('暂无完整详情', 'No full details yet');
+  }
+
+  Map<String, dynamic>? _getImagesToolPayloadFromResult(String resultJson) {
+    final Object? decoded = _decodeJsonOrNull(resultJson);
+    if (decoded is Map) {
+      final Map<String, dynamic> map = Map<String, dynamic>.from(decoded);
+      return (map['tool'] ?? '').toString().trim() == 'get_images' ? map : null;
+    }
+    if (decoded is List) {
+      for (final Object? rawItem in decoded) {
+        if (rawItem is! Map) continue;
+        final Map<String, dynamic> item = Map<String, dynamic>.from(rawItem);
+        final String content = (item['content'] ?? '').toString().trim();
+        final Map<String, dynamic>? map = _decodeJsonMapOrNull(content);
+        if (map == null) continue;
+        if ((map['tool'] ?? '').toString().trim() == 'get_images') return map;
+      }
+    }
+    return null;
+  }
+
+  List<String> _getImagesPreviewFilenames(Map<String, dynamic>? detail) {
+    if (widget.chip.toolName.trim() != 'get_images') return const <String>[];
+
+    final Map<String, dynamic>? resultPayload =
+        _getImagesToolPayloadFromResult(_detailValue(detail, 'result_json')) ??
+        _decodeJsonMapOrNull(_detailValue(detail, 'result_text'));
+    final List<String> provided = _stringListFromJsonValue(
+      resultPayload?['provided'],
+    );
+    final List<String> requested = _stringListFromJsonValue(
+      resultPayload?['requested'],
+    );
+    final Map<String, dynamic>? args = _decodeJsonMapOrNull(
+      _detailValue(detail, 'arguments_json'),
+    );
+    final List<String> argumentNames = _stringListFromJsonValue(
+      args?['filenames'],
+    );
+
+    final List<String> preferred = provided.isNotEmpty
+        ? provided
+        : (requested.isNotEmpty ? requested : argumentNames);
+    final Set<String> seen = <String>{};
+    final List<String> out = <String>[];
+    for (final String name in preferred) {
+      final String t = name.trim();
+      if (t.isEmpty || t.contains('/') || t.contains('\\')) continue;
+      if (seen.add(t)) out.add(t);
+    }
+    return out;
+  }
+
+  Future<List<_ToolImagePreviewItem>> _resolveImagePreviewItems(
+    List<String> filenames,
+  ) async {
+    if (filenames.isEmpty) return const <_ToolImagePreviewItem>[];
+    final Map<String, String> paths = await ScreenshotDatabase.instance
+        .findPathsByBasenames(filenames.toSet());
+    final List<_ToolImagePreviewItem> out = <_ToolImagePreviewItem>[];
+    for (final String filename in filenames) {
+      final String path = (paths[filename] ?? '').trim();
+      if (path.isEmpty) continue;
+      final File file = File(path);
+      if (!await file.exists()) continue;
+      out.add(_ToolImagePreviewItem(filename: filename, path: path));
+    }
+    return out;
+  }
+
+  Future<List<_ToolImagePreviewItem>> _imagePreviewFutureFor(
+    List<String> filenames,
+  ) {
+    final String key = filenames.join('\n');
+    if (_imagePreviewFuture == null || key != _imagePreviewFutureKey) {
+      _imagePreviewFutureKey = key;
+      _imagePreviewFuture = _resolveImagePreviewItems(filenames);
+    }
+    return _imagePreviewFuture!;
   }
 
   @override
@@ -1108,6 +1221,11 @@ class _ToolCallDetailSheetState extends State<_ToolCallDetailSheet> {
             monospace: true,
             initiallyExpanded: true,
           ),
+        if (widget.chip.toolName.trim() == 'get_images')
+          _buildImagePreviewSection(
+            context,
+            filenames: _getImagesPreviewFilenames(detail),
+          ),
         if (resultJson.isNotEmpty)
           _buildTextSection(
             context,
@@ -1136,6 +1254,116 @@ class _ToolCallDetailSheetState extends State<_ToolCallDetailSheet> {
             initiallyExpanded: true,
           ),
       ],
+    );
+  }
+
+  Widget _buildImagePreviewSection(
+    BuildContext context, {
+    required List<String> filenames,
+  }) {
+    final theme = Theme.of(context);
+    final ColorScheme cs = theme.colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _loc('预览结果', 'Preview'),
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (filenames.isEmpty)
+              Text(
+                _loc('没有可预览的图片。', 'No preview images available.'),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              )
+            else
+              FutureBuilder<List<_ToolImagePreviewItem>>(
+                future: _imagePreviewFutureFor(filenames),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  final List<_ToolImagePreviewItem> items =
+                      snapshot.data ?? const <_ToolImagePreviewItem>[];
+                  if (items.isEmpty) {
+                    return Text(
+                      _loc(
+                        '图片文件未找到，可能已移动或删除。',
+                        'Image files were not found. They may have moved or been deleted.',
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    );
+                  }
+                  return Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      for (final _ToolImagePreviewItem item in items)
+                        _buildImagePreviewTile(context, item),
+                    ],
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImagePreviewTile(
+    BuildContext context,
+    _ToolImagePreviewItem item,
+  ) {
+    final theme = Theme.of(context);
+    final String path = item.path.trim();
+    final bool extraNsfwMask =
+        NsfwPreferenceService.instance.isAiNsfwCached(filePath: path) ||
+        NsfwPreferenceService.instance.isSegmentNsfwCached(filePath: path);
+    return SizedBox(
+      width: 104,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ScreenshotImageWidget(
+            file: File(path),
+            privacyMode: true,
+            extraNsfwMask: extraNsfwMask,
+            width: 104,
+            height: 184,
+            fit: BoxFit.cover,
+            borderRadius: BorderRadius.circular(8),
+            targetWidth: 208,
+            showNsfwButton: true,
+            showTimelineJumpButton: true,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            item.filename,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelSmall,
+          ),
+        ],
+      ),
     );
   }
 
@@ -1249,6 +1477,13 @@ class _ToolCallDetailSheetState extends State<_ToolCallDetailSheet> {
       ),
     );
   }
+}
+
+class _ToolImagePreviewItem {
+  const _ToolImagePreviewItem({required this.filename, required this.path});
+
+  final String filename;
+  final String path;
 }
 
 // 滚动遮罩组件：当列表不在顶部或底部时显示白色渐变遮罩

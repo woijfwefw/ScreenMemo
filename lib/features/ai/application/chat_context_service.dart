@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:screen_memo/features/ai/application/ai_context_budgets.dart';
 import 'package:screen_memo/features/ai/application/ai_request_gateway.dart';
 import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
+import 'package:screen_memo/features/ai/application/codex_style_token_usage.dart';
 import 'package:screen_memo/core/logging/flutter_logger.dart';
 import 'package:screen_memo/core/localization/locale_service.dart';
 import 'package:screen_memo/features/ai/application/prompt_budget.dart';
@@ -174,6 +175,22 @@ class PromptUsageEvent {
     final int maybe = int.tryParse((v ?? '').toString()) ?? 0;
     if (maybe > 0) return maybe;
     return resolvedPromptTokens + resolvedCompletionTokens;
+  }
+
+  CodexStyleTokenUsage get codexStyleUsage => CodexStyleTokenUsage.fromValues(
+    inputTokens: resolvedPromptTokens,
+    cachedInputTokens: usageCacheHitTokens ?? 0,
+    outputTokens: resolvedCompletionTokens,
+    reasoningOutputTokens: _toInt(breakdown['reasoning_output_tokens']),
+    totalTokens: resolvedTotalTokens,
+    source: hasUsage ? 'usage' : 'estimate',
+  );
+
+  static int _toInt(Object? v) {
+    if (v == null) return 0;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v.toString()) ?? 0;
   }
 }
 
@@ -702,6 +719,135 @@ class ChatContextService {
     } catch (_) {
       return const <PromptUsageEvent>[];
     }
+  }
+
+  PromptUsageEvent _promptUsageEventFromRow(Map<String, Object?> row) {
+    Map<String, dynamic> breakdown = <String, dynamic>{};
+    final String raw = (row['breakdown_json'] as String?)?.trim() ?? '';
+    if (raw.isNotEmpty) {
+      try {
+        final dynamic decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          breakdown = Map<String, dynamic>.from(decoded);
+        }
+      } catch (_) {}
+    }
+    return PromptUsageEvent(
+      id: _toInt(row['id']),
+      conversationId: (row['conversation_id'] as String?) ?? '',
+      model: (row['model'] as String?) ?? '',
+      promptEstBefore: row['prompt_est_before'] == null
+          ? null
+          : _toInt(row['prompt_est_before']),
+      promptEstSent: row['prompt_est_sent'] == null
+          ? null
+          : _toInt(row['prompt_est_sent']),
+      usagePromptTokens: row['usage_prompt_tokens'] == null
+          ? null
+          : _toInt(row['usage_prompt_tokens']),
+      usageCompletionTokens: row['usage_completion_tokens'] == null
+          ? null
+          : _toInt(row['usage_completion_tokens']),
+      usageTotalTokens: row['usage_total_tokens'] == null
+          ? null
+          : _toInt(row['usage_total_tokens']),
+      usageCacheHitTokens: row['usage_cache_hit_tokens'] == null
+          ? null
+          : _toInt(row['usage_cache_hit_tokens']),
+      usageCacheMissTokens: row['usage_cache_miss_tokens'] == null
+          ? null
+          : _toInt(row['usage_cache_miss_tokens']),
+      usageSource: (row['usage_source'] as String?) ?? '',
+      isToolLoop: _toInt(row['is_tool_loop']) != 0,
+      includeHistory: _toInt(row['include_history']) != 0,
+      toolsCount: _toInt(row['tools_count']),
+      strictFullAttempted: _toInt(row['strict_full_attempted']) != 0,
+      fallbackTriggered: _toInt(row['fallback_triggered']) != 0,
+      breakdown: breakdown,
+      createdAtMs: _toInt(row['created_at']),
+    );
+  }
+
+  Future<CodexStyleTokenUsageInfo> getCodexStyleTokenUsageInfo({
+    String? cid,
+    int? modelContextWindow,
+  }) async {
+    final String resolvedCid = (cid == null || cid.trim().isEmpty)
+        ? await _settings.getActiveConversationCid()
+        : cid.trim();
+    final List<PromptUsageEvent> events = <PromptUsageEvent>[];
+    try {
+      final storage = await _db.database;
+      final List<Map<String, Object?>> rows = await storage.query(
+        'ai_prompt_usage_events',
+        columns: <String>[
+          'id',
+          'conversation_id',
+          'model',
+          'prompt_est_before',
+          'prompt_est_sent',
+          'usage_prompt_tokens',
+          'usage_completion_tokens',
+          'usage_total_tokens',
+          'usage_cache_hit_tokens',
+          'usage_cache_miss_tokens',
+          'usage_source',
+          'is_tool_loop',
+          'include_history',
+          'tools_count',
+          'strict_full_attempted',
+          'fallback_triggered',
+          'breakdown_json',
+          'created_at',
+        ],
+        where: 'conversation_id = ?',
+        whereArgs: <Object?>[resolvedCid],
+        orderBy: 'created_at DESC, id DESC',
+      );
+      for (final Map<String, Object?> row in rows) {
+        events.add(_promptUsageEventFromRow(row));
+      }
+    } catch (_) {}
+
+    CodexStyleTokenUsage total = CodexStyleTokenUsage.zero();
+    int usageBacked = 0;
+    for (final PromptUsageEvent event in events) {
+      final CodexStyleTokenUsage usage = event.codexStyleUsage;
+      total = total.plus(usage);
+      if (event.hasUsage) usageBacked += 1;
+    }
+
+    CodexStyleTokenUsage last = events.isNotEmpty
+        ? events.first.codexStyleUsage
+        : CodexStyleTokenUsage.zero();
+    try {
+      final Map<String, dynamic>? row = await _db.getAiConversationByCid(
+        resolvedCid,
+      );
+      final int lastPromptTokens = _toInt(row?['last_prompt_tokens']);
+      final int lastPromptAtMs = _toInt(row?['last_prompt_at']);
+      final int latestEventAtMs = events.isEmpty ? 0 : events.first.createdAtMs;
+      if (lastPromptTokens > 0 &&
+          (events.isEmpty || lastPromptAtMs >= latestEventAtMs)) {
+        last = CodexStyleTokenUsage.fromValues(
+          inputTokens: lastPromptTokens,
+          cachedInputTokens: 0,
+          outputTokens: 0,
+          reasoningOutputTokens: 0,
+          totalTokens: lastPromptTokens,
+          source: 'estimate',
+        );
+        if (events.isEmpty) total = last;
+      }
+    } catch (_) {}
+
+    return CodexStyleTokenUsageInfo(
+      totalTokenUsage: total,
+      lastTokenUsage: last,
+      modelContextWindow: modelContextWindow,
+      eventsCount: events.length,
+      usageBackedCount: usageBacked,
+    );
   }
 
   Future<PromptUsageTotals> getConversationPromptUsageTotals({
@@ -1833,7 +1979,7 @@ class ChatContextService {
     final String note = zh
         ? '说明：以下是历史工具记录摘要，不是当前这轮对话的硬约束。'
         : 'Note: the following are digests of historical tool calls, not hard constraints for the current turn.';
-    final List<String> lines = <String>[label + ':', note];
+    final List<String> lines = <String>['$label:', note];
     int shown = 0;
     for (final dynamic it in items.reversed) {
       if (it is! Map) continue;
@@ -1881,7 +2027,7 @@ class ChatContextService {
   String _clip(String text, int maxLen) {
     final String t = _oneLine(text);
     if (t.length <= maxLen) return t;
-    return t.substring(0, maxLen) + '…';
+    return '${t.substring(0, maxLen)}…';
   }
 
   int _toInt(Object? v) {

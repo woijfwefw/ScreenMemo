@@ -438,6 +438,9 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
       if (!mounted) return;
       _perfLoggedMarkdownMsgKeys.clear();
       _setState(() {
+        if ((_activeConversationCid ?? '').trim() != chatCid) {
+          _lastIntent = null;
+        }
         _activeConversationCid = chatCid.isEmpty ? null : chatCid;
         _messages = List<AIMessage>.from(history);
         _olderBeforeId = firstPage.nextBeforeId;
@@ -451,7 +454,6 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
           ..clear()
           ..addAll(tb);
         _contentSegmentsByIndex.clear();
-        _nextContentStartsNewSegmentByIndex.clear();
         _reasoningByIndex
           ..clear()
           ..addAll(rb);
@@ -619,7 +621,6 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
     shiftMap<Duration>(_reasoningDurationByIndex);
     shiftMap<List<_ThinkingBlock>>(_thinkingBlocksByIndex);
     shiftMap<List<String>>(_contentSegmentsByIndex);
-    shiftMap<bool>(_nextContentStartsNewSegmentByIndex);
     shiftMap<List<EvidenceImageAttachment>>(_attachmentsByIndex);
 
     if (_currentAssistantIndex != null) {
@@ -1142,6 +1143,8 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
         _evidenceResolveFutures.clear();
         _reasoningByIndex.clear();
         _reasoningDurationByIndex.clear();
+        _thinkingBlocksByIndex.clear();
+        _contentSegmentsByIndex.clear();
         _currentAssistantIndex = null;
         _inStreaming = false;
         _clarifyState = null;
@@ -1651,14 +1654,8 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
     if (type == 'tool_batch_begin') {
       final List<dynamic> tools = (payload['tools'] as List?) ?? const [];
       _clearTransientThinkingSteps(assistantIdx);
-      // Tool UI events can arrive after we've already streamed some visible
-      // content for the same assistant turn (e.g. the model emits a preamble
-      // before declaring tool_calls). In that case we want tools to appear
-      // AFTER that earlier content, matching the model output order.
-      //
-      // `_ensureThinkingBlock` will create a new block only when the previous
-      // one has been marked finished (e.g. after the first content token), and
-      // will also start a new content segment after this block.
+      // 工具 UI 事件可能晚于正文 token 到达。UI 统一把思考和工具过程放在
+      // 助手正文之前，避免网络事件顺序把最终回答切成多段。
       final _ThinkingBlock block = _ensureThinkingBlock(assistantIdx);
       final String title = _isZhLocale() ? '工具调用' : 'Tools';
       final _ThinkingEvent toolsEvent =
@@ -1897,8 +1894,7 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
     final List<AIMessage> nextMessages = List<AIMessage>.from(_messages);
     nextMessages[assistantIdx] = updated;
     _messages = nextMessages;
-    _contentSegmentsByIndex[assistantIdx] = <String>[content];
-    _nextContentStartsNewSegmentByIndex[assistantIdx] = false;
+    _syncContentSegmentsForFullContent(assistantIdx, content);
     _replaceAssistantContentOnNextToken = false;
     unawaited(
       FlutterLogger.nativeInfo(
@@ -1962,8 +1958,7 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
     final List<AIMessage> nextMessages = List<AIMessage>.from(_messages);
     nextMessages[assistantIdx] = updated;
     _messages = nextMessages;
-    _contentSegmentsByIndex[assistantIdx] = <String>[content];
-    _nextContentStartsNewSegmentByIndex[assistantIdx] = false;
+    _syncContentSegmentsForFullContent(assistantIdx, content);
     unawaited(
       FlutterLogger.nativeInfo(
         'AI_IMAGE',
@@ -2008,14 +2003,23 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
       assistantIdx,
       () => <String>[],
     );
-    final bool startNew =
-        (_nextContentStartsNewSegmentByIndex[assistantIdx] ?? segs.isEmpty);
-    if (startNew) {
+    if (segs.isEmpty) {
       segs.add(chunk);
-      _nextContentStartsNewSegmentByIndex[assistantIdx] = false;
     } else {
-      segs[segs.length - 1] = segs.last + chunk;
+      segs[0] = segs.join() + chunk;
+      if (segs.length > 1) {
+        _contentSegmentsByIndex[assistantIdx] = <String>[segs[0]];
+      }
     }
+  }
+
+  void _syncContentSegmentsForFullContent(int assistantIdx, String content) {
+    final String full = content;
+    if (full.isEmpty) {
+      _contentSegmentsByIndex[assistantIdx] = <String>[];
+      return;
+    }
+    _contentSegmentsByIndex[assistantIdx] = <String>[full];
   }
 
   String _stripMarkdownCodeFences(String text) {

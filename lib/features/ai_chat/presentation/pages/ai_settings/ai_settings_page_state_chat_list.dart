@@ -86,95 +86,92 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
           final String? messageReasoningContent =
               _reasoningByIndex[index] ?? m.reasoningContent;
           final List<_ThinkingBlock> blocks = _blocksForMessageIndex(index);
-          final List<String> segs = _contentSegmentsForMessageIndex(index);
-          final int n = (blocks.length > segs.length)
-              ? blocks.length
-              : segs.length;
 
           final List<Widget> children = <Widget>[];
-          for (int i = 0; i < n; i++) {
-            if (i < blocks.length) {
-              final b = blocks[i];
-              // Only show legacy fallback reasoning while the block is still loading.
-              // For completed turns, prefer the structured timeline events; avoid
-              // dumping internal logs on restore.
-              final bool showStreamingFallbackReasoning =
-                  i == 0 &&
-                  b.isLoading &&
-                  (_reasoningByIndex[index] ?? '').trim().isNotEmpty;
-              final bool showCompletedFallbackReasoning =
-                  i == 0 &&
-                  !b.isLoading &&
-                  (m.reasoningContent ?? '').trim().isNotEmpty &&
-                  !_looksLikeOnlyInternalReasoningProgress(
-                    m.reasoningContent ?? '',
-                  );
-              final bool hasReasoningEvents = b.events.any(
-                (e) =>
-                    e.type == _ThinkingEventType.reasoning &&
-                    (e.reasoningStart ?? -1) >= 0 &&
-                    (e.reasoningLength ?? 0) > 0,
-              );
-              final bool showFallbackReasoning =
-                  !hasReasoningEvents &&
-                  (showStreamingFallbackReasoning ||
-                      showCompletedFallbackReasoning);
-              final String? fallbackReasoning = showFallbackReasoning
-                  ? messageReasoningContent
-                  : null;
-              final bool hasDisplayContent = _thinkingBlockHasDisplayContent(
-                b,
-                reasoningContent: messageReasoningContent ?? '',
-                fallbackReasoning: fallbackReasoning,
-                includeTransient: b.isLoading,
-              );
-              if (hasDisplayContent) {
-                children.add(
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppTheme.spacing2),
-                    child: _ThinkingTimelineCard(
-                      key: ValueKey(
-                        'think:${m.createdAt.millisecondsSinceEpoch}:$i',
-                      ),
-                      conversationId: (_activeConversationCid ?? '').trim(),
-                      assistantCreatedAt: m.createdAt.millisecondsSinceEpoch,
-                      createdAt: b.createdAt,
-                      finishedAt: b.finishedAt,
-                      events: b.events,
-                      reasoningContent: messageReasoningContent,
-                      fallbackReasoning: fallbackReasoning,
-                      autoCloseOnFinish:
-                          !(m.content.trim().isEmpty &&
-                              ((fallbackReasoning ?? '').trim().isNotEmpty ||
-                                  (hasReasoningEvents &&
-                                      (messageReasoningContent ?? '')
-                                          .trim()
-                                          .isNotEmpty))),
-                    ),
-                  ),
+          void addThinkingBlock(int i) {
+            if (i >= blocks.length) return;
+            final b = blocks[i];
+            // Only show legacy fallback reasoning while the block is still loading.
+            // For completed turns, prefer the structured timeline events; avoid
+            // dumping internal logs on restore.
+            final bool showStreamingFallbackReasoning =
+                i == 0 &&
+                b.isLoading &&
+                (_reasoningByIndex[index] ?? '').trim().isNotEmpty;
+            final bool showCompletedFallbackReasoning =
+                i == 0 &&
+                !b.isLoading &&
+                (m.reasoningContent ?? '').trim().isNotEmpty &&
+                !_looksLikeOnlyInternalReasoningProgress(
+                  m.reasoningContent ?? '',
                 );
-              }
-            }
-            if (i < segs.length) {
-              final String seg = segs[i];
-              if (seg.trim().isNotEmpty) {
-                children.add(
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppTheme.spacing2),
-                    child: _buildMarkdownForMessage(
-                      message: m,
-                      messageIndex: index,
-                      content: seg,
-                      fg: fg,
-                      // Only the last segment is actively streaming; completed
-                      // segments should render as final Markdown immediately.
-                      isCurrentStreaming:
-                          isCurrentStreaming && (i == segs.length - 1),
+            final bool hasReasoningEvents = b.events.any(
+              (e) =>
+                  e.type == _ThinkingEventType.reasoning &&
+                  (e.reasoningStart ?? -1) >= 0 &&
+                  (e.reasoningLength ?? 0) > 0,
+            );
+            final bool showFallbackReasoning =
+                !hasReasoningEvents &&
+                (showStreamingFallbackReasoning ||
+                    showCompletedFallbackReasoning);
+            final String? fallbackReasoning = showFallbackReasoning
+                ? messageReasoningContent
+                : null;
+            final bool hasDisplayContent = _thinkingBlockHasDisplayContent(
+              b,
+              reasoningContent: messageReasoningContent ?? '',
+              fallbackReasoning: fallbackReasoning,
+              includeTransient: b.isLoading,
+            );
+            if (hasDisplayContent) {
+              children.add(
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppTheme.spacing2),
+                  child: _ThinkingTimelineCard(
+                    key: ValueKey(
+                      'think:${m.createdAt.millisecondsSinceEpoch}:$i',
                     ),
+                    conversationId: (_activeConversationCid ?? '').trim(),
+                    assistantCreatedAt: m.createdAt.millisecondsSinceEpoch,
+                    createdAt: b.createdAt,
+                    finishedAt: b.finishedAt,
+                    events: b.events,
+                    reasoningContent: messageReasoningContent,
+                    fallbackReasoning: fallbackReasoning,
+                    autoCloseOnFinish:
+                        !(m.content.trim().isEmpty &&
+                            ((fallbackReasoning ?? '').trim().isNotEmpty ||
+                                (hasReasoningEvents &&
+                                    (messageReasoningContent ?? '')
+                                        .trim()
+                                        .isNotEmpty))),
                   ),
-                );
-              }
+                ),
+              );
             }
+          }
+
+          for (int i = 0; i < blocks.length; i++) {
+            addThinkingBlock(i);
+          }
+
+          final String content = m.content.trim().isNotEmpty
+              ? m.content
+              : _contentSegmentsForMessageIndex(index).join();
+          if (content.trim().isNotEmpty) {
+            children.add(
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppTheme.spacing2),
+                child: _buildMarkdownForMessage(
+                  message: m,
+                  messageIndex: index,
+                  content: content,
+                  fg: fg,
+                  isCurrentStreaming: isCurrentStreaming,
+                ),
+              ),
+            );
           }
 
           return Column(
@@ -756,6 +753,26 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
     final int? cacheHit = message.usageCacheHitTokens;
     final int? cacheMiss = message.usageCacheMissTokens;
     final Duration? duration = message.responseDuration;
+    final String logKey = [
+      message.role,
+      message.createdAt.millisecondsSinceEpoch,
+      prompt ?? '-',
+      completion ?? '-',
+      message.usageTotalTokens ?? '-',
+      duration?.inMilliseconds ?? '-',
+    ].join(':');
+    if (_usageStatsUiLoggedKeys.add(logKey)) {
+      unawaited(
+        FlutterLogger.nativeDebug(
+          'AIUsageTrace',
+          [
+            'UI_STATS_BUILD',
+            'role=${message.role} createdAt=${message.createdAt.millisecondsSinceEpoch} contentLen=${message.content.length}',
+            'prompt=${prompt ?? '-'} completion=${completion ?? '-'} total=${message.usageTotalTokens ?? '-'} cacheHit=${cacheHit ?? '-'} cacheMiss=${cacheMiss ?? '-'} responseMs=${duration?.inMilliseconds ?? '-'}',
+          ].join('\n'),
+        ).catchError((_) {}),
+      );
+    }
     final List<Widget> items = <Widget>[];
     if (prompt != null) {
       items.add(
@@ -860,32 +877,6 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
               tooltip: _isZhLocale() ? '重试' : 'Retry',
               onPressed: _sending ? null : () => _retryMessageAt(index),
             ),
-            if (isAssistant) ...[
-              const SizedBox(width: 4),
-              _buildFooterIconButton(
-                icon: Icons.receipt_long_rounded,
-                tooltip: _isZhLocale() ? 'AI 日志' : 'Logs',
-                onPressed: () async {
-                  try {
-                    await _showGatewayLogsSheet(index);
-                  } catch (e, st) {
-                    try {
-                      await FlutterLogger.nativeWarn(
-                        'UI',
-                        'open gateway logs failed: $e\n$st',
-                      );
-                    } catch (_) {}
-                    if (!mounted) return;
-                    UINotifier.error(
-                      context,
-                      _isZhLocale()
-                          ? ('打开日志失败：' + e.toString())
-                          : ('Failed to open logs: ' + e.toString()),
-                    );
-                  }
-                },
-              ),
-            ],
           ],
         ),
         if (isAssistant) _buildMessageNerdLine(message),
