@@ -52,4 +52,23 @@ void main() {
       );
     }
   });
+
+  test('image payloads are estimated as compact placeholders', () {
+    final String dataUrl = 'data:image/png;base64,${'A' * 200000}';
+    final AIMessage message = AIMessage(
+      role: 'user',
+      content: 'Describe this image',
+      apiContent: <Map<String, Object?>>[
+        <String, Object?>{'type': 'text', 'text': 'Describe this image'},
+        <String, Object?>{
+          'type': 'image_url',
+          'image_url': <String, Object?>{'url': dataUrl},
+        },
+      ],
+    );
+
+    final int tokens = PromptBudget.approxTokensForMessageJson(message);
+
+    expect(tokens, lessThan(100));
+  });
 }

@@ -311,6 +311,16 @@ extension AIChatServiceSendExt on AIChatService {
       result.content,
       rawTurnTranscript,
     );
+    unawaited(
+      FlutterLogger.nativeDebug(
+        'AIUsageTrace',
+        [
+          'SERVICE_RESULT_TO_MESSAGE',
+          'model=${result.modelUsed} contentLen=${content.length} reasoningLen=${result.reasoning?.length ?? 0} toolCalls=${result.toolCalls.length}',
+          'prompt=${result.usagePromptTokens ?? '-'} completion=${result.usageCompletionTokens ?? '-'} total=${result.usageTotalTokens ?? '-'} cacheHit=${result.usageCacheHitTokens ?? '-'} cacheMiss=${result.usageCacheMissTokens ?? '-'} responseMs=${responseDuration?.inMilliseconds ?? '-'}',
+        ].join('\n'),
+      ).catchError((_) {}),
+    );
     return AIMessage(
       role: 'assistant',
       content: content,
@@ -591,6 +601,7 @@ extension AIChatServiceSendExt on AIChatService {
     }
     payload['prompt_est_before'] = promptEstBefore;
     payload['prompt_est_sent'] = promptEstSent;
+    payload['total_tokens'] = usagePromptTokens ?? promptEstSent;
     if (usagePromptTokens != null) {
       payload['usage_prompt_tokens'] = usagePromptTokens;
     }
@@ -716,6 +727,57 @@ extension AIChatServiceSendExt on AIChatService {
             'model=$model promptEstBefore=$promptEstBefore promptEstSent=$promptEstSent',
             'usagePrompt=${result.usagePromptTokens ?? '-'} usageCompletion=${result.usageCompletionTokens ?? '-'} usageTotal=${result.usageTotalTokens ?? '-'} cacheHit=${result.usageCacheHitTokens ?? '-'} cacheMiss=${result.usageCacheMissTokens ?? '-'} tools=$toolsCount strictFull=${strictFullAttempted ? 1 : 0} fallback=${fallbackTriggered ? 1 : 0}',
           ].join('\n'),
+        );
+      } catch (_) {}
+      try {
+        _settings.notifyContextChanged('chat:prompt_tokens');
+      } catch (_) {}
+    }());
+  }
+
+  void _recordPromptUsageEstimateForCall({
+    required String cid,
+    required int? userCreatedAtMs,
+    required int promptEstBefore,
+    required int promptEstSent,
+    required bool strictFullAttempted,
+    required bool fallbackTriggered,
+    required String breakdownJson,
+  }) {
+    final String resolvedCid = cid.trim();
+    if (resolvedCid.isEmpty) return;
+    if (_isConversationPersistenceBlockedOrStale(
+      cid: resolvedCid,
+      createdAtMs: userCreatedAtMs,
+    )) {
+      return;
+    }
+    final String mergedBreakdown = _mergePromptUsageIntoBreakdownJson(
+      baseBreakdownJson: breakdownJson,
+      promptEstBefore: promptEstBefore,
+      promptEstSent: promptEstSent,
+      usagePromptTokens: null,
+      usageCompletionTokens: null,
+      usageTotalTokens: null,
+      usageCacheHitTokens: null,
+      usageCacheMissTokens: null,
+      strictFullAttempted: strictFullAttempted,
+      fallbackTriggered: fallbackTriggered,
+    );
+    unawaited(() async {
+      if (_isConversationPersistenceBlockedOrStale(
+        cid: resolvedCid,
+        createdAtMs: userCreatedAtMs,
+      )) {
+        return;
+      }
+      try {
+        await _chatContext.recordPromptTokens(
+          cid: resolvedCid,
+          tokensApprox: promptEstSent,
+          breakdownJson: mergedBreakdown.trim().isEmpty
+              ? null
+              : mergedBreakdown,
         );
       } catch (_) {}
       try {
@@ -1551,6 +1613,15 @@ extension AIChatServiceSendExt on AIChatService {
     )) {
       throw StateError('Request was superseded by retry.');
     }
+    _recordPromptUsageEstimateForCall(
+      cid: cid,
+      userCreatedAtMs: turnCreatedAtMs,
+      promptEstBefore: promptEstBefore,
+      promptEstSent: promptEstSent,
+      strictFullAttempted: strictFullAttempted,
+      fallbackTriggered: fallbackTriggered,
+      breakdownJson: promptBreakdownJson,
+    );
 
     final Stopwatch responseSw = Stopwatch()..start();
     final AIGatewayResult result = await _gateway.complete(
@@ -2180,6 +2251,32 @@ extension AIChatServiceSendExt on AIChatService {
       } catch (_) {}
     }
 
+    final int promptEstSent =
+        toolsSchemaTokens +
+        PromptBudget.approxTokensForMessagesJson(requestMessages);
+    final int turnCreatedAtMs = (uiUserCreatedAtMs ?? 0) > 0
+        ? uiUserCreatedAtMs!
+        : (requestMessages.isNotEmpty
+              ? requestMessages.last.createdAt.millisecondsSinceEpoch
+              : 0);
+    if (_isConversationPersistenceBlockedOrStale(
+      cid: cid,
+      createdAtMs: turnCreatedAtMs,
+    )) {
+      throw StateError('Request was superseded by retry.');
+    }
+    if (context == 'chat' && persistHistory) {
+      _recordPromptUsageEstimateForCall(
+        cid: cid,
+        userCreatedAtMs: turnCreatedAtMs,
+        promptEstBefore: promptEstBefore,
+        promptEstSent: promptEstSent,
+        strictFullAttempted: strictFullAttempted,
+        fallbackTriggered: fallbackTriggered,
+        breakdownJson: promptBreakdownJson,
+      );
+    }
+
     final Stopwatch responseSw = Stopwatch()..start();
     final AIGatewayStreamingSession gatewaySession = _gateway.startStreaming(
       endpoints: endpoints,
@@ -2193,17 +2290,6 @@ extension AIChatServiceSendExt on AIChatService {
     final Stream<AIStreamEvent> stream = gatewaySession.stream.map(
       (AIGatewayEvent event) => AIStreamEvent(event.kind, event.data),
     );
-    final int turnCreatedAtMs = (uiUserCreatedAtMs ?? 0) > 0
-        ? uiUserCreatedAtMs!
-        : (requestMessages.isNotEmpty
-              ? requestMessages.last.createdAt.millisecondsSinceEpoch
-              : 0);
-    if (_isConversationPersistenceBlockedOrStale(
-      cid: cid,
-      createdAtMs: turnCreatedAtMs,
-    )) {
-      throw StateError('Request was superseded by retry.');
-    }
     final Future<AIMessage> completed = gatewaySession.completed.then((
       AIGatewayResult result,
     ) async {
@@ -2214,9 +2300,7 @@ extension AIChatServiceSendExt on AIChatService {
           userCreatedAtMs: turnCreatedAtMs,
           model: modelForPrompt,
           promptEstBefore: promptEstBefore,
-          promptEstSent: PromptBudget.approxTokensForMessagesJson(
-            requestMessages,
-          ),
+          promptEstSent: promptEstSent,
           result: result,
           isToolLoop: false,
           includeHistory: includeHistoryEffective,
@@ -2781,6 +2865,17 @@ extension AIChatServiceSendExt on AIChatService {
           PromptBudget.approxTokensForMessagesJson(messages);
 
       final bool fallbackNow = fallbackTriggered || sentEst < beforeEst;
+      if (context == 'chat' && persistHistory) {
+        _recordPromptUsageEstimateForCall(
+          cid: cid,
+          userCreatedAtMs: pinnedUserCreatedAtMs,
+          promptEstBefore: beforeEst,
+          promptEstSent: sentEst,
+          strictFullAttempted: strictFullAttempted,
+          fallbackTriggered: fallbackNow,
+          breakdownJson: callBreakdownJson,
+        );
+      }
 
       try {
         await FlutterLogger.nativeDebug(

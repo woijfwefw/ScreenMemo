@@ -1101,6 +1101,29 @@ class AISettingsService {
       try {
         await db.ensureAiChatSchemaForRuntime();
       } catch (_) {}
+      int assistantWithUsage = 0;
+      AIMessage? lastAssistant;
+      for (final AIMessage m in trimmed) {
+        if (m.role != 'assistant') continue;
+        lastAssistant = m;
+        if (m.usagePromptTokens != null ||
+            m.usageCompletionTokens != null ||
+            m.usageTotalTokens != null ||
+            m.usageCacheHitTokens != null ||
+            m.usageCacheMissTokens != null) {
+          assistantWithUsage += 1;
+        }
+      }
+      unawaited(
+        FlutterLogger.nativeDebug(
+          'AIUsageTrace',
+          [
+            'DB_SAVE_HISTORY',
+            'cid=$conversationCid messages=${trimmed.length} assistantWithUsage=$assistantWithUsage',
+            'lastPrompt=${lastAssistant?.usagePromptTokens ?? '-'} lastCompletion=${lastAssistant?.usageCompletionTokens ?? '-'} lastTotal=${lastAssistant?.usageTotalTokens ?? '-'} lastCacheHit=${lastAssistant?.usageCacheHitTokens ?? '-'} lastCacheMiss=${lastAssistant?.usageCacheMissTokens ?? '-'} responseMs=${lastAssistant?.responseDuration?.inMilliseconds ?? '-'}',
+          ].join('\n'),
+        ).catchError((_) {}),
+      );
       final now = DateTime.now().millisecondsSinceEpoch;
       await storage.transaction((txn) async {
         // 确保会话条目存在（若无则占位创建）

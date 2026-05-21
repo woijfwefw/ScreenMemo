@@ -178,4 +178,134 @@ void main() {
     expect(assistant.containsKey('reasoning_content'), isTrue);
     expect(assistant['reasoning_content'], '');
   });
+
+  test(
+    'usageMetadata includes Gemini thoughts and cached content tokens',
+    () async {
+      final HttpServer server = await HttpServer.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+      );
+
+      final Future<void> serverDone = () async {
+        await for (final HttpRequest req in server) {
+          await utf8.decoder.bind(req).join();
+          req.response.statusCode = HttpStatus.ok;
+          req.response.headers.contentType = ContentType.json;
+          req.response.write(
+            jsonEncode(<String, dynamic>{
+              'choices': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'message': <String, dynamic>{
+                    'role': 'assistant',
+                    'content': 'ok',
+                  },
+                },
+              ],
+              'usageMetadata': <String, dynamic>{
+                'promptTokenCount': 10,
+                'candidatesTokenCount': 3,
+                'thoughtsTokenCount': 7,
+                'cachedContentTokenCount': 4,
+                'totalTokenCount': 20,
+              },
+            }),
+          );
+          await req.response.close();
+          break;
+        }
+      }();
+
+      final AIGatewayResult result = await AIRequestGateway.instance.complete(
+        endpoints: <AIEndpoint>[
+          AIEndpoint(
+            groupId: null,
+            providerType: 'openai',
+            baseUrl: 'http://127.0.0.1:${server.port}',
+            apiKey: 'test-key',
+            model: 'gemini-compatible',
+            chatPath: '/v1/chat/completions',
+          ),
+        ],
+        messages: <AIMessage>[AIMessage(role: 'user', content: 'hello')],
+        responseStartMarker: '',
+        preferStreaming: false,
+        trackKeyStats: false,
+      );
+
+      await serverDone;
+      await server.close(force: true);
+
+      expect(result.content, 'ok');
+      expect(result.usagePromptTokens, 10);
+      expect(result.usageCompletionTokens, 10);
+      expect(result.usageTotalTokens, 20);
+      expect(result.usageCacheHitTokens, 4);
+    },
+  );
+
+  test(
+    'Anthropic usage adds cache read and creation tokens to input',
+    () async {
+      final HttpServer server = await HttpServer.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+      );
+
+      final Future<void> serverDone = () async {
+        await for (final HttpRequest req in server) {
+          await utf8.decoder.bind(req).join();
+          req.response.statusCode = HttpStatus.ok;
+          req.response.headers.contentType = ContentType.json;
+          req.response.write(
+            jsonEncode(<String, dynamic>{
+              'choices': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'message': <String, dynamic>{
+                    'role': 'assistant',
+                    'content': 'ok',
+                  },
+                },
+              ],
+              'usage': <String, dynamic>{
+                'input_tokens': 11,
+                'cache_read_input_tokens': 5,
+                'cache_creation_input_tokens': 7,
+                'output_tokens': 13,
+              },
+            }),
+          );
+          await req.response.close();
+          break;
+        }
+      }();
+
+      final AIGatewayResult result = await AIRequestGateway.instance.complete(
+        endpoints: <AIEndpoint>[
+          AIEndpoint(
+            groupId: null,
+            providerType: 'openai',
+            baseUrl: 'http://127.0.0.1:${server.port}',
+            apiKey: 'test-key',
+            model: 'claude-compatible',
+            chatPath: '/v1/chat/completions',
+          ),
+        ],
+        messages: <AIMessage>[AIMessage(role: 'user', content: 'hello')],
+        responseStartMarker: '',
+        preferStreaming: false,
+        trackKeyStats: false,
+      );
+
+      await serverDone;
+      await server.close(force: true);
+
+      expect(result.content, 'ok');
+      expect(result.usagePromptTokens, 23);
+      expect(result.usageCompletionTokens, 13);
+      expect(result.usageTotalTokens, 36);
+      expect(result.usageCacheHitTokens, 5);
+      expect(result.usageCacheMissTokens, 7);
+    },
+  );
 }

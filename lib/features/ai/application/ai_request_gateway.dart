@@ -2128,6 +2128,20 @@ class AIRequestGateway {
         ? ''
         : endpoint.providerId.toString();
 
+    void logUsageSnapshot(String stage, _UsageSnapshot? usage) {
+      final String fields = usageFields(usage);
+      unawaited(
+        FlutterLogger.nativeDebug(
+          'AIUsageTrace',
+          [
+            '$stage $traceId',
+            'ctx=${(logContext ?? '').trim()} api=$apiType stream=1 tookMs=${sw.elapsedMilliseconds}',
+            'model=${endpoint.model} usage=${fields.isEmpty ? '-' : fields}',
+          ].join('\n'),
+        ).catchError((_) {}),
+      );
+    }
+
     try {
       await _logPreparedRequestSummary(
         traceId: traceId,
@@ -2314,7 +2328,13 @@ class AIRequestGateway {
 
           if (prepared.isGoogle) {
             final _GoogleStreamParts chunk = _extractGoogleStreamParts(json);
-            usageSnapshot = _extractUsageSnapshotFromAny(json) ?? usageSnapshot;
+            final _UsageSnapshot? incomingUsage = _extractUsageSnapshotFromAny(
+              json,
+            );
+            if (incomingUsage != null && !incomingUsage.isEmpty) {
+              usageSnapshot = incomingUsage;
+              logUsageSnapshot('STREAM_USAGE_PARSED', usageSnapshot);
+            }
 
             // Visible content parts (thought=false). Still run through the <think> filter for
             // OpenAI-compatible relays that embed tags in plain text.
@@ -2353,15 +2373,24 @@ class AIRequestGateway {
           final dynamic type = json['type'];
           if (type is String) {
             emitUiLog('EVENT type=$type');
-            usageSnapshot = _extractUsageSnapshotFromAny(json) ?? usageSnapshot;
+            final _UsageSnapshot? incomingUsage = _extractUsageSnapshotFromAny(
+              json,
+            );
+            if (incomingUsage != null && !incomingUsage.isEmpty) {
+              usageSnapshot = incomingUsage;
+              logUsageSnapshot('STREAM_USAGE_PARSED', usageSnapshot);
+            }
             if (type == 'response.completed') {
               final dynamic resp0 = json['response'];
               if (resp0 is Map) {
-                usageSnapshot =
+                final _UsageSnapshot? completedUsage =
                     _extractUsageSnapshotFromAny(
                       Map<String, dynamic>.from(resp0),
-                    ) ??
-                    usageSnapshot;
+                    );
+                if (completedUsage != null && !completedUsage.isEmpty) {
+                  usageSnapshot = completedUsage;
+                  logUsageSnapshot('STREAM_USAGE_PARSED', usageSnapshot);
+                }
               }
             }
             if (type == 'response.completed') {
@@ -2685,7 +2714,13 @@ class AIRequestGateway {
           }
 
           final dynamic choices = json['choices'];
-          usageSnapshot = _extractUsageSnapshotFromAny(json) ?? usageSnapshot;
+          final _UsageSnapshot? incomingUsage = _extractUsageSnapshotFromAny(
+            json,
+          );
+          if (incomingUsage != null && !incomingUsage.isEmpty) {
+            usageSnapshot = incomingUsage;
+            logUsageSnapshot('STREAM_USAGE_PARSED', usageSnapshot);
+          }
           if (choices is List && choices.isNotEmpty) {
             final dynamic first = choices.first;
             if (first is Map<String, dynamic>) {
@@ -2693,7 +2728,19 @@ class AIRequestGateway {
               if (finishReason is String &&
                   finishReason.isNotEmpty &&
                   finishReason != 'null') {
-                done = true;
+                emitUiLog(
+                  'EVENT chat.finish_reason=$finishReason keepReadingForUsage=1',
+                );
+                try {
+                  await FlutterLogger.nativeDebug(
+                    'AIUsageTrace',
+                    [
+                      'STREAM_FINISH_REASON $traceId',
+                      'ctx=${(logContext ?? '').trim()} api=$apiType stream=1 tookMs=${sw.elapsedMilliseconds}',
+                      'model=${endpoint.model} finishReason=$finishReason keepReadingForUsage=1 usage=${usageFields(usageSnapshot).isEmpty ? '-' : usageFields(usageSnapshot)}',
+                    ].join('\n'),
+                  );
+                } catch (_) {}
               }
               final dynamic delta = first['delta'];
               if (delta is Map<String, dynamic>) {
@@ -3292,6 +3339,18 @@ _UsageSnapshot? _usageFromObject(Object? raw) {
     return null;
   }
 
+  final int? anthropicInput = firstOf(<String>['input_tokens', 'inputTokens']);
+  final int? anthropicCacheRead = firstOf(<String>[
+    'cache_read_input_tokens',
+    'cacheReadInputTokens',
+  ]);
+  final int? anthropicCacheCreation = firstOf(<String>[
+    'cache_creation_input_tokens',
+    'cacheCreationInputTokens',
+  ]);
+  final bool hasAnthropicCacheFields =
+      anthropicCacheRead != null || anthropicCacheCreation != null;
+
   final int? cacheHit =
       firstOf(<String>[
         'prompt_cache_hit_tokens',
@@ -3302,6 +3361,7 @@ _UsageSnapshot? _usageFromObject(Object? raw) {
         'cachedTokens',
         'cache_read_input_tokens',
         'cacheReadInputTokens',
+        'cachedContentTokenCount',
       ]) ??
       fromNested('prompt_tokens_details', <String>[
         'cached_tokens',
@@ -3327,28 +3387,37 @@ _UsageSnapshot? _usageFromObject(Object? raw) {
     'cacheMissTokens',
     'cache_write_input_tokens',
     'cacheWriteInputTokens',
+    'cache_creation_input_tokens',
+    'cacheCreationInputTokens',
   ]);
 
-  final int? prompt =
-      firstOf(<String>[
-        'prompt_tokens',
-        'input_tokens',
-        'inputTokens',
-        'promptTokenCount',
-      ]) ??
-      fromNested('input_tokens_details', <String>['total']) ??
-      fromNested('inputTokensDetails', <String>['total']);
+  final int? prompt = hasAnthropicCacheFields && anthropicInput != null
+      ? anthropicInput +
+            (anthropicCacheRead ?? 0) +
+            (anthropicCacheCreation ?? 0)
+      : firstOf(<String>[
+              'prompt_tokens',
+              'input_tokens',
+              'inputTokens',
+              'promptTokenCount',
+            ]) ??
+            fromNested('input_tokens_details', <String>['total']) ??
+            fromNested('inputTokensDetails', <String>['total']);
 
-  final int? completion =
-      firstOf(<String>[
-        'completion_tokens',
-        'output_tokens',
-        'outputTokens',
-        'candidatesTokenCount',
-        'completionTokenCount',
-      ]) ??
-      fromNested('output_tokens_details', <String>['total']) ??
-      fromNested('outputTokensDetails', <String>['total']);
+  final int? googleCandidates = firstOf(<String>[
+    'candidatesTokenCount',
+    'completionTokenCount',
+  ]);
+  final int? googleThoughts = intFromKey('thoughtsTokenCount');
+  final int? completion = (googleCandidates != null || googleThoughts != null)
+      ? (googleCandidates ?? 0) + (googleThoughts ?? 0)
+      : firstOf(<String>[
+              'completion_tokens',
+              'output_tokens',
+              'outputTokens',
+            ]) ??
+            fromNested('output_tokens_details', <String>['total']) ??
+            fromNested('outputTokensDetails', <String>['total']);
 
   int? total = firstOf(<String>[
     'total_tokens',

@@ -26,12 +26,53 @@ class PromptBudget {
     return approxTokensFromBytes(utf8Bytes(text));
   }
 
+  static Object? _sanitizeApiContentForTokenEstimate(Object? apiContent) {
+    if (apiContent is! List) return apiContent;
+    final List<Object?> out = <Object?>[];
+    for (final Object? raw in apiContent) {
+      if (raw is! Map) {
+        out.add(raw);
+        continue;
+      }
+      final Map<Object?, Object?> map = Map<Object?, Object?>.from(raw);
+      final String type = (map['type'] ?? '').toString();
+      if (type == 'image_url' || type == 'input_image') {
+        out.add(<String, Object?>{'type': type, 'image': '<image>'});
+        continue;
+      }
+      if (type == 'text' || type == 'input_text' || type == 'output_text') {
+        out.add(<String, Object?>{
+          'type': type,
+          'text': (map['text'] ?? '').toString(),
+        });
+        continue;
+      }
+      out.add(<String, Object?>{'type': type});
+    }
+    return out;
+  }
+
+  static Map<String, dynamic> _messageJsonForTokenEstimate(AIMessage message) {
+    final Map<String, dynamic> json = message.toJson();
+    final Object? content = json['content'];
+    if (content is List) {
+      json['content'] = _sanitizeApiContentForTokenEstimate(content);
+    }
+    return json;
+  }
+
   static int approxTokensForMessageJson(AIMessage message) {
     try {
-      return approxTokensForText(jsonEncode(message.toJson()));
+      return approxTokensForText(
+        jsonEncode(_messageJsonForTokenEstimate(message)),
+      );
     } catch (_) {
       // Fallback: still provide a stable, monotonic estimate.
-      return approxTokensForText('${message.role}\n${message.content}');
+      final Object? apiContent = message.apiContent;
+      final String content = apiContent is List
+          ? '<structured content>'
+          : message.content;
+      return approxTokensForText('${message.role}\n$content');
     }
   }
 
@@ -135,7 +176,7 @@ class PromptBudget {
 
   static String _formatTruncationMarker(int remainingTokens) {
     final int tokens = remainingTokens.clamp(0, 1 << 30);
-    return '…${tokens} tokens truncated…';
+    return '…$tokens tokens truncated…';
   }
 
   /// Truncate [text] to [maxBytes] (UTF-8), keeping head+tail and inserting [marker].

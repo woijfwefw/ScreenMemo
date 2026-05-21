@@ -311,6 +311,16 @@ Rules:
     String? conversationTitle,
   }) async {
     if (!persistHistory) return;
+    unawaited(
+      FlutterLogger.nativeDebug(
+        'AIUsageTrace',
+        [
+          'PERSIST_BEGIN',
+          'cid=$cid model=$modelUsed history=${history.length} rawTurn=${rawTurnTranscript.length} persistTail=${persistHistoryTail ? 1 : 0}',
+          'assistantPrompt=${assistant.usagePromptTokens ?? '-'} assistantCompletion=${assistant.usageCompletionTokens ?? '-'} assistantTotal=${assistant.usageTotalTokens ?? '-'} assistantCacheHit=${assistant.usageCacheHitTokens ?? '-'} assistantCacheMiss=${assistant.usageCacheMissTokens ?? '-'} responseMs=${assistant.responseDuration?.inMilliseconds ?? '-'}',
+        ].join('\n'),
+      ).catchError((_) {}),
+    );
     final String localUserMessage =
         (localUserMessageForHistory ?? '').trim().isNotEmpty
         ? localUserMessageForHistory!.trim()
@@ -355,6 +365,23 @@ Rules:
             existingHistory: existing,
             userMessage: localUserMessage,
             assistantFinal: assistant,
+          );
+          AIMessage? mergedAssistant;
+          for (int i = merged.length - 1; i >= 0; i--) {
+            if (merged[i].role == 'assistant') {
+              mergedAssistant = merged[i];
+              break;
+            }
+          }
+          unawaited(
+            FlutterLogger.nativeDebug(
+              'AIUsageTrace',
+              [
+                'PERSIST_MERGED_TAIL',
+                'cid=$cid existing=${existing.length} merged=${merged.length}',
+                'mergedPrompt=${mergedAssistant?.usagePromptTokens ?? '-'} mergedCompletion=${mergedAssistant?.usageCompletionTokens ?? '-'} mergedTotal=${mergedAssistant?.usageTotalTokens ?? '-'} mergedCacheHit=${mergedAssistant?.usageCacheHitTokens ?? '-'} mergedCacheMiss=${mergedAssistant?.usageCacheMissTokens ?? '-'} responseMs=${mergedAssistant?.responseDuration?.inMilliseconds ?? '-'}',
+              ].join('\n'),
+            ).catchError((_) {}),
           );
           await _settings.saveChatHistoryByCid(cid, merged);
           mergedTail = merged;

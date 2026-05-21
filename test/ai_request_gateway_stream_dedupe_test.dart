@@ -28,6 +28,12 @@ Future<void> _writeSseEvent(
   await response.flush();
 }
 
+Future<void> _writeSseData(HttpResponse response, Object data) async {
+  final String encoded = data is String ? data : jsonEncode(data);
+  response.write('data: $encoded\n\n');
+  await response.flush();
+}
+
 void main() {
   test('responses terminal events do not duplicate final content', () async {
     final HttpServer server = await HttpServer.bind(
@@ -140,7 +146,15 @@ void main() {
           'response.completed',
           <String, dynamic>{
             'type': 'response.completed',
-            'response': <String, dynamic>{'id': 'resp_test'},
+            'response': <String, dynamic>{
+              'id': 'resp_test',
+              'usage': <String, dynamic>{
+                'input_tokens': 100,
+                'output_tokens': 25,
+                'total_tokens': 125,
+                'input_tokens_details': <String, dynamic>{'cached_tokens': 40},
+              },
+            },
           },
         );
 
@@ -177,10 +191,121 @@ void main() {
     final List<String> contentChunks = await contentChunksFuture;
 
     expect(result.content, finalText);
+    expect(result.usagePromptTokens, 100);
+    expect(result.usageCompletionTokens, 25);
+    expect(result.usageTotalTokens, 125);
+    expect(result.usageCacheHitTokens, 40);
     final String streamedText = contentChunks.join();
     expect(_countOccurrences(streamedText, finalText), 1);
 
     await serverDone;
     await server.close(force: true);
   });
+
+  test(
+    'chat completions stream reads usage chunk after finish_reason',
+    () async {
+      final HttpServer server = await HttpServer.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+      );
+
+      Map<String, dynamic>? capturedBody;
+      final Future<void> serverDone = () async {
+        await for (final HttpRequest req in server) {
+          if (req.method != 'POST' || req.uri.path != '/v1/chat/completions') {
+            req.response.statusCode = HttpStatus.notFound;
+            await req.response.close();
+            continue;
+          }
+
+          final String body = await utf8.decoder.bind(req).join();
+          capturedBody = jsonDecode(body) as Map<String, dynamic>;
+
+          req.response.statusCode = HttpStatus.ok;
+          req.response.headers.set(
+            HttpHeaders.contentTypeHeader,
+            'text/event-stream; charset=utf-8',
+          );
+          req.response.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
+
+          await _writeSseData(req.response, <String, dynamic>{
+            'id': 'chatcmpl_test',
+            'model': 'gpt-test',
+            'choices': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'index': 0,
+                'delta': <String, dynamic>{'content': 'Hello'},
+                'finish_reason': null,
+              },
+            ],
+          });
+          await _writeSseData(req.response, <String, dynamic>{
+            'id': 'chatcmpl_test',
+            'model': 'gpt-test',
+            'choices': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'index': 0,
+                'delta': <String, dynamic>{},
+                'finish_reason': 'stop',
+              },
+            ],
+          });
+          await _writeSseData(req.response, <String, dynamic>{
+            'id': 'chatcmpl_test',
+            'model': 'gpt-test',
+            'choices': <Object>[],
+            'usage': <String, dynamic>{
+              'prompt_tokens': 11,
+              'completion_tokens': 3,
+              'total_tokens': 14,
+              'prompt_tokens_details': <String, dynamic>{'cached_tokens': 5},
+            },
+          });
+          await _writeSseData(req.response, '[DONE]');
+          await req.response.close();
+          break;
+        }
+      }();
+
+      final AIEndpoint endpoint = AIEndpoint(
+        groupId: null,
+        baseUrl: 'http://127.0.0.1:${server.port}',
+        apiKey: 'test-key',
+        model: 'gpt-test',
+        chatPath: '/v1/chat/completions',
+        useResponseApi: false,
+      );
+
+      final AIGatewayStreamingSession session = AIRequestGateway.instance
+          .startStreaming(
+            endpoints: <AIEndpoint>[endpoint],
+            messages: <AIMessage>[AIMessage(role: 'user', content: 'hello')],
+            responseStartMarker: '',
+            timeout: const Duration(seconds: 5),
+          );
+
+      final Future<List<String>> contentChunksFuture = session.stream
+          .where((AIGatewayEvent e) => e.kind == AIGatewayEventKind.content)
+          .map((AIGatewayEvent e) => e.data)
+          .toList();
+
+      final AIGatewayResult result = await session.completed;
+      final List<String> contentChunks = await contentChunksFuture;
+
+      expect(contentChunks.join(), 'Hello');
+      expect(result.content, 'Hello');
+      expect(result.usagePromptTokens, 11);
+      expect(result.usageCompletionTokens, 3);
+      expect(result.usageTotalTokens, 14);
+      expect(result.usageCacheHitTokens, 5);
+      expect(
+        (capturedBody?['stream_options'] as Map?)?['include_usage'],
+        isTrue,
+      );
+
+      await serverDone;
+      await server.close(force: true);
+    },
+  );
 }
