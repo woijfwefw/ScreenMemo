@@ -140,6 +140,13 @@ class _HomePageState extends State<HomePage>
       _loadStatsFresh();
       _loadTotals(); // 同时刷新汇总统计
     });
+    ScreenshotService.instance.onScreenshotToggleChanged.listen((enabled) {
+      if (!mounted) return;
+      _homeSetState(() {
+        _screenshotEnabled = enabled;
+      });
+      _checkScreenshotToggleState();
+    });
 
     // 订阅排序模式变更，自动刷新排序
     AppSelectionService.instance.onSortModeChanged.listen((mode) {
@@ -171,6 +178,12 @@ class _HomePageState extends State<HomePage>
       Future.delayed(const Duration(milliseconds: 300), () async {
         await _loadStatsFresh();
         await _loadTotals();
+        final screenshotEnabled = await _appService.getScreenshotEnabled();
+        if (mounted) {
+          _homeSetState(() {
+            _screenshotEnabled = screenshotEnabled;
+          });
+        }
         // 回到前台后同步刷新自定义标记
         // ignore: unawaited_futures
         _loadPerAppCustomFlags();

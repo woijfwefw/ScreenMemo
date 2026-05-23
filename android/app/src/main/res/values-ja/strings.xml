@@ -8,10 +8,12 @@
     <string name="fg_notif_interval_value">%1$d秒</string>
     <string name="fg_notif_title_with_interval">%1$s · %2$s</string>
     <string name="fg_notif_last_never">未撮影</string>
-    <string name="fg_notif_capture_on">このアプリをキャプチャ</string>
-    <string name="fg_notif_capture_off">このアプリはキャプチャしない</string>
-    <string name="fg_notif_status_collapsed">%1$s · 前回 %2$s</string>
+    <string name="fg_notif_capture_on">キャプチャ中</string>
+    <string name="fg_notif_capture_off">キャプチャしない</string>
+    <string name="fg_notif_status_collapsed">%1$s · %2$s · 前回 %3$s</string>
     <string name="fg_notif_status_expanded">%1$s\n前回 %2$s</string>
+    <string name="fg_notif_action_start_capture">キャプチャ開始</string>
+    <string name="fg_notif_action_pause_capture">キャプチャ一時停止</string>
     <string name="fg_time_just_now">たった今</string>
     <string name="fg_time_minutes_ago">%1$d分前</string>
     <string name="fg_time_hours_ago">%1$d時間前</string>

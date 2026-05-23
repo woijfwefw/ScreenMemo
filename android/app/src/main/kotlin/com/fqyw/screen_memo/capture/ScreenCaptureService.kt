@@ -10,6 +10,9 @@ import com.fqyw.screen_memo.segment.SegmentSummaryManager
 import com.fqyw.screen_memo.health.AppHealthNativeRecorder
 import com.fqyw.screen_memo.health.AppHealthScheduler
 import com.fqyw.screen_memo.service.ServiceStateManager
+import com.fqyw.screen_memo.settings.LegacySettingKeysNative
+import com.fqyw.screen_memo.settings.UserSettingsKeysNative
+import com.fqyw.screen_memo.settings.UserSettingsStorage
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -24,6 +27,8 @@ import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.IBinder
 import android.util.TypedValue
+import android.view.View
+import android.widget.RemoteViews
 import java.util.Locale
  
 import androidx.core.app.NotificationCompat
@@ -35,6 +40,8 @@ class ScreenCaptureService : Service() {
         private const val TAG = "ScreenCaptureService"
         private const val NOTIFICATION_ID = 1002
         private const val CHANNEL_ID = "screen_capture_foreground_channel"
+        private const val ACTION_TOGGLE_SCREENSHOT =
+            "com.fqyw.screen_memo.action.TOGGLE_SCREENSHOT"
 
         private const val NOTIFICATION_PREFS = "screen_memo_foreground_notification"
         private const val KEY_FOREGROUND_PKG = "foreground_pkg"
@@ -220,6 +227,7 @@ class ScreenCaptureService : Service() {
             } catch (_: Exception) { -1 }
 
             val lastScreenshotAt = try { sp?.getLong(KEY_LAST_SCREENSHOT_AT, 0L) ?: 0L } catch (_: Exception) { 0L }
+            val globalScreenshotEnabled = isGlobalScreenshotEnabled(context)
 
             val now = System.currentTimeMillis()
             val intervalText = if (intervalSeconds > 0) {
@@ -245,16 +253,6 @@ class ScreenCaptureService : Service() {
                 try { lc.getString(R.string.fg_notif_last_never) } catch (_: Exception) { "--" }
             }
 
-            val content = try {
-                lc.getString(R.string.fg_notif_status_collapsed, captureText, lastText)
-            } catch (_: Exception) {
-                "$captureText · $lastText"
-            }
-            val expandedText = try {
-                lc.getString(R.string.fg_notif_status_expanded, captureText, lastText)
-            } catch (_: Exception) {
-                content
-            }
             val titleBase = try { lc.getString(R.string.app_name) } catch (_: Exception) { "ScreenMemo" }
             val title = if (intervalSeconds > 0) {
                 try {
@@ -265,23 +263,13 @@ class ScreenCaptureService : Service() {
             } else {
                 titleBase
             }
+            val content = try {
+                lc.getString(R.string.fg_notif_status_collapsed, captureText, intervalText, lastText)
+            } catch (_: Exception) {
+                "$captureText · $intervalText · $lastText"
+            }
 
-            val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-                .setContentTitle(title)
-                .setContentText(content)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(expandedText))
-                .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentIntent(pendingIntent)
-                .setOngoing(true)
-                .setAutoCancel(false)
-                .setOnlyAlertOnce(true)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .setCategory(NotificationCompat.CATEGORY_SERVICE)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setShowWhen(false)
-                .setLocalOnly(true)
-
-            val largeIcon = if (!foregroundPkg.isNullOrBlank()) {
+            val appIcon = if (!foregroundPkg.isNullOrBlank()) {
                 val cachedPkg = cachedLargeIconPkg
                 val cachedBmp = cachedLargeIconBitmap
                 if (cachedPkg == foregroundPkg && cachedBmp != null && !cachedBmp.isRecycled) {
@@ -297,11 +285,145 @@ class ScreenCaptureService : Service() {
             } else {
                 null
             }
-            if (largeIcon != null) {
-                builder.setLargeIcon(largeIcon)
-            }
+
+            val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+                .setContentTitle(title)
+                .setContentText(content)
+                .setCustomContentView(
+                    buildNotificationRemoteView(
+                        context = context,
+                        layoutId = R.layout.notification_screen_capture_compact,
+                        content = content,
+                        globalScreenshotEnabled = globalScreenshotEnabled,
+                        appIcon = appIcon
+                    )
+                )
+                .setCustomBigContentView(
+                    buildNotificationRemoteView(
+                        context = context,
+                        layoutId = R.layout.notification_screen_capture_expanded,
+                        content = content,
+                        globalScreenshotEnabled = globalScreenshotEnabled,
+                        appIcon = appIcon
+                    )
+                )
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentIntent(pendingIntent)
+                .setOngoing(true)
+                .setAutoCancel(false)
+                .setOnlyAlertOnce(true)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setCategory(NotificationCompat.CATEGORY_SERVICE)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setShowWhen(false)
+                .setLocalOnly(true)
+
+            // 自定义紧凑通知只保留系统 smallIcon，避免 largeIcon 撑高内容区域。
 
             return builder.build()
+        }
+
+        private fun buildNotificationRemoteView(
+            context: Context,
+            layoutId: Int,
+            content: String,
+            globalScreenshotEnabled: Boolean,
+            appIcon: Bitmap?
+        ): RemoteViews {
+            val views = RemoteViews(
+                context.packageName,
+                layoutId
+            )
+            views.setTextViewText(R.id.fg_notif_content, content)
+            if (appIcon != null && !appIcon.isRecycled) {
+                views.setViewVisibility(R.id.fg_notif_app_icon, View.VISIBLE)
+                views.setImageViewBitmap(R.id.fg_notif_app_icon, appIcon)
+            } else {
+                views.setViewVisibility(R.id.fg_notif_app_icon, View.GONE)
+            }
+            views.setImageViewResource(
+                R.id.fg_notif_toggle,
+                if (globalScreenshotEnabled) {
+                    R.drawable.ic_notification_camera
+                } else {
+                    R.drawable.ic_notification_camera_off
+                }
+            )
+            views.setOnClickPendingIntent(
+                R.id.fg_notif_toggle,
+                buildToggleScreenshotPendingIntent(context)
+            )
+            return views
+        }
+
+        private fun buildToggleScreenshotAction(
+            context: Context,
+            localizedContext: Context,
+            enabled: Boolean
+        ): NotificationCompat.Action {
+            val pendingIntent = buildToggleScreenshotPendingIntent(context)
+            val title = try {
+                if (enabled) {
+                    localizedContext.getString(R.string.fg_notif_action_pause_capture)
+                } else {
+                    localizedContext.getString(R.string.fg_notif_action_start_capture)
+                }
+            } catch (_: Exception) {
+                if (enabled) "Pause capture" else "Start capture"
+            }
+            val icon = if (enabled) {
+                android.R.drawable.ic_media_pause
+            } else {
+                android.R.drawable.ic_media_play
+            }
+            return NotificationCompat.Action.Builder(icon, title, pendingIntent).build()
+        }
+
+        private fun buildToggleScreenshotPendingIntent(context: Context): PendingIntent {
+            val actionIntent = Intent(context, ScreenCaptureService::class.java).apply {
+                action = ACTION_TOGGLE_SCREENSHOT
+            }
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                PendingIntent.getForegroundService(
+                    context,
+                    10021,
+                    actionIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            } else {
+                PendingIntent.getService(
+                    context,
+                    10021,
+                    actionIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            }
+        }
+
+        private fun isGlobalScreenshotEnabled(context: Context): Boolean {
+            return try {
+                UserSettingsStorage.getBoolean(
+                    context,
+                    UserSettingsKeysNative.SCREENSHOT_ENABLED,
+                    false,
+                    legacyPrefKeys = listOf(UserSettingsKeysNative.SCREENSHOT_ENABLED)
+                )
+            } catch (_: Exception) {
+                false
+            }
+        }
+
+        private fun readScreenshotInterval(context: Context): Int {
+            return try {
+                UserSettingsStorage.getInt(
+                    context,
+                    UserSettingsKeysNative.SCREENSHOT_INTERVAL,
+                    5,
+                    legacyPrefKeys = LegacySettingKeysNative.SCREENSHOT_INTERVAL
+                ).coerceIn(1, 60)
+            } catch (_: Exception) {
+                5
+            }
         }
 
         private fun spGetIntCompat(sp: android.content.SharedPreferences, key: String, def: Int): Int {
@@ -389,6 +511,8 @@ class ScreenCaptureService : Service() {
             force = true,
         )
 
+        val action = intent?.action
+
         try {
             // 启动前台服务
             // 注意：我们使用的是无障碍服务截屏，不需要 MEDIA_PROJECTION 类型
@@ -411,6 +535,10 @@ class ScreenCaptureService : Service() {
             FileLogger.e(TAG, "启动前台服务失败", e)
         }
 
+        if (action == ACTION_TOGGLE_SCREENSHOT) {
+            handleToggleScreenshotAction()
+        }
+
         // 保障段落采样在服务生命周期内可被触发（即便应用被刷掉）
         try {
             // 这里不做定时器常驻，只保证进程在，实际采样在每次截图后由 SegmentSummaryManager 驱动
@@ -419,6 +547,98 @@ class ScreenCaptureService : Service() {
 
         FileLogger.e(TAG, "=== 前台服务 onStartCommand 完成 ===")
         return START_STICKY // 服务被杀死后自动重启
+    }
+
+    private fun handleToggleScreenshotAction() {
+        try {
+            val enable = !isGlobalScreenshotEnabled(this)
+            FileLogger.i(TAG, "通知栏截图开关点击：目标状态=$enable")
+            UserSettingsStorage.putBoolean(
+                this,
+                UserSettingsKeysNative.SCREENSHOT_ENABLED,
+                enable,
+                legacyPrefKeys = listOf(UserSettingsKeysNative.SCREENSHOT_ENABLED)
+            )
+            val sharedPrefs = getSharedPreferences("screen_memo_prefs", Context.MODE_PRIVATE)
+            if (enable) {
+                val interval = readScreenshotInterval(this)
+                val started = ScreenCaptureAccessibilityService.instance?.startTimedScreenshot(interval) ?: false
+                sharedPrefs.edit()
+                    .putBoolean("screenshot_service_running", started)
+                    .putInt("screenshot_interval", interval)
+                    .apply()
+                mirrorFlutterScreenshotState(enable = started, running = started, interval = interval)
+                if (!started) {
+                    UserSettingsStorage.putBoolean(
+                        this,
+                        UserSettingsKeysNative.SCREENSHOT_ENABLED,
+                        false,
+                        legacyPrefKeys = listOf(UserSettingsKeysNative.SCREENSHOT_ENABLED)
+                    )
+                    ScreenCaptureService.updateNotificationState(
+                        this,
+                        intervalSeconds = interval,
+                        captureEnabled = false,
+                        clearForegroundPackage = true
+                    )
+                    refreshNotification(this)
+                    FileLogger.w(TAG, "通知栏启动截图失败：无障碍服务不可用")
+                    notifyFlutterScreenshotToggleChanged(false, started = false)
+                    return
+                }
+                refreshNotification(this)
+                notifyFlutterScreenshotToggleChanged(true, started = true)
+            } else {
+                ScreenCaptureAccessibilityService.instance?.stopTimedScreenshot()
+                sharedPrefs.edit()
+                    .putBoolean("screenshot_service_running", false)
+                    .putBoolean("timed_screenshot_was_running", false)
+                    .apply()
+                mirrorFlutterScreenshotState(
+                    enable = false,
+                    running = false,
+                    interval = readScreenshotInterval(this)
+                )
+                ScreenCaptureService.updateNotificationState(
+                    this,
+                    captureEnabled = false,
+                    clearForegroundPackage = true
+                )
+                refreshNotification(this)
+                notifyFlutterScreenshotToggleChanged(false, started = true)
+            }
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "处理通知栏截图开关失败", e)
+            refreshNotification(this)
+        }
+    }
+
+    private fun notifyFlutterScreenshotToggleChanged(enabled: Boolean, started: Boolean) {
+        try {
+            val intent = Intent("com.fqyw.screen_memo.SCREENSHOT_TOGGLE_CHANGED").apply {
+                setPackage(packageName)
+                putExtra("enabled", enabled)
+                putExtra("started", started)
+            }
+            sendBroadcast(intent)
+        } catch (_: Exception) {}
+    }
+
+    private fun mirrorFlutterScreenshotState(enable: Boolean, running: Boolean, interval: Int) {
+        try {
+            val editor = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE).edit()
+            // 兼容 shared_preferences 的历史前缀和项目中已有的原生直写键。
+            for (key in listOf("screenshot_enabled", "flutter.screenshot_enabled")) {
+                editor.putBoolean(key, enable)
+            }
+            for (key in listOf("screenshot_service_running", "flutter.screenshot_service_running")) {
+                editor.putBoolean(key, running)
+            }
+            for (key in listOf("screenshot_interval", "flutter.screenshot_interval")) {
+                editor.putInt(key, interval.coerceIn(1, 60))
+            }
+            editor.apply()
+        } catch (_: Exception) {}
     }
     
     override fun onDestroy() {
