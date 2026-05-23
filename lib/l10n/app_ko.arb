@@ -36,7 +36,7 @@
   "screenshotDisabledToast": "캡처를 비활성화했습니다",
   "intervalSettingTitle": "캡처 간격 설정",
   "intervalLabel": "간격(초)",
-  "intervalHint": "5~60 사이의 정수를 입력하세요",
+  "intervalHint": "1~60 사이의 정수를 입력하세요",
   "intervalSavedToast": "캡처 간격을 {seconds}초로 설정했습니다",
   "@intervalSavedToast": {
     "description": "Prompt after saving capture interval in seconds",
@@ -163,8 +163,8 @@
   "imeExplainText": "다른 앱에서 키보드가 나타나면 시스템이 IME 창으로 전환됩니다. 제외하지 않으면 IME를 사용하는 것으로 착각하여 플로팅 창 감지가 잘못될 수 있습니다. IME 앱은 자동으로 제외되며 IME가 감지되면 IME가 팝업되기 전에 부동 창을 앱으로 이동합니다.",
   "gotIt": "알았어요",
   "unknownIme": "알 수 없는 IME",
-  "intervalRangeNote": "범위: 5~60초, 기본값: 5초.",
-  "intervalInvalidInput": "5~60 사이의 유효한 정수를 입력하세요.",
+  "intervalRangeNote": "캡처 시점을 우선하기 위해 목표 크기 압축을 켜면 스크린샷을 먼저 저장하고 정확한 압축은 백그라운드에서 나중에 완료될 수 있습니다.",
+  "intervalInvalidInput": "1~60 사이의 유효한 정수를 입력하세요.",
   "removeMonitoringMessage": "모니터링만 해제하고 이미지는 삭제하지 않습니다. 계속할까요?",
   "remove": "해제",
   "removedMonitoringToast": "{count}개의 앱에서 모니터링을 해제했습니다(이미지는 삭제되지 않음)",
@@ -524,8 +524,8 @@
   "enableBannerNotificationDesc": "화면 상단에 배너 알림이 표시되도록 허용합니다",
   "setIntervalDialogTitle": "스크린샷 간격 설정",
   "intervalSecondsLabel": "간격(초)",
-  "intervalInputHint": "5~60 사이의 정수를 입력하세요.",
-  "intervalInvalidError": "5~60 사이의 유효한 정수를 입력하세요",
+  "intervalInputHint": "1~60 사이의 정수를 입력하세요.",
+  "intervalInvalidError": "1~60 사이의 유효한 정수를 입력하세요",
   "intervalSavedSuccess": "스크린샷 간격을 {seconds}초로 설정했습니다",
   "@intervalSavedSuccess": {
     "placeholders": {

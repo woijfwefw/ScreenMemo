@@ -54,6 +54,17 @@ class PermissionService with WidgetsBindingObserver {
             // print('转发onScreenshotSaved失败: $e');
           }
           break;
+        case 'onScreenshotRecompressed':
+          try {
+            final Map<String, dynamic> args = Map<String, dynamic>.from(
+              call.arguments as Map,
+            );
+            await ScreenshotService.instance
+                .handleScreenshotRecompressedFromPlatform(args);
+          } catch (e) {
+            // 忽略异常，避免阻断其他事件
+          }
+          break;
         case 'onMediaProjectionResult':
           // 废弃的MediaProjection处理，现在不再需要
           break;

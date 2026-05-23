@@ -489,8 +489,8 @@ class AppSelectionService {
   /// 保存截屏间隔
   Future<void> saveScreenshotInterval(int interval) async {
     try {
-      // 统一约束：5-60 秒
-      final int clamped = interval < 5 ? 5 : (interval > 60 ? 60 : interval);
+      // 统一约束：1-60 秒
+      final int clamped = interval < 1 ? 1 : (interval > 60 ? 60 : interval);
       await UserSettingsService.instance.setInt(
         UserSettingKeys.screenshotInterval,
         clamped,
@@ -516,8 +516,8 @@ class AppSelectionService {
           ...LegacySettingKeys.screenshotInterval,
         ],
       );
-      // 统一约束：5-60 秒
-      _screenshotInterval = raw < 5 ? 5 : (raw > 60 ? 60 : raw);
+      // 统一约束：1-60 秒
+      _screenshotInterval = raw < 1 ? 1 : (raw > 60 ? 60 : raw);
       return _screenshotInterval;
     } catch (e) {
       print('获取截屏间隔失败: $e');

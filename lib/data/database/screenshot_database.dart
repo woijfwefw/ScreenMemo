@@ -690,6 +690,68 @@ class ScreenshotDatabase {
     }
   }
 
+  /// 更新指定截图记录的文件大小（通过包名 + 绝对路径定位）。
+  Future<void> updateFileSizeByPath({
+    required String packageName,
+    required String filePath,
+    required int newSize,
+  }) async {
+    if (packageName.isEmpty || filePath.isEmpty || newSize <= 0) return;
+    try {
+      final DateTime? inferred = _inferCaptureTimeFromPath(filePath);
+      if (inferred == null) return;
+      final int year = inferred.year;
+      final int month = inferred.month;
+      final Database? shardDb = await _openShardDb(packageName, year);
+      if (shardDb == null) return;
+      final String table = _monthTableName(year, month);
+      if (!await _tableExists(shardDb, table)) return;
+
+      await shardDb.update(
+        table,
+        <String, Object>{
+          'file_size': newSize,
+          'updated_at': DateTime.now().millisecondsSinceEpoch,
+        },
+        where: 'file_path = ?',
+        whereArgs: <Object>[filePath],
+      );
+    } catch (e) {
+      print('按路径更新文件大小失败: $e, package=$packageName, path=$filePath');
+    }
+  }
+
+  DateTime? _inferCaptureTimeFromPath(String filePath) {
+    try {
+      final String normalized = filePath.replaceAll('\\', '/');
+      final List<String> parts = normalized.split('/');
+      for (int i = 0; i < parts.length - 2; i++) {
+        final RegExpMatch? ym = RegExp(
+          r'^(\d{4})-(\d{2})$',
+        ).firstMatch(parts[i]);
+        if (ym == null) continue;
+        final RegExpMatch? d = RegExp(r'^(\d{1,2})$').firstMatch(parts[i + 1]);
+        if (d == null) continue;
+        final RegExpMatch? time = RegExp(
+          r'^(\d{2})(\d{2})(\d{2})(?:_(\d{1,3}))?',
+        ).firstMatch(parts[i + 2]);
+        if (time == null) continue;
+        return DateTime(
+          int.parse(ym.group(1)!),
+          int.parse(ym.group(2)!),
+          int.parse(d.group(1)!),
+          int.parse(time.group(1)!),
+          int.parse(time.group(2)!),
+          int.parse(time.group(3)!),
+          int.parse((time.group(4) ?? '0').padRight(3, '0')),
+        );
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// 创建数据库表
   Future<void> _onCreate(Database db, int version) async {
     // 新架构：应用注册表，记录所有已创建的应用表

@@ -321,7 +321,7 @@ abstract class AppLocalizations {
   /// No description provided for @intervalHint.
   ///
   /// In en, this message translates to:
-  /// **'Enter an integer between 5-60'**
+  /// **'Enter an integer between 1-60'**
   String get intervalHint;
 
   /// Prompt after saving capture interval in seconds
@@ -855,13 +855,13 @@ abstract class AppLocalizations {
   /// No description provided for @intervalRangeNote.
   ///
   /// In en, this message translates to:
-  /// **'Range: 5–60 seconds, default: 5 seconds.'**
+  /// **'To preserve capture timing, target-size compression saves the screenshot first and may finish exact compression later in the background.'**
   String get intervalRangeNote;
 
   /// No description provided for @intervalInvalidInput.
   ///
   /// In en, this message translates to:
-  /// **'Please enter a valid integer between 5–60'**
+  /// **'Please enter a valid integer between 1–60'**
   String get intervalInvalidInput;
 
   /// No description provided for @removeMonitoringMessage.
@@ -1989,13 +1989,13 @@ abstract class AppLocalizations {
   /// No description provided for @intervalInputHint.
   ///
   /// In en, this message translates to:
-  /// **'Enter an integer between 5-60'**
+  /// **'Enter an integer between 1-60'**
   String get intervalInputHint;
 
   /// No description provided for @intervalInvalidError.
   ///
   /// In en, this message translates to:
-  /// **'Please enter a valid integer between 5-60'**
+  /// **'Please enter a valid integer between 1-60'**
   String get intervalInvalidError;
 
   /// No description provided for @intervalSavedSuccess.

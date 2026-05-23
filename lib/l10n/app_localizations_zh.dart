@@ -117,7 +117,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get intervalLabel => '间隔时间（秒）';
 
   @override
-  String get intervalHint => '请输入5-60的整数';
+  String get intervalHint => '请输入1-60的整数';
 
   @override
   String intervalSavedToast(Object seconds) {
@@ -399,10 +399,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get unknownIme => '未知输入法';
 
   @override
-  String get intervalRangeNote => '范围：5-60 秒，默认值：5 秒。';
+  String get intervalRangeNote => '为保证截图时机，启用目标大小压缩时会先保存截图，精确压缩可能在后台延后完成。';
 
   @override
-  String get intervalInvalidInput => '请输入 5-60 的有效整数';
+  String get intervalInvalidInput => '请输入 1-60 的有效整数';
 
   @override
   String get removeMonitoringMessage => '仅移除监测，不会删除对应图片。是否继续？';
@@ -1030,10 +1030,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get intervalSecondsLabel => '间隔时间（秒）';
 
   @override
-  String get intervalInputHint => '请输入 5-60 的整数';
+  String get intervalInputHint => '请输入 1-60 的整数';
 
   @override
-  String get intervalInvalidError => '请输入 5-60 的有效整数';
+  String get intervalInvalidError => '请输入 1-60 的有效整数';
 
   @override
   String intervalSavedSuccess(Object seconds) {

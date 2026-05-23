@@ -578,6 +578,18 @@ extension _SettingsScreenshotPart on _SettingsPageState {
               ),
             ),
           ),
+          const SizedBox(height: AppTheme.spacing3),
+          Container(
+            padding: const EdgeInsets.all(AppTheme.spacing3),
+            decoration: BoxDecoration(
+              color: AppTheme.info.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+            ),
+            child: Text(
+              AppLocalizations.of(context).intervalRangeNote,
+              style: TextStyle(fontSize: 12, color: AppTheme.info),
+            ),
+          ),
         ],
       ),
       actions: [
@@ -589,7 +601,7 @@ extension _SettingsScreenshotPart on _SettingsPageState {
           onPressed: (ctx) async {
             final input = controller.text.trim();
             final interval = int.tryParse(input);
-            if (interval == null || interval < 5 || interval > 60) {
+            if (interval == null || interval < 1 || interval > 60) {
               UINotifier.error(
                 ctx,
                 AppLocalizations.of(ctx).intervalInvalidError,

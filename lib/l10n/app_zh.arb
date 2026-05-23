@@ -36,7 +36,7 @@
   "screenshotDisabledToast": "截屏已停用",
   "intervalSettingTitle": "设置截屏间隔",
   "intervalLabel": "间隔时间（秒）",
-  "intervalHint": "请输入5-60的整数",
+  "intervalHint": "请输入1-60的整数",
   "intervalSavedToast": "截屏间隔已设置为 {seconds} 秒",
   "@intervalSavedToast": {
     "description": "提示保存的截屏间隔，单位秒",
@@ -165,8 +165,8 @@
   "imeExplainText": "当你在其它应用中弹出键盘时，系统会切换到输入法窗口。如果不排除，会被误认为正在使用输入法，从而导致截图浮窗判断错误。我们已自动排除输入法应用，并在检测到输入法时，仍会将浮窗移到弹出输入法之前的应用。",
   "gotIt": "知道了",
   "unknownIme": "未知输入法",
-  "intervalRangeNote": "范围：5-60 秒，默认值：5 秒。",
-  "intervalInvalidInput": "请输入 5-60 的有效整数",
+  "intervalRangeNote": "为保证截图时机，启用目标大小压缩时会先保存截图，精确压缩可能在后台延后完成。",
+  "intervalInvalidInput": "请输入 1-60 的有效整数",
   "removeMonitoringMessage": "仅移除监测，不会删除对应图片。是否继续？",
   "remove": "移除",
   "removedMonitoringToast": "已移除监测 {count} 个应用（不删除图片）",
@@ -526,8 +526,8 @@
   "enableBannerNotificationDesc": "允许在屏幕顶部弹出通知（横幅/悬浮）",
   "setIntervalDialogTitle": "设置截屏间隔",
   "intervalSecondsLabel": "间隔时间（秒）",
-  "intervalInputHint": "请输入 5-60 的整数",
-  "intervalInvalidError": "请输入 5-60 的有效整数",
+  "intervalInputHint": "请输入 1-60 的整数",
+  "intervalInvalidError": "请输入 1-60 的有效整数",
   "intervalSavedSuccess": "截屏间隔已设置为 {seconds} 秒",
   "@intervalSavedSuccess": {
     "placeholders": {

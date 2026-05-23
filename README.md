@@ -130,6 +130,7 @@ ScreenMemo 是一款在本地运行的智能截屏备忘与检索工具：自动
 - **Android SDK**：发布工作流使用 `Platform 36`、`Build-Tools 36.0.0`、`NDK 27.0.12077973`
 - **APK 当前构建配置**：`minSdk 24`、`targetSdk 36`
 - **主功能平台要求**：自动截屏依赖 Android 11（API 30）及以上
+- **截屏间隔**：默认与最低值已调整为 `1` 秒，截图采集与后处理在后台异步执行，不会阻塞下一次截屏触发
 - **IDE**：Android Studio / VS Code + Flutter 插件
 
 #### 安装与运行

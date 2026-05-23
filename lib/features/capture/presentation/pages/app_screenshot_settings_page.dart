@@ -90,7 +90,7 @@ class _AppScreenshotSettingsPageState extends State<AppScreenshotSettingsPage> {
         _targetSizeKb = (q['target_size_kb'] as int?) ?? _targetSizeKb;
         _expireEnabled = (e['enabled'] as bool?) ?? _expireEnabled;
         _expireDays = (e['days'] as int?) ?? _expireDays;
-        _intervalSec = (iv ?? _intervalSec).clamp(5, 60);
+        _intervalSec = (iv ?? _intervalSec).clamp(1, 60);
       });
     } catch (_) {}
     await _loadStats();
@@ -482,6 +482,7 @@ class _AppScreenshotSettingsPageState extends State<AppScreenshotSettingsPage> {
     required String hint,
     required int value,
     required void Function(int) onValid,
+    String? note,
   }) {
     final controller = TextEditingController(text: value.toString());
     showUIDialog<void>(
@@ -520,6 +521,20 @@ class _AppScreenshotSettingsPageState extends State<AppScreenshotSettingsPage> {
               ),
             ),
           ),
+          if (note != null && note.trim().isNotEmpty) ...[
+            const SizedBox(height: AppTheme.spacing3),
+            Container(
+              padding: const EdgeInsets.all(AppTheme.spacing3),
+              decoration: BoxDecoration(
+                color: AppTheme.info.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              ),
+              child: Text(
+                note,
+                style: TextStyle(fontSize: 12, color: AppTheme.info),
+              ),
+            ),
+          ],
         ],
       ),
       actions: [
@@ -1061,8 +1076,9 @@ class _AppScreenshotSettingsPageState extends State<AppScreenshotSettingsPage> {
                           ).intervalSecondsLabel,
                           hint: AppLocalizations.of(context).intervalInputHint,
                           value: _intervalSec,
+                          note: AppLocalizations.of(context).intervalRangeNote,
                           onValid: (v) async {
-                            if (v < 5 || v > 60) {
+                            if (v < 1 || v > 60) {
                               UINotifier.error(
                                 context,
                                 AppLocalizations.of(

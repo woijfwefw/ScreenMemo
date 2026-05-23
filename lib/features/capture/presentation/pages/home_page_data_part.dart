@@ -695,7 +695,7 @@ extension _HomePageDataPart on _HomePageState {
           onPressed: (ctx) async {
             final input = controller.text.trim();
             final interval = int.tryParse(input);
-            if (interval == null || interval < 5 || interval > 60) {
+            if (interval == null || interval < 1 || interval > 60) {
               UINotifier.error(
                 ctx,
                 AppLocalizations.of(ctx).intervalInvalidInput,

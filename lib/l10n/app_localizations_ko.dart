@@ -118,7 +118,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get intervalLabel => '간격(초)';
 
   @override
-  String get intervalHint => '5~60 사이의 정수를 입력하세요';
+  String get intervalHint => '1~60 사이의 정수를 입력하세요';
 
   @override
   String intervalSavedToast(Object seconds) {
@@ -406,10 +406,11 @@ class AppLocalizationsKo extends AppLocalizations {
   String get unknownIme => '알 수 없는 IME';
 
   @override
-  String get intervalRangeNote => '범위: 5~60초, 기본값: 5초.';
+  String get intervalRangeNote =>
+      '캡처 시점을 우선하기 위해 목표 크기 압축을 켜면 스크린샷을 먼저 저장하고 정확한 압축은 백그라운드에서 나중에 완료될 수 있습니다.';
 
   @override
-  String get intervalInvalidInput => '5~60 사이의 유효한 정수를 입력하세요.';
+  String get intervalInvalidInput => '1~60 사이의 유효한 정수를 입력하세요.';
 
   @override
   String get removeMonitoringMessage => '모니터링만 해제하고 이미지는 삭제하지 않습니다. 계속할까요?';
@@ -1043,10 +1044,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get intervalSecondsLabel => '간격(초)';
 
   @override
-  String get intervalInputHint => '5~60 사이의 정수를 입력하세요.';
+  String get intervalInputHint => '1~60 사이의 정수를 입력하세요.';
 
   @override
-  String get intervalInvalidError => '5~60 사이의 유효한 정수를 입력하세요';
+  String get intervalInvalidError => '1~60 사이의 유효한 정수를 입력하세요';
 
   @override
   String intervalSavedSuccess(Object seconds) {

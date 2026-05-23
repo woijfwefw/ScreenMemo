@@ -201,7 +201,7 @@ class PerAppScreenshotSettingsService {
     String packageName,
     int seconds,
   ) async {
-    final clamped = seconds < 5 ? 5 : (seconds > 60 ? 60 : seconds);
+    final clamped = seconds < 1 ? 1 : (seconds > 60 ? 60 : seconds);
     await _setRaw(packageName, 'screenshot_interval_sec', clamped.toString());
   }
 }

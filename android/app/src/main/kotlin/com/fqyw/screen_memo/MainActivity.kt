@@ -106,6 +106,7 @@ class MainActivity : FlutterActivity() {
     private var accessibilityStateMonitor: AccessibilityStateMonitor? = null
     private var mediaProjectionRequestReceiver: BroadcastReceiver? = null
     private var screenshotSavedReceiver: BroadcastReceiver? = null
+    private var screenshotToggleReceiver: BroadcastReceiver? = null
     private var accessibilityServiceBinder: IAccessibilityServiceAidl? = null
     private var didRunPostFirstFrameInit: Boolean = false
     private var activityCreateTs: Long = 0L
@@ -595,6 +596,9 @@ class MainActivity : FlutterActivity() {
             val t4 = System.currentTimeMillis()
             setupScreenshotSavedReceiver()
             FileLogger.e(TAG, "步骤：setupScreenshotSavedReceiver -> ${System.currentTimeMillis() - t4}毫秒")
+            val t4b = System.currentTimeMillis()
+            setupScreenshotToggleReceiver()
+            FileLogger.e(TAG, "步骤：setupScreenshotToggleReceiver -> ${System.currentTimeMillis() - t4b}毫秒")
 
             // 启动辅助功能状态监听
             val t5 = System.currentTimeMillis()
@@ -958,11 +962,29 @@ class MainActivity : FlutterActivity() {
                             "captureTime" to captureTime,
                             "pageUrl" to pageUrl
                         ))
+                    } else if (intent?.action == "com.fqyw.screen_memo.SCREENSHOT_RECOMPRESSED") {
+                        val packageName = intent.getStringExtra("packageName") ?: ""
+                        val filePath = intent.getStringExtra("filePath") ?: ""
+                        val absolutePath = intent.getStringExtra("absolutePath") ?: ""
+                        val newSize = intent.getLongExtra("newSize", 0L)
+                        val nativeDbUpdated = intent.getBooleanExtra("nativeDbUpdated", false)
+
+                        FileLogger.i(TAG, "收到截图延后压缩完成通知: $packageName - $filePath, size=$newSize")
+                        methodChannel.invokeMethod("onScreenshotRecompressed", mapOf(
+                            "packageName" to packageName,
+                            "filePath" to filePath,
+                            "absolutePath" to absolutePath,
+                            "newSize" to newSize,
+                            "nativeDbUpdated" to nativeDbUpdated
+                        ))
                     }
                 }
             }
             
-            val filter = IntentFilter("com.fqyw.screen_memo.SCREENSHOT_SAVED")
+            val filter = IntentFilter().apply {
+                addAction("com.fqyw.screen_memo.SCREENSHOT_SAVED")
+                addAction("com.fqyw.screen_memo.SCREENSHOT_RECOMPRESSED")
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 registerReceiver(screenshotSavedReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
             } else {
@@ -971,6 +993,43 @@ class MainActivity : FlutterActivity() {
             FileLogger.e(TAG, "截图保存通知广播接收器已注册")
         } catch (e: Exception) {
             FileLogger.e(TAG, "设置截图保存通知广播接收器失败", e)
+        }
+    }
+
+    /**
+     * 设置通知栏截图开关广播接收器
+     */
+    private fun setupScreenshotToggleReceiver() {
+        try {
+            if (screenshotToggleReceiver != null) return
+            screenshotToggleReceiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) {
+                    try {
+                        val enabled = intent?.getBooleanExtra("enabled", false) ?: false
+                        val started = intent?.getBooleanExtra("started", true) ?: true
+                        FileLogger.i(TAG, "收到通知栏截图开关状态: enabled=$enabled started=$started")
+                        methodChannel.invokeMethod(
+                            "onScreenshotToggleChanged",
+                            mapOf(
+                                "enabled" to enabled,
+                                "started" to started
+                            )
+                        )
+                    } catch (e: Exception) {
+                        FileLogger.w(TAG, "转发通知栏截图开关状态失败：${e.message}")
+                    }
+                }
+            }
+
+            val filter = IntentFilter("com.fqyw.screen_memo.SCREENSHOT_TOGGLE_CHANGED")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(screenshotToggleReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(screenshotToggleReceiver, filter)
+            }
+            FileLogger.e(TAG, "通知栏截图开关广播接收器已注册")
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "设置通知栏截图开关广播接收器失败", e)
         }
     }
 
@@ -1788,6 +1847,15 @@ class MainActivity : FlutterActivity() {
                 FileLogger.e(TAG, "截图保存通知广播接收器已取消注册")
             } catch (e: Exception) {
                 FileLogger.e(TAG, "取消注册截图保存广播接收器失败", e)
+            }
+        }
+
+        screenshotToggleReceiver?.let {
+            try {
+                unregisterReceiver(it)
+                FileLogger.e(TAG, "通知栏截图开关广播接收器已取消注册")
+            } catch (e: Exception) {
+                FileLogger.e(TAG, "取消注册通知栏截图开关广播接收器失败", e)
             }
         }
 

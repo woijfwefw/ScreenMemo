@@ -36,7 +36,7 @@
   "screenshotDisabledToast": "キャプチャを無効にしました",
   "intervalSettingTitle": "キャプチャ間隔を設定",
   "intervalLabel": "間隔（秒）",
-  "intervalHint": "5～60 の整数を入力してください",
+  "intervalHint": "1～60 の整数を入力してください",
   "intervalSavedToast": "キャプチャ間隔を {seconds} 秒に設定しました",
   "@intervalSavedToast": {
     "description": "Prompt after saving capture interval in seconds",
@@ -163,8 +163,8 @@
   "imeExplainText": "別のアプリでキーボードがポップアップすると、システムは IME ウィンドウに切り替わります。除外しない場合、IMEを使用していると誤認され、フローティングウィンドウの検出が誤る可能性があります。 IME アプリは自動的に除外されますが、IME が検出されたときに IME がポップアップする前にフローティング ウィンドウをアプリに移動します。",
   "gotIt": "わかった",
   "unknownIme": "不明な IME",
-  "intervalRangeNote": "範囲: 5 ～ 60 秒、デフォルト: 5 秒。",
-  "intervalInvalidInput": "5 ～ 60 の有効な整数を入力してください",
+  "intervalRangeNote": "キャプチャのタイミングを優先するため、目標サイズ圧縮を有効にすると先にスクリーンショットを保存し、正確な圧縮は後でバックグラウンドで完了する場合があります。",
+  "intervalInvalidInput": "1 ～ 60 の有効な整数を入力してください",
   "removeMonitoringMessage": "監視のみ解除し、画像は削除しません。続行しますか？",
   "remove": "解除",
   "removedMonitoringToast": "{count} 件のアプリの監視を解除しました（画像は削除されません）",
@@ -524,8 +524,8 @@
   "enableBannerNotificationDesc": "画面上部に通知バナーを表示できるようにする",
   "setIntervalDialogTitle": "スクリーンショットの間隔を設定",
   "intervalSecondsLabel": "間隔（秒）",
-  "intervalInputHint": "5 ～ 60 の整数を入力してください",
-  "intervalInvalidError": "5～60 の有効な整数を入力してください",
+  "intervalInputHint": "1 ～ 60 の整数を入力してください",
+  "intervalInvalidError": "1～60 の有効な整数を入力してください",
   "intervalSavedSuccess": "スクリーンショット間隔を {seconds} 秒に設定しました",
   "@intervalSavedSuccess": {
     "placeholders": {

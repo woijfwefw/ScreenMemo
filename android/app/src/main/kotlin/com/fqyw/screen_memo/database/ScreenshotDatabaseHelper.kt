@@ -113,6 +113,93 @@ object ScreenshotDatabaseHelper {
         }
     }
 
+    /**
+     * 精确压缩异步完成后，按文件路径更新分库文件大小，并修正聚合统计。
+     */
+    fun updateFileSizeByFilePath(context: Context, absoluteFilePath: String, newSize: Long): Boolean {
+        if (newSize <= 0L) return false
+        var masterDb: SQLiteDatabase? = null
+        var shardDb: SQLiteDatabase? = null
+        var cursor: Cursor? = null
+        try {
+            val pkg = extractPackageFromPath(absoluteFilePath) ?: return false
+            val ym = extractYearMonthFromPath(absoluteFilePath) ?: return false
+            val year = ym.first
+            val month = ym.second
+
+            val masterDbPath = resolveMasterDbPath(context) ?: return false
+            masterDb = SQLiteDatabase.openDatabase(
+                masterDbPath,
+                null,
+                SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.CREATE_IF_NECESSARY
+            )
+            ensureSchema(masterDb!!)
+
+            shardDb = openShardDb(context, pkg, year)
+            if (shardDb == null) return false
+            val table = monthTableName(year, month)
+            ensureMonthTable(shardDb!!, year, month)
+
+            cursor = shardDb!!.query(
+                table,
+                arrayOf("file_size", "capture_time"),
+                "file_path = ?",
+                arrayOf(absoluteFilePath),
+                null,
+                null,
+                null,
+                "1"
+            )
+            val c = cursor ?: return false
+            if (!c.moveToFirst()) return false
+            val oldSize = try { c.getLong(0) } catch (_: Exception) { 0L }
+            val captureTime = try { c.getLong(1) } catch (_: Exception) { 0L }
+            val delta = newSize - oldSize
+            if (delta == 0L) return true
+
+            val now = System.currentTimeMillis()
+            val values = ContentValues().apply {
+                put("file_size", newSize)
+                put("updated_at", now)
+            }
+            shardDb!!.update(table, values, "file_path = ?", arrayOf(absoluteFilePath))
+
+            try {
+                masterDb!!.execSQL(
+                    "UPDATE app_stats SET total_size = COALESCE(total_size, 0) + ? WHERE app_package_name = ?",
+                    arrayOf(delta, pkg)
+                )
+            } catch (_: Exception) {
+                try { recomputeAppStatForPackage(masterDb!!, pkg) } catch (_: Exception) {}
+            }
+            try {
+                masterDb!!.execSQL(
+                    "UPDATE totals SET total_size_bytes = COALESCE(total_size_bytes, 0) + ?, updated_at = ? WHERE id = 1",
+                    arrayOf(delta, now)
+                )
+            } catch (_: Exception) {}
+            if (captureTime > 0L) {
+                val day = dayKeyFromMillis(captureTime)
+                if (day.isNotBlank()) {
+                    try {
+                        masterDb!!.execSQL(
+                            "UPDATE day_stats SET total_size_bytes = COALESCE(total_size_bytes, 0) + ?, updated_at = ? WHERE day = ?",
+                            arrayOf(delta, now, day)
+                        )
+                    } catch (_: Exception) {}
+                }
+            }
+            return true
+        } catch (e: Exception) {
+            FileLogger.w(TAG, "更新截图文件大小失败：${e.message}")
+            return false
+        } finally {
+            try { cursor?.close() } catch (_: Exception) {}
+            try { shardDb?.close() } catch (_: Exception) {}
+            try { masterDb?.close() } catch (_: Exception) {}
+        }
+    }
+
     private fun extractPackageFromPath(path: String): String? {
         // 适配新旧结构：.../output/screen/<package>/... 或 .../<package>/screenshots/...
         val parts = path.replace('\\', '/').split('/')

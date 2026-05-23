@@ -118,7 +118,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get intervalLabel => '間隔（秒）';
 
   @override
-  String get intervalHint => '5～60 の整数を入力してください';
+  String get intervalHint => '1～60 の整数を入力してください';
 
   @override
   String intervalSavedToast(Object seconds) {
@@ -407,10 +407,11 @@ class AppLocalizationsJa extends AppLocalizations {
   String get unknownIme => '不明な IME';
 
   @override
-  String get intervalRangeNote => '範囲: 5 ～ 60 秒、デフォルト: 5 秒。';
+  String get intervalRangeNote =>
+      'キャプチャのタイミングを優先するため、目標サイズ圧縮を有効にすると先にスクリーンショットを保存し、正確な圧縮は後でバックグラウンドで完了する場合があります。';
 
   @override
-  String get intervalInvalidInput => '5 ～ 60 の有効な整数を入力してください';
+  String get intervalInvalidInput => '1 ～ 60 の有効な整数を入力してください';
 
   @override
   String get removeMonitoringMessage => '監視のみ解除し、画像は削除しません。続行しますか？';
@@ -1046,10 +1047,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get intervalSecondsLabel => '間隔（秒）';
 
   @override
-  String get intervalInputHint => '5 ～ 60 の整数を入力してください';
+  String get intervalInputHint => '1 ～ 60 の整数を入力してください';
 
   @override
-  String get intervalInvalidError => '5～60 の有効な整数を入力してください';
+  String get intervalInvalidError => '1～60 の有効な整数を入力してください';
 
   @override
   String intervalSavedSuccess(Object seconds) {

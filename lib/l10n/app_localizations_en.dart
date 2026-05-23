@@ -118,7 +118,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intervalLabel => 'Interval (seconds)';
 
   @override
-  String get intervalHint => 'Enter an integer between 5-60';
+  String get intervalHint => 'Enter an integer between 1-60';
 
   @override
   String intervalSavedToast(Object seconds) {
@@ -419,11 +419,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get unknownIme => 'Unknown IME';
 
   @override
-  String get intervalRangeNote => 'Range: 5–60 seconds, default: 5 seconds.';
+  String get intervalRangeNote =>
+      'To preserve capture timing, target-size compression saves the screenshot first and may finish exact compression later in the background.';
 
   @override
   String get intervalInvalidInput =>
-      'Please enter a valid integer between 5–60';
+      'Please enter a valid integer between 1–60';
 
   @override
   String get removeMonitoringMessage =>
@@ -1081,11 +1082,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intervalSecondsLabel => 'Interval (seconds)';
 
   @override
-  String get intervalInputHint => 'Enter an integer between 5-60';
+  String get intervalInputHint => 'Enter an integer between 1-60';
 
   @override
   String get intervalInvalidError =>
-      'Please enter a valid integer between 5-60';
+      'Please enter a valid integer between 1-60';
 
   @override
   String intervalSavedSuccess(Object seconds) {

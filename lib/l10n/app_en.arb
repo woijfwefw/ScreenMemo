@@ -36,7 +36,7 @@
   "screenshotDisabledToast": "Capture disabled",
   "intervalSettingTitle": "Set capture interval",
   "intervalLabel": "Interval (seconds)",
-  "intervalHint": "Enter an integer between 5-60",
+  "intervalHint": "Enter an integer between 1-60",
   "intervalSavedToast": "Capture interval set to {seconds}s",
   "@intervalSavedToast": {
     "description": "Prompt after saving capture interval in seconds",
@@ -165,8 +165,8 @@
   "imeExplainText": "When the keyboard pops up in another app, the system switches to the IME window. If not excluded, it may be mistaken as using the IME, causing the floating window detection to be wrong. We automatically exclude IME apps and will still move the floating window to the app before the IME pops up when an IME is detected.",
   "gotIt": "Got it",
   "unknownIme": "Unknown IME",
-  "intervalRangeNote": "Range: 5–60 seconds, default: 5 seconds.",
-  "intervalInvalidInput": "Please enter a valid integer between 5–60",
+  "intervalRangeNote": "To preserve capture timing, target-size compression saves the screenshot first and may finish exact compression later in the background.",
+  "intervalInvalidInput": "Please enter a valid integer between 1–60",
   "removeMonitoringMessage": "Only remove monitoring and do not delete images. Continue?",
   "remove": "Remove",
   "removedMonitoringToast": "Removed monitoring for {count} apps (images are not deleted)",
@@ -526,8 +526,8 @@
   "enableBannerNotificationDesc": "Allow notifications to pop up at the top of screen (banner/floating)",
   "setIntervalDialogTitle": "Set screenshot interval",
   "intervalSecondsLabel": "Interval (seconds)",
-  "intervalInputHint": "Enter an integer between 5-60",
-  "intervalInvalidError": "Please enter a valid integer between 5-60",
+  "intervalInputHint": "Enter an integer between 1-60",
+  "intervalInvalidError": "Please enter a valid integer between 1-60",
   "intervalSavedSuccess": "Screenshot interval set to {seconds}s",
   "@intervalSavedSuccess": {
     "placeholders": {

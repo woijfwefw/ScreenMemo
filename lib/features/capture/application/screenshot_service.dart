@@ -67,6 +67,10 @@ class ScreenshotService {
 
   final _screenshotStreamController = StreamController<void>.broadcast();
   Stream<void> get onScreenshotSaved => _screenshotStreamController.stream;
+  final _screenshotToggleStreamController =
+      StreamController<bool>.broadcast();
+  Stream<bool> get onScreenshotToggleChanged =>
+      _screenshotToggleStreamController.stream;
 
   bool _isRunning = false;
   int _currentInterval = 5;
@@ -267,9 +271,9 @@ class ScreenshotService {
   Future<bool> startScreenshotService(int intervalSeconds) async {
     try {
       print('=== 开始启动截屏服务 ===');
-      // 统一约束：5-60 秒
-      final int clampedInterval = intervalSeconds < 5
-          ? 5
+      // 统一约束：1-60 秒
+      final int clampedInterval = intervalSeconds < 1
+          ? 1
           : (intervalSeconds > 60 ? 60 : intervalSeconds);
       if (clampedInterval != intervalSeconds) {
         print('截屏间隔超出范围，自动调整为: $clampedInterval秒 (原输入: $intervalSeconds)');
@@ -393,9 +397,9 @@ class ScreenshotService {
   /// 更新截屏间隔
   Future<bool> updateInterval(int intervalSeconds) async {
     try {
-      // 统一约束：5-60 秒
-      final int clampedInterval = intervalSeconds < 5
-          ? 5
+      // 统一约束：1-60 秒
+      final int clampedInterval = intervalSeconds < 1
+          ? 1
           : (intervalSeconds > 60 ? 60 : intervalSeconds);
       if (_isRunning) {
         // 重新启动服务以应用新间隔
@@ -473,7 +477,7 @@ class ScreenshotService {
       final prefs = await SharedPreferences.getInstance();
       _isRunning = prefs.getBool('screenshot_service_running') ?? false;
       final saved = prefs.getInt('screenshot_interval') ?? 5;
-      _currentInterval = saved < 5 ? 5 : (saved > 60 ? 60 : saved);
+      _currentInterval = saved < 1 ? 1 : (saved > 60 ? 60 : saved);
 
       // 如果之前服务在运行，尝试重新启动
       if (_isRunning) {
@@ -523,6 +527,13 @@ class ScreenshotService {
             await _handleScreenshotSaved(arguments);
             print('=== 截图保存回调处理完成 ===');
             break;
+          case 'onScreenshotRecompressed':
+            if (call.arguments is Map) {
+              await _handleScreenshotRecompressed(
+                Map<String, dynamic>.from(call.arguments as Map),
+              );
+            }
+            break;
           case 'onDailySummaryNotificationTap':
             // 通知点击：打开每日总结页面
             try {
@@ -553,6 +564,15 @@ class ScreenshotService {
               print('处理动态重建通知点击失败: $e');
             }
             break;
+          case 'onScreenshotToggleChanged':
+            if (call.arguments is Map) {
+              final args = Map<String, dynamic>.from(call.arguments as Map);
+              final enabled = args['enabled'] == true;
+              _isRunning = enabled;
+              await _saveServiceState();
+              _screenshotToggleStreamController.add(enabled);
+            }
+            break;
           case 'onCompressionProgress':
             if (call.arguments is Map) {
               _handleCompressionProgress(
@@ -576,6 +596,52 @@ class ScreenshotService {
     Map<String, dynamic> data,
   ) async {
     await _handleScreenshotSaved(data);
+  }
+
+  Future<void> handleScreenshotRecompressedFromPlatform(
+    Map<String, dynamic> data,
+  ) async {
+    await _handleScreenshotRecompressed(data);
+  }
+
+  Future<void> _handleScreenshotRecompressed(Map<String, dynamic> data) async {
+    try {
+      final String packageName = data['packageName'] as String? ?? '';
+      final String relativePath = data['filePath'] as String? ?? '';
+      final String absolutePath = data['absolutePath'] as String? ?? '';
+      int newSize = _coerceToInt(data['newSize']);
+      final bool nativeDbUpdated = _coerceToBool(data['nativeDbUpdated']);
+      if (packageName.isEmpty) return;
+
+      String filePath = absolutePath;
+      if (filePath.isEmpty && relativePath.isNotEmpty) {
+        final baseDir = await PathService.getInternalAppDir(null);
+        if (baseDir != null) {
+          filePath = p.join(baseDir.path, relativePath);
+        }
+      }
+      if (newSize <= 0 && filePath.isNotEmpty) {
+        final file = File(filePath);
+        if (await file.exists()) {
+          newSize = await file.length();
+        }
+      }
+      if (filePath.isEmpty || newSize <= 0) return;
+
+      if (!nativeDbUpdated) {
+        await _database.updateFileSizeByPath(
+          packageName: packageName,
+          filePath: filePath,
+          newSize: newSize,
+        );
+        await _database.recomputeAppStatsForPackage(packageName);
+        await _database.recalculateTotals();
+      }
+      await _refreshStatsCache(force: true);
+      _screenshotStreamController.add(null);
+    } catch (e) {
+      print('处理截图延后压缩完成通知失败: $e');
+    }
   }
 
   void _handleCompressionProgress(Map<String, dynamic> raw) {

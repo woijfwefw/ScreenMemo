@@ -27,6 +27,7 @@ import android.content.Intent
 import android.content.ComponentName
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
@@ -39,6 +40,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
+import android.system.Os
  
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -56,7 +58,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.concurrent.timer
 import android.os.IBinder
@@ -80,7 +82,7 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
     }
 
     private fun normalizeScreenshotIntervalSeconds(seconds: Int): Int {
-        return seconds.coerceIn(5, 60)
+        return seconds.coerceIn(1, 60)
     }
 
     private fun screenshotIntervalMillis(seconds: Int): Long {
@@ -205,6 +207,18 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
         val effective: EffectiveScreenshotInterval,
         val timerReset: Boolean
     )
+
+    private fun tryReserveScreenshotSaveSlot(): Int {
+        while (true) {
+            val current = pendingScreenshotSaves.get()
+            if (current >= maxPendingScreenshotSaves) {
+                return -1
+            }
+            if (pendingScreenshotSaves.compareAndSet(current, current + 1)) {
+                return current + 1
+            }
+        }
+    }
     
     // 去重：保留裁剪后画面的精确签名（宽高 + SHA-256）
     private val lastSignatureByApp: MutableMap<String, String> = mutableMapOf()
@@ -223,7 +237,12 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
     private val screenshotSaveExecutor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "ScreenMemoScreenshotSave").apply { isDaemon = true }
     }
-    private val isScreenshotSaveInProgress = AtomicBoolean(false)
+    private val screenshotCompressionExecutor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "ScreenMemoScreenshotCompress").apply { isDaemon = true }
+    }
+    private val pendingScreenshotSaves = AtomicInteger(0)
+    private val maxPendingScreenshotSaves = 20
+    private val pendingDeferredCompressions = AtomicInteger(0)
     private val captureTraceCounter = AtomicLong(0)
 
     // 段落推进心跳（无新截图时也能结束 collecting）
@@ -781,7 +800,11 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
         try {
             screenshotSaveExecutor.shutdownNow()
         } catch (_: Exception) {}
-        isScreenshotSaveInProgress.set(false)
+        try {
+            screenshotCompressionExecutor.shutdownNow()
+        } catch (_: Exception) {}
+        pendingScreenshotSaves.set(0)
+        pendingDeferredCompressions.set(0)
 
         // 释放WakeLock
         releaseWakeLock()
@@ -1197,12 +1220,15 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
                                     )
                                 }
 
-                                if (!isScreenshotSaveInProgress.compareAndSet(false, true)) {
+                                val pendingAfterEnqueue = tryReserveScreenshotSaveSlot()
+                                if (pendingAfterEnqueue < 0) {
+                                    val pendingBeforeEnqueue = pendingScreenshotSaves.get()
                                     perf(
-                                        "trace=$traceId stage=save_guard result=skip reason=save_in_progress " +
-                                            "target=$lockedTarget apiMs=$apiMs wrapMs=$wrapMs sinceTickMs=${SystemClock.elapsedRealtime() - tickStartMs}"
+                                        "trace=$traceId stage=save_guard result=skip reason=save_queue_full " +
+                                            "target=$lockedTarget pending=$pendingBeforeEnqueue limit=$maxPendingScreenshotSaves " +
+                                            "apiMs=$apiMs wrapMs=$wrapMs sinceTickMs=${SystemClock.elapsedRealtime() - tickStartMs}"
                                     )
-                                    FileLogger.w(TAG, "save_in_progress_skip: 上一张截图仍在编码/写入，跳过保存 target=$lockedTarget")
+                                    FileLogger.w(TAG, "save_queue_full_skip: 截图保存队列已满，丢弃当前帧 target=$lockedTarget, pending=$pendingBeforeEnqueue")
                                     try {
                                         ScreenCaptureService.updateNotificationState(
                                             this@ScreenCaptureAccessibilityService,
@@ -1220,7 +1246,7 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
                                 try {
                                     perf(
                                         "trace=$traceId stage=save_enqueue target=$lockedTarget " +
-                                            "apiMs=$apiMs wrapMs=$wrapMs sinceTickMs=${callbackAtMs - tickStartMs}"
+                                            "pending=$pendingAfterEnqueue apiMs=$apiMs wrapMs=$wrapMs sinceTickMs=${callbackAtMs - tickStartMs}"
                                     )
                                     screenshotSaveExecutor.execute {
                                     try {
@@ -1301,13 +1327,13 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
                                         callback(false, null)
                                     } finally {
                                         try { bitmap.recycle() } catch (_: Exception) {}
-                                        isScreenshotSaveInProgress.set(false)
+                                        pendingScreenshotSaves.decrementAndGet()
                                         releaseWakeLock()
                                     }
                                 }
                                     shouldReleaseWakeLock = false
                                 } catch (e: Exception) {
-                                    isScreenshotSaveInProgress.set(false)
+                                    pendingScreenshotSaves.decrementAndGet()
                                     perf(
                                         "trace=$traceId stage=save_enqueue result=exception target=$lockedTarget " +
                                             "message=${e.message ?: "-"} totalMs=${SystemClock.elapsedRealtime() - tickStartMs}"
@@ -1810,15 +1836,6 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
                 )
             } catch (_: Exception) {}
 
-            if (isScreenshotSaveInProgress.get()) {
-                perf(
-                    "trace=$traceId stage=tick result=skip reason=save_in_progress target=$targetApp " +
-                        "elapsedMs=${SystemClock.elapsedRealtime() - tickStartMs}"
-                )
-                FileLogger.w(TAG, "save_in_progress_skip: 上一张截图仍在编码/写入，本轮不再调用截图 API target=$targetApp")
-                return
-            }
-
             // 使用无障碍服务截屏
             takeScreenshotUsingAccessibility(targetApp, traceId, tickStartMs) { success, filePath ->
                 if (success) {
@@ -2267,10 +2284,14 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
 
             // 应用压缩设置（不改变分辨率，仅通过编码质量/格式控制大小；可选灰度）
             val encodeStartMs = SystemClock.elapsedRealtime()
-            val encodeResult = encodeToBytesAccordingToSettings(rotatedOrOriginal ?: bitmap, packageName, traceId)
+            val encodeResult = encodeToBytesAccordingToSettings(
+                rotatedOrOriginal ?: bitmap,
+                packageName,
+                traceId,
+            )
             encodeMs = SystemClock.elapsedRealtime() - encodeStartMs
-            val bytes = encodeResult.first
-            finalExt = encodeResult.second
+            val bytes = encodeResult.bytes
+            finalExt = encodeResult.ext
             if (bytes == null) {
                 FileLogger.e(TAG, "编码失败：返回空字节流")
                 return null
@@ -2329,6 +2350,17 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
                 nativeDbMs = SystemClock.elapsedRealtime() - nativeDbStartMs
             } catch (e: Exception) {
                 FileLogger.w(TAG, "原生侧入库失败: ${e.message}")
+            }
+
+            encodeResult.deferredTarget?.let { spec ->
+                enqueueDeferredTargetCompression(
+                    file = file,
+                    relativePath = relativePath,
+                    packageName = packageName,
+                    spec = spec,
+                    traceId = traceId,
+                    initialBytes = outputBytes
+                )
             }
 
             // 通知段落管理器（用于段落开始与采样调度）
@@ -2396,7 +2428,8 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
                     "appNameMs=$appNameMs mkdirMs=$mkdirMs rotateMs=$rotateMs encodeMs=$encodeMs " +
                     "writeMs=$writeMs urlMs=$urlMs nativeDbMs=$nativeDbMs segmentMs=$segmentMs " +
                     "ocrLaunchMs=$ocrLaunchMs flutterNotifyMs=$flutterNotifyMs saveTotalMs=${SystemClock.elapsedRealtime() - saveTotalStartMs} " +
-                    "totalMs=${SystemClock.elapsedRealtime() - captureStartMs} bytes=$encodedBytes fileBytes=$outputBytes ext=$finalExt path=$relativePath"
+                    "totalMs=${SystemClock.elapsedRealtime() - captureStartMs} bytes=$encodedBytes fileBytes=$outputBytes " +
+                    "deferredTarget=${encodeResult.deferredTarget != null} ext=$finalExt path=$relativePath"
             )
             
             relativePath // 返回相对路径
@@ -2638,12 +2671,26 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
      *  - flutter.target_size_kb: Int（默认 50，仅对 lossy 生效）
      *  - flutter.grayscale: Bool（默认 false）
      */
-    // 返回 Pair<字节数组, 扩展名>
+    private data class EncodedScreenshot(
+        val bytes: ByteArray?,
+        val ext: String,
+        val deferredTarget: DeferredTargetCompressionSpec? = null
+    )
+
+    private data class DeferredTargetCompressionSpec(
+        val formatName: String,
+        val compressFormat: Bitmap.CompressFormat,
+        val targetBytes: Int,
+        val fallbackQuality: Int,
+        val targetKb: Int
+    )
+
+    // 返回编码结果；目标大小模式会先快速编码，精确压缩延后到独立队列。
     private fun encodeToBytesAccordingToSettings(
         src: Bitmap,
         packageName: String?,
         traceId: Long = nextCaptureTraceId()
-    ): Pair<ByteArray?, String> {
+    ): EncodedScreenshot {
             val totalStartMs = SystemClock.elapsedRealtime()
             var settingsReadMs = 0L
             var perAppReadMs = 0L
@@ -2696,17 +2743,33 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
 
         // 目标大小仅在有损编码时生效
         if (isLossy && useTarget) {
-            val compressStartMs = SystemClock.elapsedRealtime()
-            val bytes = compressToTargetSize(bitmap, cf, targetKb * 1024, minQ = 1, maxQ = 100)
-                ?: compressOnce(bitmap, cf, 1)
-            val compressMs = SystemClock.elapsedRealtime() - compressStartMs
-            FileLogger.i(TAG, "目标大小编码完成 -> 实际字节=${bytes.size}, 目标字节=${targetKb * 1024}")
-            perf(
-                "trace=$traceId stage=encode result=ok mode=target format=$format ext=$ext " +
-                    "quality=$quality targetKb=$targetKb settingsReadMs=$settingsReadMs perAppReadMs=$perAppReadMs " +
-                    "compressMs=$compressMs encodeTotalMs=${SystemClock.elapsedRealtime() - totalStartMs} bytes=${bytes.size}"
-            )
-            return Pair(bytes, ext)
+            return try {
+                val compressStartMs = SystemClock.elapsedRealtime()
+                val quickQuality = 100
+                val data = compressOnce(bitmap, cf, quickQuality)
+                val compressMs = SystemClock.elapsedRealtime() - compressStartMs
+                val spec = DeferredTargetCompressionSpec(
+                    formatName = format,
+                    compressFormat = cf,
+                    targetBytes = targetKb * 1024,
+                    fallbackQuality = 1,
+                    targetKb = targetKb
+                )
+                FileLogger.i(TAG, "目标大小快速编码完成，精确压缩延后 -> 当前字节=${data.size}, 目标字节=${spec.targetBytes}")
+                perf(
+                    "trace=$traceId stage=encode result=ok mode=target_deferred format=$format ext=$ext " +
+                        "quality=$quickQuality targetKb=$targetKb settingsReadMs=$settingsReadMs perAppReadMs=$perAppReadMs " +
+                        "compressMs=$compressMs encodeTotalMs=${SystemClock.elapsedRealtime() - totalStartMs} bytes=${data.size}"
+                )
+                EncodedScreenshot(data, ext, spec)
+            } catch (e: Exception) {
+                perf(
+                    "trace=$traceId stage=encode result=exception mode=target_deferred format=$format ext=$ext " +
+                        "settingsReadMs=$settingsReadMs perAppReadMs=$perAppReadMs " +
+                        "encodeTotalMs=${SystemClock.elapsedRealtime() - totalStartMs} message=${e.message ?: "-"}"
+                )
+                EncodedScreenshot(null, ext)
+            }
         }
 
         // 否则按质量单次压缩；无损忽略质量
@@ -2721,14 +2784,14 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
                     "quality=$appliedQ settingsReadMs=$settingsReadMs perAppReadMs=$perAppReadMs " +
                     "compressMs=$compressMs encodeTotalMs=${SystemClock.elapsedRealtime() - totalStartMs} bytes=${data.size}"
             )
-            Pair(data, ext)
+            EncodedScreenshot(data, ext)
         } catch (e: Exception) {
             perf(
                 "trace=$traceId stage=encode result=exception format=$format ext=$ext " +
                     "settingsReadMs=$settingsReadMs perAppReadMs=$perAppReadMs " +
                     "encodeTotalMs=${SystemClock.elapsedRealtime() - totalStartMs} message=${e.message ?: "-"}"
             )
-            Pair(null, ext)
+            EncodedScreenshot(null, ext)
         }
     }
 
@@ -2738,6 +2801,160 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
         val baos = java.io.ByteArrayOutputStream()
         bm.compress(cf, q.coerceIn(1,100), baos)
             return baos.toByteArray()
+    }
+
+    private fun enqueueDeferredTargetCompression(
+        file: File,
+        relativePath: String,
+        packageName: String,
+        spec: DeferredTargetCompressionSpec,
+        traceId: Long,
+        initialBytes: Long
+    ) {
+        val pendingAfterEnqueue = pendingDeferredCompressions.incrementAndGet()
+        try {
+            perf(
+                "trace=$traceId stage=deferred_compress_enqueue result=ok app=$packageName " +
+                    "pending=$pendingAfterEnqueue initialBytes=$initialBytes targetBytes=${spec.targetBytes} path=$relativePath"
+            )
+            screenshotCompressionExecutor.execute {
+                try {
+                    runDeferredTargetCompression(file, relativePath, packageName, spec, traceId, initialBytes)
+                } finally {
+                    pendingDeferredCompressions.decrementAndGet()
+                }
+            }
+        } catch (e: Exception) {
+            pendingDeferredCompressions.decrementAndGet()
+            perf(
+                "trace=$traceId stage=deferred_compress_enqueue result=exception app=$packageName " +
+                    "message=${e.message ?: "-"} path=$relativePath"
+            )
+            FileLogger.w(TAG, "提交延后精确压缩任务失败: ${e.message}")
+        }
+    }
+
+    private fun runDeferredTargetCompression(
+        file: File,
+        relativePath: String,
+        packageName: String,
+        spec: DeferredTargetCompressionSpec,
+        traceId: Long,
+        initialBytes: Long
+    ) {
+        val totalStartMs = SystemClock.elapsedRealtime()
+        var decodeMs = 0L
+        var compressMs = 0L
+        var writeMs = 0L
+        var replaceMs = 0L
+        var dbMs = 0L
+        var notifyMs = 0L
+        var decoded: Bitmap? = null
+        val tmpFile = File(file.parentFile, "${file.name}.target.tmp")
+        try {
+            if (!file.exists()) {
+                perf(
+                    "trace=$traceId stage=deferred_compress result=skip reason=file_missing " +
+                        "app=$packageName path=$relativePath"
+                )
+                return
+            }
+
+            val decodeStartMs = SystemClock.elapsedRealtime()
+            decoded = BitmapFactory.decodeFile(file.absolutePath)
+            decodeMs = SystemClock.elapsedRealtime() - decodeStartMs
+            val bitmap = decoded
+            if (bitmap == null) {
+                perf(
+                    "trace=$traceId stage=deferred_compress result=skip reason=decode_failed " +
+                        "app=$packageName decodeMs=$decodeMs path=$relativePath"
+                )
+                return
+            }
+
+            val compressStartMs = SystemClock.elapsedRealtime()
+            val targetBytes = compressToTargetSize(
+                bitmap,
+                spec.compressFormat,
+                spec.targetBytes,
+                minQ = 1,
+                maxQ = 100
+            ) ?: compressOnce(bitmap, spec.compressFormat, spec.fallbackQuality)
+            compressMs = SystemClock.elapsedRealtime() - compressStartMs
+
+            val writeStartMs = SystemClock.elapsedRealtime()
+            FileOutputStream(tmpFile).use { out ->
+                out.write(targetBytes)
+                try {
+                    out.fd.sync()
+                } catch (_: Exception) {}
+            }
+            writeMs = SystemClock.elapsedRealtime() - writeStartMs
+
+            val replaceStartMs = SystemClock.elapsedRealtime()
+            try {
+                Os.rename(tmpFile.absolutePath, file.absolutePath)
+            } catch (_: Exception) {
+                try {
+                    FileOutputStream(file, false).use { out ->
+                        out.write(targetBytes)
+                        try {
+                            out.fd.sync()
+                        } catch (_: Exception) {}
+                    }
+                    tmpFile.delete()
+                } catch (e: Exception) {
+                    FileLogger.w(TAG, "延后精确压缩替换文件失败: ${e.message}")
+                    throw e
+                }
+            }
+            replaceMs = SystemClock.elapsedRealtime() - replaceStartMs
+
+            val newSize = try { file.length() } catch (_: Exception) { targetBytes.size.toLong() }
+            var nativeDbUpdated = false
+            try {
+                val dbStartMs = SystemClock.elapsedRealtime()
+                nativeDbUpdated = ScreenshotDatabaseHelper.updateFileSizeByFilePath(
+                    this@ScreenCaptureAccessibilityService,
+                    file.absolutePath,
+                    newSize
+                )
+                dbMs = SystemClock.elapsedRealtime() - dbStartMs
+            } catch (e: Exception) {
+                FileLogger.w(TAG, "延后精确压缩后更新原生文件大小失败: ${e.message}")
+            }
+
+            try {
+                val notifyStartMs = SystemClock.elapsedRealtime()
+                notifyScreenshotFileRecompressed(
+                    packageName,
+                    relativePath,
+                    file.absolutePath,
+                    newSize,
+                    nativeDbUpdated,
+                    traceId
+                )
+                notifyMs = SystemClock.elapsedRealtime() - notifyStartMs
+            } catch (e: Exception) {
+                FileLogger.w(TAG, "通知Flutter延后压缩完成失败: ${e.message}")
+            }
+
+            perf(
+                "trace=$traceId stage=deferred_compress result=ok app=$packageName " +
+                    "format=${spec.formatName} targetKb=${spec.targetKb} initialBytes=$initialBytes newBytes=$newSize " +
+                    "decodeMs=$decodeMs compressMs=$compressMs writeMs=$writeMs replaceMs=$replaceMs dbMs=$dbMs notifyMs=$notifyMs " +
+                    "totalMs=${SystemClock.elapsedRealtime() - totalStartMs} path=$relativePath"
+            )
+        } catch (e: Exception) {
+            perf(
+                "trace=$traceId stage=deferred_compress result=exception app=$packageName " +
+                    "message=${e.message ?: "-"} decodeMs=$decodeMs compressMs=$compressMs writeMs=$writeMs " +
+                    "replaceMs=$replaceMs totalMs=${SystemClock.elapsedRealtime() - totalStartMs} path=$relativePath"
+            )
+        } finally {
+            try { decoded?.recycle() } catch (_: Exception) {}
+            try { if (tmpFile.exists()) tmpFile.delete() } catch (_: Exception) {}
+        }
     }
 
     /**
@@ -2895,6 +3112,38 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
                     "message=${e.message ?: "-"} path=$filePath"
             )
             FileLogger.e(TAG, "发送截图保存通知失败", e)
+        }
+    }
+
+    private fun notifyScreenshotFileRecompressed(
+        packageName: String,
+        relativePath: String,
+        absolutePath: String,
+        newSize: Long,
+        nativeDbUpdated: Boolean,
+        traceId: Long = nextCaptureTraceId()
+    ) {
+        try {
+            val startMs = SystemClock.elapsedRealtime()
+            val intent = Intent("com.fqyw.screen_memo.SCREENSHOT_RECOMPRESSED").apply {
+                setPackage(this@ScreenCaptureAccessibilityService.packageName)
+                putExtra("packageName", packageName)
+                putExtra("filePath", relativePath)
+                putExtra("absolutePath", absolutePath)
+                putExtra("newSize", newSize)
+                putExtra("nativeDbUpdated", nativeDbUpdated)
+            }
+            sendBroadcast(intent)
+            perf(
+                "trace=$traceId stage=deferred_compress_broadcast result=sent app=$packageName " +
+                    "sendMs=${SystemClock.elapsedRealtime() - startMs} newSize=$newSize path=$relativePath"
+            )
+        } catch (e: Exception) {
+            perf(
+                "trace=$traceId stage=deferred_compress_broadcast result=exception app=$packageName " +
+                    "message=${e.message ?: "-"} path=$relativePath"
+            )
+            FileLogger.w(TAG, "发送延后压缩完成通知失败: ${e.message}")
         }
     }
 

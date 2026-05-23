@@ -79,7 +79,7 @@ object PerAppSettingsBridge {
     }
 
     /**
-     * 若 use_custom=true 且存在 screenshot_interval_sec，则返回每应用自定义间隔（秒，限制在5..60）；否则返回 null。
+     * 若 use_custom=true 且存在 screenshot_interval_sec，则返回每应用自定义间隔（秒，限制在1..60）；否则返回 null。
      */
     fun readIntervalIfCustom(context: Context, packageName: String?): Int? {
         if (packageName.isNullOrBlank()) return null
@@ -92,7 +92,7 @@ object PerAppSettingsBridge {
             val useCustom = parseBool(readValue(db, "use_custom")) ?: false
             if (!useCustom) return null
             val iv = parseInt(readValue(db, "screenshot_interval_sec")) ?: return null
-            iv.coerceIn(5, 60)
+            iv.coerceIn(1, 60)
         } catch (_: Exception) {
             null
         } finally {
