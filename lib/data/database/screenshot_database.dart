@@ -1459,6 +1459,8 @@ class ScreenshotDatabase {
         final file = File(record.filePath);
         final actualFileSize = await file.exists() ? await file.length() : 0;
         final recordWithSize = record.copyWith(fileSize: actualFileSize);
+        final bool shouldMarkDayStatsInitialized =
+            await _shouldMarkDayStatsInitializedOnInsert(txn);
         final bool isNewAppStat = await _isAppStatMissing(
           txn,
           recordWithSize.appPackageName,
@@ -1494,6 +1496,9 @@ class ScreenshotDatabase {
           firstCaptureTime: ts,
           lastCaptureTime: ts,
         );
+        if (shouldMarkDayStatsInitialized) {
+          await _markDayStatsInitialized(txn);
+        }
 
         final gid = _encodeGid(year, month, localId);
         print('分库插入成功 gid=$gid table=$tableName');
@@ -1532,6 +1537,8 @@ class ScreenshotDatabase {
 
     try {
       await db.transaction((txn) async {
+        final bool shouldMarkDayStatsInitialized =
+            await _shouldMarkDayStatsInitializedOnInsert(txn);
         for (final record in records) {
           await _registerAppIfNeeded(
             txn,
@@ -1618,6 +1625,9 @@ class ScreenshotDatabase {
               lastCaptureTime: dayLastCapture[dayKey] ?? 0,
             );
           }
+          if (shouldMarkDayStatsInitialized) {
+            await _markDayStatsInitialized(txn);
+          }
         }
       });
     } catch (e) {
@@ -1637,6 +1647,10 @@ class ScreenshotDatabase {
     final Map<String, int> packageCounts = {};
     final Map<String, int> packageSizes = {};
     final Set<String> newPackages = <String>{};
+    final Map<String, int> dayCounts = <String, int>{};
+    final Map<String, int> daySizes = <String, int>{};
+    final Map<String, int> dayFirstCapture = <String, int>{};
+    final Map<String, int> dayLastCapture = <String, int>{};
 
     try {
       // 按包分组（减少表切换开销）
@@ -1647,6 +1661,8 @@ class ScreenshotDatabase {
       }
 
       await db.transaction((txn) async {
+        final bool shouldMarkDayStatsInitialized =
+            await _shouldMarkDayStatsInitializedOnInsert(txn);
         for (final entry in byPkg.entries) {
           final String packageName = entry.key;
           final List<ScreenshotRecord> list = entry.value;
@@ -1708,6 +1724,16 @@ class ScreenshotDatabase {
             packageSizes[packageName] =
                 (packageSizes[packageName] ?? 0) +
                 ym.value.fold(0, (sum, r) => sum + r.fileSize);
+            for (final ScreenshotRecord r in ym.value) {
+              final int ts = r.captureTime.millisecondsSinceEpoch;
+              final String dayKey = _dayKeyFromMillis(ts);
+              dayCounts[dayKey] = (dayCounts[dayKey] ?? 0) + 1;
+              daySizes[dayKey] = (daySizes[dayKey] ?? 0) + r.fileSize;
+              final int prevFirst = dayFirstCapture[dayKey] ?? ts;
+              final int prevLast = dayLastCapture[dayKey] ?? ts;
+              if (ts <= prevFirst) dayFirstCapture[dayKey] = ts;
+              if (ts >= prevLast) dayLastCapture[dayKey] = ts;
+            }
           }
         }
 
@@ -1727,6 +1753,19 @@ class ScreenshotDatabase {
             screenshotCount: totalScreenshots,
             totalSizeBytes: totalSize,
           );
+          for (final String dayKey in dayCounts.keys) {
+            await _updateDayStatsOnInsertWithExecutor(
+              txn,
+              dayKey: dayKey,
+              screenshotCount: dayCounts[dayKey] ?? 0,
+              totalSizeBytes: daySizes[dayKey] ?? 0,
+              firstCaptureTime: dayFirstCapture[dayKey] ?? 0,
+              lastCaptureTime: dayLastCapture[dayKey] ?? 0,
+            );
+          }
+          if (shouldMarkDayStatsInitialized) {
+            await _markDayStatsInitialized(txn);
+          }
         }
       });
     } catch (e) {
@@ -2171,8 +2210,24 @@ class ScreenshotDatabase {
     );
   }
 
-  Future<int?> getInitializedDayStatsCount() async {
-    final db = await database;
+  Future<bool> _shouldMarkDayStatsInitializedOnInsert(
+    DatabaseExecutor db,
+  ) async {
+    try {
+      final bool initialized = await _isDayStatsInitialized(db);
+      if (initialized) return false;
+      final List<Map<String, Object?>> rows = await db.rawQuery(
+        'SELECT COALESCE(SUM(total_count), 0) AS c FROM app_stats',
+      );
+      final Object? raw = rows.isNotEmpty ? rows.first['c'] : null;
+      final int count = raw is num ? raw.toInt() : int.tryParse('$raw') ?? 0;
+      return count <= 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> _isDayStatsInitialized(DatabaseExecutor db) async {
     try {
       await _createDayStatsTables(db);
       final List<Map<String, Object?>> meta = await db.query(
@@ -2181,11 +2236,46 @@ class ScreenshotDatabase {
         where: 'id = 1',
         limit: 1,
       );
-      if (meta.isEmpty) return null;
+      return meta.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _markDayStatsInitialized(DatabaseExecutor db) async {
+    try {
+      await _createDayStatsTables(db);
+      await db.insert('day_stats_meta', <String, Object?>{
+        'id': 1,
+        'rebuilt_at': DateTime.now().millisecondsSinceEpoch,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    } catch (_) {}
+  }
+
+  Future<int?> _countCachedDayStats(DatabaseExecutor db) async {
+    try {
+      await _createDayStatsTables(db);
       final List<Map<String, Object?>> rows = await db.rawQuery(
         'SELECT COUNT(*) AS c FROM day_stats WHERE screenshot_count > 0',
       );
-      return (rows.first['c'] as int?) ?? 0;
+      final Object? raw = rows.isNotEmpty ? rows.first['c'] : null;
+      if (raw is num) return raw.toInt();
+      return int.tryParse('$raw') ?? 0;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<int?> getCachedDayStatsCount() async {
+    final db = await database;
+    return _countCachedDayStats(db);
+  }
+
+  Future<int?> getInitializedDayStatsCount() async {
+    final db = await database;
+    try {
+      if (!await _isDayStatsInitialized(db)) return null;
+      return await _countCachedDayStats(db) ?? 0;
     } catch (_) {
       return null;
     }
@@ -2216,10 +2306,7 @@ class ScreenshotDatabase {
           }, conflictAlgorithm: ConflictAlgorithm.replace);
         }
         await batch.commit(noResult: true);
-        await txn.insert('day_stats_meta', <String, Object?>{
-          'id': 1,
-          'rebuilt_at': now,
-        }, conflictAlgorithm: ConflictAlgorithm.replace);
+        await _markDayStatsInitialized(txn);
       });
       return days.length;
     } catch (e) {

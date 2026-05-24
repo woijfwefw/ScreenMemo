@@ -67,8 +67,7 @@ class ScreenshotService {
 
   final _screenshotStreamController = StreamController<void>.broadcast();
   Stream<void> get onScreenshotSaved => _screenshotStreamController.stream;
-  final _screenshotToggleStreamController =
-      StreamController<bool>.broadcast();
+  final _screenshotToggleStreamController = StreamController<bool>.broadcast();
   Stream<bool> get onScreenshotToggleChanged =>
       _screenshotToggleStreamController.stream;
 
@@ -88,6 +87,7 @@ class ScreenshotService {
   int? _dayCountMemCache;
   int _dayCountMemCacheTs = 0;
   Future<int>? _dayCountRefreshingFuture;
+  Future<void>? _dayCountLightRefreshingFuture;
   // 移除全量扫描相关：不再维护文件系统与DB的强制同步节流
   // static const String _lastSyncTsKey = 'stats_last_sync_ts';
   // static const int _syncThrottleSeconds = 120; // 2分钟
@@ -2723,25 +2723,13 @@ class ScreenshotService {
     }
 
     final int now = DateTime.now().millisecondsSinceEpoch;
-    final int? initializedDbCount = await _database
-        .getInitializedDayStatsCount();
-    if (initializedDbCount != null) {
-      _dayCountMemCache = initializedDbCount;
-      _dayCountMemCacheTs = now;
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setInt(_dayCountCacheKey, initializedDbCount);
-        await prefs.setInt(_dayCountCacheTsKey, now);
-      } catch (_) {}
-      return initializedDbCount;
-    }
 
     final int ageInMemory = now - _dayCountMemCacheTs;
     if (_dayCountMemCache != null) {
       if (ageInMemory <= _dayCountCacheTtlMillis) {
         return _dayCountMemCache!;
       }
-      _refreshDayCountInBackground();
+      _refreshCachedDayCountInBackground();
       return _dayCountMemCache!;
     }
 
@@ -2752,16 +2740,24 @@ class ScreenshotService {
       if (cached != null) {
         _dayCountMemCache = cached;
         _dayCountMemCacheTs = ts;
-        if (now - ts > _dayCountCacheTtlMillis) {
-          _refreshDayCountInBackground();
-        } else {
-          _rebuildDayStatsInBackgroundIfNeeded();
-        }
         return cached;
       }
     } catch (_) {}
 
-    return await _refreshDayCount();
+    final int? initializedDbCount = await _database
+        .getInitializedDayStatsCount();
+    if (initializedDbCount != null) {
+      await _cacheDayCount(initializedDbCount, now);
+      return initializedDbCount;
+    }
+
+    final int? cachedDbCount = await _database.getCachedDayStatsCount();
+    if (cachedDbCount != null) {
+      await _cacheDayCount(cachedDbCount, now);
+      return cachedDbCount;
+    }
+
+    return _dayCountMemCache ?? 0;
   }
 
   /// 清除内存缓存（例如在数据发生较大调整后调用）
@@ -2787,13 +2783,7 @@ class ScreenshotService {
       int? count = await _database.getInitializedDayStatsCount();
       count ??= await _database.recalculateDayStats();
       final int now = DateTime.now().millisecondsSinceEpoch;
-      _dayCountMemCache = count;
-      _dayCountMemCacheTs = now;
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setInt(_dayCountCacheKey, count);
-        await prefs.setInt(_dayCountCacheTsKey, now);
-      } catch (_) {}
+      await _cacheDayCount(count, now);
       return count;
     } catch (_) {
       return _dayCountMemCache ?? 0;
@@ -2802,20 +2792,32 @@ class ScreenshotService {
     }
   }
 
-  void _refreshDayCountInBackground() {
-    if (_dayCountRefreshingFuture != null) {
-      return;
-    }
-    // ignore: discarded_futures
-    _refreshDayCount();
+  Future<void> _cacheDayCount(int count, int timestamp) async {
+    _dayCountMemCache = count;
+    _dayCountMemCacheTs = timestamp;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_dayCountCacheKey, count);
+      await prefs.setInt(_dayCountCacheTsKey, timestamp);
+    } catch (_) {}
   }
 
-  void _rebuildDayStatsInBackgroundIfNeeded() {
-    // ignore: discarded_futures
-    (() async {
-      final int? count = await _database.getInitializedDayStatsCount();
-      if (count != null) return;
-      await _refreshDayCount();
+  void _refreshCachedDayCountInBackground() {
+    if (_dayCountRefreshingFuture != null ||
+        _dayCountLightRefreshingFuture != null) {
+      return;
+    }
+    _dayCountLightRefreshingFuture = (() async {
+      try {
+        final int? initializedCount = await _database
+            .getInitializedDayStatsCount();
+        final int? count =
+            initializedCount ?? await _database.getCachedDayStatsCount();
+        if (count == null) return;
+        await _cacheDayCount(count, DateTime.now().millisecondsSinceEpoch);
+      } finally {
+        _dayCountLightRefreshingFuture = null;
+      }
     })();
   }
 

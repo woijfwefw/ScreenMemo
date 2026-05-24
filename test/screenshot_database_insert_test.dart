@@ -6,6 +6,19 @@ import 'package:screen_memo/data/database/screenshot_database.dart';
 import 'package:screen_memo/models/screenshot_record.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+Future<void> _deleteTempDir(Directory dir) async {
+  for (int attempt = 0; attempt < 5; attempt++) {
+    try {
+      if (await dir.exists()) {
+        await dir.delete(recursive: true);
+      }
+      return;
+    } on PathAccessException {
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+    }
+  }
+}
+
 void main() {
   setUpAll(() {
     sqfliteFfiInit();
@@ -85,9 +98,8 @@ void main() {
       );
       expect(totalsAfterDuplicate.single['screenshot_count'], 1);
     } finally {
-      if (await tmp.exists()) {
-        await tmp.delete(recursive: true);
-      }
+      await ScreenshotDatabase.instance.disposeDesktop();
+      await _deleteTempDir(tmp);
     }
   });
 }
