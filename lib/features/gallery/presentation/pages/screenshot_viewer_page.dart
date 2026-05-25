@@ -32,14 +32,13 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
   static const MethodChannel _platform = MethodChannel(
     'com.fqyw.screen_memo/accessibility',
   );
-  late List<ScreenshotRecord> _screenshots;
-  late int _currentIndex;
-  late String _appName;
-  late AppInfo _appInfo;
-  late PageController _pageController;
+  List<ScreenshotRecord> _screenshots = <ScreenshotRecord>[];
+  int _currentIndex = 0;
+  String _appName = 'Unknown';
+  AppInfo _appInfo = _unknownAppInfo();
+  PageController? _pageController;
   bool _showAppBar = true;
   bool _initialized = false;
-  bool _fromPathsOnly = false; // 是否通过路径进入（点击前未构造完整记录）
   bool _singleMode = false; // 单图模式（对话内联图：强制1/1）
 
   // 动态页 AI 图片标签/描述（可选）
@@ -61,6 +60,147 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
 
   // 移除调试日志
 
+  static AppInfo _unknownAppInfo({
+    String packageName = 'unknown',
+    String appName = 'Unknown',
+  }) {
+    return AppInfo(
+      packageName: packageName,
+      appName: appName,
+      icon: null,
+      version: '',
+      isSystemApp: false,
+    );
+  }
+
+  bool get _hasValidCurrent =>
+      _screenshots.isNotEmpty &&
+      _currentIndex >= 0 &&
+      _currentIndex < _screenshots.length;
+
+  ScreenshotRecord? get _currentScreenshotOrNull =>
+      _hasValidCurrent ? _screenshots[_currentIndex] : null;
+
+  int _coerceIndex(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value.trim()) ?? 0;
+    return 0;
+  }
+
+  int _clampIndex(int index, int length) {
+    if (length <= 0) return 0;
+    if (index < 0) return 0;
+    if (index >= length) return length - 1;
+    return index;
+  }
+
+  Map<String, dynamic>? _coerceRouteArgs(Object? rawArgs) {
+    if (rawArgs is! Map) return null;
+    final args = <String, dynamic>{};
+    for (final entry in rawArgs.entries) {
+      final key = entry.key;
+      if (key is String) {
+        args[key] = entry.value;
+      }
+    }
+    return args;
+  }
+
+  void _setEmptyViewerState() {
+    _screenshots = <ScreenshotRecord>[];
+    _currentIndex = 0;
+    _appName = 'Unknown';
+    _appInfo = _unknownAppInfo();
+    _singleMode = false;
+  }
+
+  bool _initFromRouteArgs(Object? rawArgs) {
+    final args = _coerceRouteArgs(rawArgs);
+    if (args == null) {
+      _setEmptyViewerState();
+      return false;
+    }
+
+    final rawPaths = args['paths'];
+    if (rawPaths is List) {
+      final paths = rawPaths
+          .map((e) => e?.toString().trim() ?? '')
+          .where((e) => e.isNotEmpty)
+          .toList(growable: false);
+      if (paths.isNotEmpty) {
+        _singleMode = args['singleMode'] is bool
+            ? args['singleMode'] as bool
+            : true;
+        final requestedIndex = _clampIndex(
+          _coerceIndex(args['initialIndex']),
+          paths.length,
+        );
+        final selectedPaths = _singleMode
+            ? <String>[paths[requestedIndex]]
+            : paths;
+        _screenshots = selectedPaths
+            .map(
+              (p) => ScreenshotRecord(
+                id: null,
+                appPackageName: 'unknown',
+                appName: 'Unknown',
+                filePath: p,
+                captureTime: DateTime.now(),
+                fileSize: 0,
+              ),
+            )
+            .toList();
+        _currentIndex = _singleMode ? 0 : requestedIndex;
+        _appName = (args['appName'] as String?)?.trim().isNotEmpty == true
+            ? (args['appName'] as String).trim()
+            : 'Unknown';
+        _appInfo = args['appInfo'] is AppInfo
+            ? args['appInfo'] as AppInfo
+            : _unknownAppInfo(appName: _appName);
+        // 后台补全元数据（不阻塞UI）
+        // ignore: unawaited_futures
+        _hydrateRecordsAndAppInfo(
+          _singleMode ? <String>[_screenshots[0].filePath] : paths,
+        );
+        return true;
+      }
+    }
+
+    final rawScreenshots = args['screenshots'];
+    if (rawScreenshots is! List) {
+      _setEmptyViewerState();
+      return false;
+    }
+
+    _screenshots = rawScreenshots.whereType<ScreenshotRecord>().toList(
+      growable: true,
+    );
+    if (_screenshots.isEmpty) {
+      _setEmptyViewerState();
+      return false;
+    }
+
+    _singleMode = false;
+    _currentIndex = _clampIndex(
+      _coerceIndex(args['initialIndex']),
+      _screenshots.length,
+    );
+    final firstScreenshot = _screenshots[_currentIndex];
+    final appInfoArg = args['appInfo'];
+    _appInfo = appInfoArg is AppInfo
+        ? appInfoArg
+        : _unknownAppInfo(
+            packageName: firstScreenshot.appPackageName,
+            appName: firstScreenshot.appName,
+          );
+    final rawAppName = args['appName'];
+    _appName = rawAppName is String && rawAppName.trim().isNotEmpty
+        ? rawAppName.trim()
+        : _appInfo.appName;
+    return true;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -71,15 +211,16 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
   }
 
   Future<void> _openCurrentLink() async {
-    if (_screenshots.isEmpty) return;
-    final url = _screenshots[_currentIndex].pageUrl;
+    final current = _currentScreenshotOrNull;
+    if (current == null) return;
+    final url = current.pageUrl;
     if (url == null || url.isEmpty) return;
     try {
       // 记录点击打开链接的日志（Flutter 与原生）
       // ignore: unawaited_futures
-      FlutterLogger.info('UI.查看器-打开链接 链接=' + url);
+      FlutterLogger.info('UI.查看器-打开链接 链接=$url');
       // ignore: unawaited_futures
-      FlutterLogger.nativeInfo('UI', '查看器打开链接：' + url);
+      FlutterLogger.nativeInfo('UI', '查看器打开链接：$url');
       final uri = Uri.parse(url);
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -88,8 +229,9 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
   }
 
   Future<void> _showLinkDialog() async {
-    if (_screenshots.isEmpty) return;
-    final url = _screenshots[_currentIndex].pageUrl;
+    final current = _currentScreenshotOrNull;
+    if (current == null) return;
+    final url = current.pageUrl;
     if (url == null || url.isEmpty) return;
     await showUIDialog<void>(
       context: context,
@@ -116,9 +258,9 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
               }
             } catch (e) {
               // ignore: unawaited_futures
-              FlutterLogger.error('UI.查看器-复制链接 失败: ' + e.toString());
+              FlutterLogger.error('UI.查看器-复制链接 失败: $e');
               // ignore: unawaited_futures
-              FlutterLogger.nativeError('UI', '查看器复制链接失败：' + e.toString());
+              FlutterLogger.nativeError('UI', '查看器复制链接失败：$e');
               if (mounted) {
                 UINotifier.error(
                   context,
@@ -152,137 +294,54 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
     if (_initialized) return;
 
     // 获取路由参数（仅初始化一次，避免后续依赖变化导致索引重置）
-    final args =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    if (args != null) {
-      final List<dynamic>? rawPaths = args['paths'] as List<dynamic>?;
-      if (rawPaths != null && rawPaths.isNotEmpty) {
-        _fromPathsOnly = true;
-        final List<String> paths = rawPaths.map((e) => e.toString()).toList();
-        _currentIndex = (args['initialIndex'] as int?) ?? 0;
-        // 若标记为单图模式或未显式指定，则对话证据默认单图模式
-        _singleMode = (args['singleMode'] as bool?) ?? true;
-        if (_singleMode) {
-          // 仅保留当前索引对应的那一张
-          final String currentPath =
-              paths[(_currentIndex >= 0 && _currentIndex < paths.length)
-                  ? _currentIndex
-                  : 0];
-          _screenshots = [
-            ScreenshotRecord(
-              id: null,
-              appPackageName: 'unknown',
-              appName: 'Unknown',
-              filePath: currentPath,
-              captureTime: DateTime.now(),
-              fileSize: 0,
-            ),
-          ];
-          _currentIndex = 0;
-        } else {
-          _screenshots = paths
-              .map(
-                (p) => ScreenshotRecord(
-                  id: null,
-                  appPackageName: 'unknown',
-                  appName: 'Unknown',
-                  filePath: p,
-                  captureTime: DateTime.now(),
-                  fileSize: 0,
-                ),
-              )
-              .toList();
-        }
-        _appName = (args['appName'] as String?) ?? 'Unknown';
-        _appInfo =
-            (args['appInfo'] as AppInfo?) ??
-            AppInfo(
-              packageName: 'unknown',
-              appName: 'Unknown',
-              icon: null,
-              version: '',
-              isSystemApp: false,
-            );
-        // 后台补全元数据（不阻塞UI）
-        // ignore: unawaited_futures
-        _hydrateRecordsAndAppInfo(
-          _singleMode ? [_screenshots[0].filePath] : paths,
-        );
-      } else {
-        _screenshots = args['screenshots'] as List<ScreenshotRecord>;
-        _currentIndex = args['initialIndex'] as int;
-        final ScreenshotRecord firstScreenshot = _screenshots.isNotEmpty
-            ? _screenshots[_currentIndex >= 0 &&
-                      _currentIndex < _screenshots.length
-                  ? _currentIndex
-                  : 0]
-            : ScreenshotRecord(
-                id: null,
-                appPackageName: 'unknown',
-                appName: 'Unknown',
-                filePath: '',
-                captureTime: DateTime.now(),
-                fileSize: 0,
-              );
-        final AppInfo? appInfoArg = args['appInfo'] as AppInfo?;
-        _appInfo =
-            appInfoArg ??
-            AppInfo(
-              packageName: firstScreenshot.appPackageName,
-              appName: firstScreenshot.appName,
-              icon: null,
-              version: '',
-              isSystemApp: false,
-            );
-        _appName = (args['appName'] as String?) ?? _appInfo.appName;
-      }
-      _pageController = PageController(initialPage: _currentIndex);
-      _initialized = true;
+    final rawArgs = ModalRoute.of(context)?.settings.arguments;
+    final args = _coerceRouteArgs(rawArgs);
+    final hasValidData = _initFromRouteArgs(rawArgs);
+    _pageController = PageController(initialPage: _currentIndex);
+    _initialized = true;
+    if (!hasValidData || args == null) return;
 
-      // 尝试解析来自动态页的 AI 结果快照（用于“AI响应抽屉”）
-      _initSegmentAiContext(args);
+    // 尝试解析来自动态页的 AI 结果快照（用于“AI响应抽屉”）
+    _initSegmentAiContext(args);
 
-      // 尝试解析来自动态页的结构化 JSON（用于图片标签/描述展示）
-      _initAiMeta(args);
-      // 若未携带结构化 JSON（或部分缺失），则从主库 ai_image_meta 回填，用于全局复用
+    // 尝试解析来自动态页的结构化 JSON（用于图片标签/描述展示）
+    _initAiMeta(args);
+    // 若未携带结构化 JSON（或部分缺失），则从主库 ai_image_meta 回填，用于全局复用
+    // ignore: unawaited_futures
+    _loadAiMetaFromDb();
+
+    // 预加载 NSFW 规则与手动标记（不阻塞UI）
+    // ignore: unawaited_futures
+    NsfwPreferenceService.instance.ensureRulesLoaded();
+    final ids = _screenshots
+        .where((s) => s.id != null)
+        .map((s) => s.id!)
+        .toList();
+    if (ids.isNotEmpty) {
       // ignore: unawaited_futures
-      _loadAiMetaFromDb();
-
-      // 预加载 NSFW 规则与手动标记（不阻塞UI）
-      // ignore: unawaited_futures
-      NsfwPreferenceService.instance.ensureRulesLoaded();
-      final ids = _screenshots
-          .where((s) => s.id != null)
-          .map((s) => s.id!)
-          .toList();
-      if (ids.isNotEmpty) {
-        // ignore: unawaited_futures
-        NsfwPreferenceService.instance.preloadManualFlags(
-          appPackageName: _appInfo.packageName,
-          screenshotIds: ids,
-        );
-      }
-      final paths = _screenshots
-          .map((s) => s.filePath.toString().trim())
-          .where((e) => e.isNotEmpty)
-          .toList(growable: false);
-      if (paths.isNotEmpty) {
-        // ignore: unawaited_futures
-        NsfwPreferenceService.instance.preloadAiNsfwFlags(filePaths: paths);
-        // ignore: unawaited_futures
-        NsfwPreferenceService.instance.preloadSegmentNsfwFlags(
-          filePaths: paths,
-        );
-      }
-      // 同步隐私模式
-      // ignore: unawaited_futures
-      _loadPrivacyMode();
-
-      // 预热当前与相邻图片，降低首帧解码卡顿
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _precacheAround(_currentIndex);
-      });
+      NsfwPreferenceService.instance.preloadManualFlags(
+        appPackageName: _appInfo.packageName,
+        screenshotIds: ids,
+      );
     }
+    final paths = _screenshots
+        .map((s) => s.filePath.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList(growable: false);
+    if (paths.isNotEmpty) {
+      // ignore: unawaited_futures
+      NsfwPreferenceService.instance.preloadAiNsfwFlags(filePaths: paths);
+      // ignore: unawaited_futures
+      NsfwPreferenceService.instance.preloadSegmentNsfwFlags(filePaths: paths);
+    }
+    // 同步隐私模式
+    // ignore: unawaited_futures
+    _loadPrivacyMode();
+
+    // 预热当前与相邻图片，降低首帧解码卡顿
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _precacheAround(_currentIndex);
+    });
   }
 
   String _basename(String path) {
@@ -308,9 +367,7 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
     try {
       final dynamic rawResult = args['aiResult'];
       if (rawResult is Map) {
-        final Map<String, dynamic> m = Map<String, dynamic>.from(
-          rawResult as Map,
-        );
+        final Map<String, dynamic> m = Map<String, dynamic>.from(rawResult);
         if (_segmentId == null) {
           final dynamic sid = m['segment_id'];
           if (sid is int && sid > 0) {
@@ -380,10 +437,10 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
       if (raw is String && raw.trim().isNotEmpty) {
         final decoded = jsonDecode(raw);
         if (decoded is Map) {
-          _aiStructured = Map<String, dynamic>.from(decoded as Map);
+          _aiStructured = Map<String, dynamic>.from(decoded);
         }
       } else if (raw is Map) {
-        _aiStructured = Map<String, dynamic>.from(raw as Map);
+        _aiStructured = Map<String, dynamic>.from(raw);
       }
     } catch (_) {
       _aiStructured = null;
@@ -398,7 +455,7 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
       if (rawTags is List) {
         for (final e in rawTags) {
           if (e is! Map) continue;
-          final m = Map<String, dynamic>.from(e as Map);
+          final m = Map<String, dynamic>.from(e);
           final String rawFile = (m['file'] ?? '').toString().trim();
           if (rawFile.isEmpty) continue;
           final String file = _basename(rawFile);
@@ -438,7 +495,7 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
       if (rawDescs is List) {
         for (final e in rawDescs) {
           if (e is! Map) continue;
-          final m = Map<String, dynamic>.from(e as Map);
+          final m = Map<String, dynamic>.from(e);
           final String from = (m['from_file'] ?? m['from'] ?? m['start'] ?? '')
               .toString()
               .trim();
@@ -482,7 +539,7 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
       if (rawDescribed is List) {
         for (final e in rawDescribed) {
           if (e is! Map) continue;
-          final m = Map<String, dynamic>.from(e as Map);
+          final m = Map<String, dynamic>.from(e);
           final String rawFile = (m['file'] ?? '').toString().trim();
           if (rawFile.isEmpty) continue;
           final String file = _basename(rawFile);
@@ -578,8 +635,9 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
   }
 
   Widget _buildAiMetaBar(BuildContext context) {
-    if (_screenshots.isEmpty) return const SizedBox.shrink();
-    final String file = _basename(_screenshots[_currentIndex].filePath);
+    final current = _currentScreenshotOrNull;
+    if (current == null) return const SizedBox.shrink();
+    final String file = _basename(current.filePath);
     final List<String> tags = _aiTagsByFile[file] ?? const <String>[];
     final String desc = (_aiDescByFile[file] ?? '').trim();
     final String range = (_aiDescRangeByFile[file] ?? file).trim();
@@ -602,11 +660,11 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
             borderRadius: BorderRadius.circular(999),
             onTap: () => AiMetaSheet.show(
               context,
-              filePath: _screenshots[_currentIndex].filePath,
+              filePath: current.filePath,
               fallbackTags: tags,
               fallbackDescription: desc,
               fallbackRange: range,
-              fallbackOcrText: _screenshots[_currentIndex].ocrText,
+              fallbackOcrText: current.ocrText,
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -651,6 +709,8 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
     );
   }
 
+  // 保留给后续恢复 AI 图片元数据总览入口。
+  // ignore: unused_element
   Future<void> _showAiMetaOverview() async {
     if (_screenshots.isEmpty) return;
 
@@ -1243,9 +1303,9 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
   void dispose() {
     // Android：恢复状态栏
     if (Platform.isAndroid) {
-      _platform.invokeMethod('showStatusBar');
+      _platform.invokeMethod('showStatusBar').catchError((_) {});
     }
-    _pageController.dispose();
+    _pageController?.dispose();
     super.dispose();
   }
 
@@ -1259,7 +1319,7 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
   Future<void> _hydrateRecordsAndAppInfo(List<String> paths) async {
     try {
       // ignore: unawaited_futures
-      FlutterLogger.info('UI.Viewer：初始化开始 数量=' + paths.length.toString());
+      FlutterLogger.info('UI.Viewer：初始化开始 数量=${paths.length}');
       final recs = await Future.wait(
         paths.map(
           (p) => ScreenshotDatabase.instance
@@ -1281,6 +1341,7 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
       // 尝试基于当前项更新 AppInfo
       AppInfo? app;
       try {
+        if (hydrated.isEmpty) return;
         final head =
             hydrated[(_currentIndex >= 0 && _currentIndex < hydrated.length)
                 ? _currentIndex
@@ -1307,12 +1368,12 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
       setState(() {
         if (changed) _screenshots = hydrated;
         if (app != null) {
-          _appInfo = app!;
-          _appName = app!.appName;
+          _appInfo = app;
+          _appName = app.appName;
         }
       });
       // ignore: unawaited_futures
-      FlutterLogger.info('UI.Viewer：初始化完成 有变化=' + (changed ? '1' : '0'));
+      FlutterLogger.info('UI.Viewer：初始化完成 有变化=${changed ? '1' : '0'}');
     } catch (_) {}
   }
 
@@ -1328,19 +1389,15 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
       final f = File(_screenshots[i].filePath);
       try {
         // ignore: unawaited_futures
-        FlutterLogger.debug('UI.Viewer：预缓存 索引=' + i.toString());
+        FlutterLogger.debug('UI.Viewer：预缓存 索引=$i');
         await precacheImage(FileImage(f), context);
       } catch (_) {}
     }
   }
 
   Future<void> _deleteCurrentImage() async {
-    if (_screenshots.isEmpty ||
-        _currentIndex < 0 ||
-        _currentIndex >= _screenshots.length) {
-      return;
-    }
-    final screenshot = _screenshots[_currentIndex];
+    final screenshot = _currentScreenshotOrNull;
+    if (screenshot == null) return;
 
     final confirmed = await showUIDialog<bool>(
       context: context,
@@ -1433,7 +1490,8 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
   }
 
   void _showImageInfo() {
-    final screenshot = _screenshots[_currentIndex];
+    final screenshot = _currentScreenshotOrNull;
+    if (screenshot == null) return;
 
     showUIDialog<void>(
       context: context,
@@ -1473,7 +1531,7 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
   Widget _buildInfoRow(String label, String value) {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
-    final labelColor = onSurface.withOpacity(0.7);
+    final labelColor = onSurface.withValues(alpha: 0.7);
     final valueColor = onSurface;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1497,7 +1555,9 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_screenshots.isEmpty) {
+    final pageController = _pageController;
+    final current = _currentScreenshotOrNull;
+    if (pageController == null || current == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           Navigator.of(context).maybePop();
@@ -1580,9 +1640,7 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
                   onPressed: _showImageInfo,
                   tooltip: AppLocalizations.of(context).imageInfoTooltip,
                 ),
-                if (_screenshots.isNotEmpty &&
-                    _screenshots[_currentIndex].pageUrl != null &&
-                    _screenshots[_currentIndex].pageUrl!.isNotEmpty)
+                if ((current.pageUrl ?? '').isNotEmpty)
                   IconButton(
                     icon: const Icon(Icons.link),
                     onPressed: _showLinkDialog,
@@ -1604,6 +1662,16 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
             PhotoViewGallery.builder(
               scrollPhysics: const BouncingScrollPhysics(),
               builder: (BuildContext context, int index) {
+                if (index < 0 || index >= _screenshots.length) {
+                  return PhotoViewGalleryPageOptions.customChild(
+                    child: Center(
+                      child: Text(
+                        AppLocalizations.of(context).imageLoadFailed,
+                        style: const TextStyle(color: Colors.white54),
+                      ),
+                    ),
+                  );
+                }
                 final screenshot = _screenshots[index];
                 final file = File(screenshot.filePath);
 
@@ -1642,7 +1710,7 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
                     ? Theme.of(context).scaffoldBackgroundColor
                     : Colors.black,
               ),
-              pageController: _pageController,
+              pageController: pageController,
               onPageChanged: _singleMode
                   ? null
                   : (index) {
@@ -1654,10 +1722,11 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
             ),
 
             // NSFW 遮罩（规则 + 手动标记 + 自动识别聚合；用户点“显示”后本会话内记忆）
-            if (_screenshots.isNotEmpty) ...[
+            if (_hasValidCurrent) ...[
               Builder(
                 builder: (context) {
-                  final s = _screenshots[_currentIndex];
+                  final s = _currentScreenshotOrNull;
+                  if (s == null) return const SizedBox.shrink();
                   final id = s.id;
                   final fileName = _basename(s.filePath);
                   final aiTags = _aiTagsByFile[fileName] ?? const <String>[];
@@ -1778,9 +1847,10 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
   }
 
   Future<void> _saveCurrentToGallery() async {
-    if (_screenshots.isEmpty) return;
+    final current = _currentScreenshotOrNull;
+    if (current == null) return;
     final l10n = AppLocalizations.of(context);
-    final path = _screenshots[_currentIndex].filePath;
+    final path = current.filePath;
     try {
       bool has = false;
       try {
@@ -1820,8 +1890,8 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
   }
 
   Future<void> _showNsfwMenu() async {
-    if (_screenshots.isEmpty) return;
-    final s = _screenshots[_currentIndex];
+    final s = _currentScreenshotOrNull;
+    if (s == null) return;
     final l10n = AppLocalizations.of(context);
     final id = s.id;
     if (id == null) return;

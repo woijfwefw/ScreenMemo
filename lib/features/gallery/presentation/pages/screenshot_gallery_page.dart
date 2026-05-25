@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:screen_memo/l10n/app_localizations.dart';
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' show Offset, Rect;
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/services.dart';
@@ -68,8 +67,8 @@ class ScreenshotGalleryPage extends StatefulWidget {
 
 class _ScreenshotGalleryPageState extends State<ScreenshotGalleryPage>
     with AutomaticKeepAliveClientMixin, SingleTickerProviderStateMixin {
-  late AppInfo _appInfo;
-  late String _packageName;
+  AppInfo _appInfo = _unknownAppInfo();
+  String _packageName = '';
   List<ScreenshotRecord> _screenshots = [];
   bool _isLoading = false; // 默认不显示加载，直接显示内容
   String? _error;
@@ -108,6 +107,33 @@ class _ScreenshotGalleryPageState extends State<ScreenshotGalleryPage>
   final GlobalKey _gridKey = GlobalKey(); // 获取网格可见区域以计算首个可见项
   // 时间线拖动时的逐帧节流标记，避免频繁 jumpTo 造成抖动
   bool _scrubJumpScheduled = false;
+
+  bool get _hasValidRouteArgs => _packageName.trim().isNotEmpty;
+
+  static AppInfo _unknownAppInfo({
+    String packageName = 'unknown',
+    String appName = 'Unknown',
+  }) {
+    return AppInfo(
+      packageName: packageName,
+      appName: appName,
+      icon: null,
+      version: '',
+      isSystemApp: false,
+    );
+  }
+
+  Map<String, dynamic>? _coerceRouteArgs(Object? rawArgs) {
+    if (rawArgs is! Map) return null;
+    final args = <String, dynamic>{};
+    for (final entry in rawArgs.entries) {
+      final key = entry.key;
+      if (key is String) {
+        args[key] = entry.value;
+      }
+    }
+    return args;
+  }
 
   // 分页与懒加载
   static const int _initialPageSize = 8; // 首屏项数（用户一屏可见4个，初始加载8个确保体验）
@@ -172,11 +198,14 @@ class _ScreenshotGalleryPageState extends State<ScreenshotGalleryPage>
     super.didChangeDependencies();
     if (_initialized) return;
     _initialized = true;
-    final args =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    if (args != null) {
-      _appInfo = args['appInfo'] as AppInfo;
-      _packageName = args['packageName'] as String;
+    final args = _coerceRouteArgs(ModalRoute.of(context)?.settings.arguments);
+    final appInfoArg = args?['appInfo'];
+    final packageNameArg = args?['packageName'];
+    final packageName = packageNameArg is String ? packageNameArg.trim() : '';
+    if (appInfoArg is AppInfo && packageName.isNotEmpty) {
+      _appInfo = appInfoArg;
+      _packageName = packageName;
+      // ignore: unawaited_futures
       _loadInitialData();
       // 准备日期Tabs（异步）
       // ignore: unawaited_futures
@@ -277,7 +306,7 @@ class _ScreenshotGalleryPageState extends State<ScreenshotGalleryPage>
           if (!_selectionMode) ...[
             IconButton(
               icon: const Icon(Icons.settings_outlined),
-              onPressed: _openAppScreenshotSettings,
+              onPressed: _hasValidRouteArgs ? _openAppScreenshotSettings : null,
               tooltip: AppLocalizations.of(context).screenshotSectionTitle,
             ),
           ] else ...[
@@ -303,6 +332,7 @@ class _ScreenshotGalleryPageState extends State<ScreenshotGalleryPage>
                 // 依据当前筛选（天Tab）决定全选范围
                 List<int> allIds = <int>[];
                 try {
+                  if (!_hasValidRouteArgs) return;
                   if (_dateFilterStartMillis != null &&
                       _dateFilterEndMillis != null &&
                       _currentTabIndex >= 0 &&
