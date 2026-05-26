@@ -242,6 +242,14 @@ ScreenMemo 可以在手机上手动开启只读的局域网 MCP 服务，让同�
 </details>
 
 <details>
+<summary>如何查看 AI 对话请求日志和缓存命中？</summary>
+
+- AI 对话请求会记录请求链路、接口地址、模型、输入 / 输出 token、总 token，以及服务商返回的缓存命中 / 未命中 token。
+- 在 AI 对话或相关日志查看入口打开请求日志后，概览页会显示“缓存命中”“缓存未命中”和“命中率”；原始日志中对应字段为 `cacheHitTokens` 和 `cacheMissTokens`。
+- 如果某次请求没有这些字段，通常表示当前服务商或接口响应没有返回缓存使用信息，而不是本地解析失败。
+</details>
+
+<details>
 <summary>如何备份 / 迁移数据？</summary>
 
 - 在“数据与备份”里可以导出 ZIP 备份；导出前会先扫描范围、生成 manifest，并展示分类进度
