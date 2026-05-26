@@ -306,10 +306,11 @@ extension AIChatServiceSendExt on AIChatService {
     String? uiThinkingJson,
     Duration? responseDuration,
     List<AIMessage> rawTurnTranscript = const <AIMessage>[],
+    Map<String, String> localEvidencePaths = const <String, String>{},
   }) {
-    final String content = _appendMissingGeneratedImageMarkers(
-      result.content,
-      rawTurnTranscript,
+    final String content = AIMessage.resolveEvidenceRefsToLocalPaths(
+      _appendMissingGeneratedImageMarkers(result.content, rawTurnTranscript),
+      localEvidencePaths,
     );
     unawaited(
       FlutterLogger.nativeDebug(
@@ -588,6 +589,8 @@ extension AIChatServiceSendExt on AIChatService {
     int? usageCacheMissTokens,
     required bool strictFullAttempted,
     required bool fallbackTriggered,
+    String callPhase = '',
+    String promptCacheKey = '',
   }) {
     final Map<String, dynamic> payload = <String, dynamic>{};
     final String raw = baseBreakdownJson.trim();
@@ -616,6 +619,12 @@ extension AIChatServiceSendExt on AIChatService {
     }
     if (usageCacheMissTokens != null) {
       payload['usage_cache_miss_tokens'] = usageCacheMissTokens;
+    }
+    if (callPhase.trim().isNotEmpty) {
+      payload['call_phase'] = callPhase.trim();
+    }
+    if (promptCacheKey.trim().isNotEmpty) {
+      payload['prompt_cache_key'] = promptCacheKey.trim();
     }
     payload['strict_full_attempted'] = strictFullAttempted;
     payload['fallback_triggered'] = fallbackTriggered;
@@ -653,6 +662,8 @@ extension AIChatServiceSendExt on AIChatService {
     required bool strictFullAttempted,
     required bool fallbackTriggered,
     required String breakdownJson,
+    String callPhase = '',
+    String promptCacheKey = '',
   }) {
     final String resolvedCid = cid.trim();
     if (resolvedCid.isEmpty) return;
@@ -675,6 +686,8 @@ extension AIChatServiceSendExt on AIChatService {
       usageCacheMissTokens: result.usageCacheMissTokens,
       strictFullAttempted: strictFullAttempted,
       fallbackTriggered: fallbackTriggered,
+      callPhase: callPhase,
+      promptCacheKey: promptCacheKey,
     );
 
     unawaited(() async {
@@ -724,7 +737,7 @@ extension AIChatServiceSendExt on AIChatService {
           'AITrace',
           [
             'USAGE_RECORD cid=$resolvedCid source=$source isToolLoop=${isToolLoop ? 1 : 0}',
-            'model=$model promptEstBefore=$promptEstBefore promptEstSent=$promptEstSent',
+            'model=$model phase=${callPhase.trim().isEmpty ? '-' : callPhase.trim()} promptCacheKey=${promptCacheKey.trim().isEmpty ? '-' : promptCacheKey.trim()} promptEstBefore=$promptEstBefore promptEstSent=$promptEstSent',
             'usagePrompt=${result.usagePromptTokens ?? '-'} usageCompletion=${result.usageCompletionTokens ?? '-'} usageTotal=${result.usageTotalTokens ?? '-'} cacheHit=${result.usageCacheHitTokens ?? '-'} cacheMiss=${result.usageCacheMissTokens ?? '-'} tools=$toolsCount strictFull=${strictFullAttempted ? 1 : 0} fallback=${fallbackTriggered ? 1 : 0}',
           ].join('\n'),
         );
@@ -1168,6 +1181,74 @@ extension AIChatServiceSendExt on AIChatService {
     }
   }
 
+  String _promptCacheKeyForCall({
+    required String cid,
+    required String model,
+    required List<Map<String, dynamic>> tools,
+  }) {
+    final String modelSlug = _cacheKeySlug(model, fallback: 'model');
+    final String cidHash = _stableShortHash(
+      cid.trim().isEmpty ? 'default' : cid.trim(),
+    );
+    final String toolsHash = _stableShortHash(
+      _stableToolsJsonForCacheKey(tools),
+    );
+    return 'screenmemo_${modelSlug}_c${cidHash}_t$toolsHash';
+  }
+
+  String _cacheKeySlug(String value, {required String fallback}) {
+    final String normalized = value
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9._-]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_+|_+$'), '');
+    final String safe = normalized.isEmpty ? fallback : normalized;
+    return safe.length <= 24 ? safe : safe.substring(0, 24);
+  }
+
+  String _stableShortHash(String value) {
+    int hash = 0x811c9dc5;
+    for (final int unit in value.codeUnits) {
+      hash ^= unit;
+      hash = (hash * 0x01000193) & 0xffffffff;
+    }
+    return hash.toRadixString(16).padLeft(8, '0');
+  }
+
+  String _stableToolsJsonForCacheKey(List<Map<String, dynamic>> tools) {
+    if (tools.isEmpty) return '[]';
+    final List<Object?> normalized = tools
+        .map<Object?>((tool) => _stableJsonForCacheKey(tool))
+        .toList(growable: false);
+    normalized.sort((a, b) => jsonEncode(a).compareTo(jsonEncode(b)));
+    return jsonEncode(normalized);
+  }
+
+  Object? _stableJsonForCacheKey(Object? value) {
+    if (value is Map) {
+      final List<String> keys = value.keys.map((e) => e.toString()).toList()
+        ..sort();
+      final Map<String, Object?> out = <String, Object?>{};
+      for (final String key in keys) {
+        out[key] = _stableJsonForCacheKey(value[key]);
+      }
+      return out;
+    }
+    if (value is List) {
+      return value.map<Object?>((e) => _stableJsonForCacheKey(e)).toList();
+    }
+    return value;
+  }
+
+  String _usageCallPhase({
+    required bool isToolLoop,
+    required AIGatewayResult result,
+  }) {
+    if (!isToolLoop) return 'final_answer';
+    return result.toolCalls.isEmpty ? 'final_answer' : 'tool_loop';
+  }
+
   String _buildPromptBreakdownJson({
     required String model,
     required String systemPrompt,
@@ -1604,6 +1685,11 @@ extension AIChatServiceSendExt on AIChatService {
     final int promptEstSent = PromptBudget.approxTokensForMessagesJson(
       requestMessages,
     );
+    final String promptCacheKey = _promptCacheKeyForCall(
+      cid: cid,
+      model: modelForPrompt,
+      tools: const <Map<String, dynamic>>[],
+    );
     final int turnCreatedAtMs = requestMessages.isNotEmpty
         ? requestMessages.last.createdAt.millisecondsSinceEpoch
         : 0;
@@ -1631,6 +1717,7 @@ extension AIChatServiceSendExt on AIChatService {
       timeout: timeout,
       preferStreaming: true,
       logContext: 'chat',
+      promptCacheKey: promptCacheKey,
     );
     responseSw.stop();
 
@@ -1647,6 +1734,8 @@ extension AIChatServiceSendExt on AIChatService {
       strictFullAttempted: strictFullAttempted,
       fallbackTriggered: fallbackTriggered,
       breakdownJson: promptBreakdownJson,
+      callPhase: 'final_answer',
+      promptCacheKey: promptCacheKey,
     );
 
     final AIMessage assistant = _assistantMessageFromGatewayResult(
@@ -2254,6 +2343,11 @@ extension AIChatServiceSendExt on AIChatService {
     final int promptEstSent =
         toolsSchemaTokens +
         PromptBudget.approxTokensForMessagesJson(requestMessages);
+    final String promptCacheKey = _promptCacheKeyForCall(
+      cid: cid,
+      model: modelForPrompt,
+      tools: const <Map<String, dynamic>>[],
+    );
     final int turnCreatedAtMs = (uiUserCreatedAtMs ?? 0) > 0
         ? uiUserCreatedAtMs!
         : (requestMessages.isNotEmpty
@@ -2285,6 +2379,7 @@ extension AIChatServiceSendExt on AIChatService {
       timeout: timeout,
       logContext: context,
       reasoningLevel: reasoningLevel,
+      promptCacheKey: promptCacheKey,
     );
 
     final Stream<AIStreamEvent> stream = gatewaySession.stream.map(
@@ -2308,6 +2403,8 @@ extension AIChatServiceSendExt on AIChatService {
           strictFullAttempted: strictFullAttempted,
           fallbackTriggered: fallbackTriggered,
           breakdownJson: promptBreakdownJson,
+          callPhase: 'final_answer',
+          promptCacheKey: promptCacheKey,
         );
       }
 
@@ -2865,6 +2962,11 @@ extension AIChatServiceSendExt on AIChatService {
           PromptBudget.approxTokensForMessagesJson(messages);
 
       final bool fallbackNow = fallbackTriggered || sentEst < beforeEst;
+      final String promptCacheKey = _promptCacheKeyForCall(
+        cid: cid,
+        model: modelForPrompt,
+        tools: toolsForCall,
+      );
       if (context == 'chat' && persistHistory) {
         _recordPromptUsageEstimateForCall(
           cid: cid,
@@ -2882,7 +2984,7 @@ extension AIChatServiceSendExt on AIChatService {
           'AITrace',
           [
             'MODEL_CALL_READY cid=$cid stage=$trimStage stream=${preferStreaming ? 1 : 0} isToolLoop=${isToolLoop ? 1 : 0}',
-            'messages=${messages.length} tools=${toolsForCall.length} beforeEst=$beforeEst sentEst=$sentEst strictFull=${strictFullAttempted ? 1 : 0} fallback=${fallbackNow ? 1 : 0}',
+            'messages=${messages.length} tools=${toolsForCall.length} promptCacheKey=$promptCacheKey beforeEst=$beforeEst sentEst=$sentEst strictFull=${strictFullAttempted ? 1 : 0} fallback=${fallbackNow ? 1 : 0}',
           ].join('\n'),
         );
       } catch (_) {}
@@ -2897,6 +2999,7 @@ extension AIChatServiceSendExt on AIChatService {
           tools: toolsForCall,
           toolChoice: toolChoiceForCall,
           reasoningLevel: reasoningLevel,
+          promptCacheKey: promptCacheKey,
         );
         final Future<AIGatewayResult> completed = session.completed;
         await for (final AIGatewayEvent e in session.stream) {
@@ -2923,6 +3026,8 @@ extension AIChatServiceSendExt on AIChatService {
             strictFullAttempted: strictFullAttempted,
             fallbackTriggered: fallbackNow,
             breakdownJson: callBreakdownJson,
+            callPhase: _usageCallPhase(isToolLoop: isToolLoop, result: result),
+            promptCacheKey: promptCacheKey,
           );
         }
         return result;
@@ -2937,6 +3042,7 @@ extension AIChatServiceSendExt on AIChatService {
         tools: toolsForCall,
         toolChoice: toolChoiceForCall,
         reasoningLevel: reasoningLevel,
+        promptCacheKey: promptCacheKey,
       );
       if (_isConversationPersistenceBlockedOrStale(
         cid: cid,
@@ -2958,6 +3064,8 @@ extension AIChatServiceSendExt on AIChatService {
           strictFullAttempted: strictFullAttempted,
           fallbackTriggered: fallbackNow,
           breakdownJson: callBreakdownJson,
+          callPhase: _usageCallPhase(isToolLoop: isToolLoop, result: result),
+          promptCacheKey: promptCacheKey,
         );
       }
       return result;
@@ -3199,6 +3307,7 @@ extension AIChatServiceSendExt on AIChatService {
         <String, Map<String, dynamic>>{};
     final List<String> generatedImageMarkersThisTurn = <String>[];
     final Set<String> generatedImageMarkersSeen = <String>{};
+    final Map<String, String> localEvidencePathsThisTurn = <String, String>{};
     int consecutiveEmptyRetrievalBatches = 0;
     bool forcedNoProgressStop = false;
     bool shouldFinishAfterGenerateImage = false;
@@ -3335,6 +3444,8 @@ extension AIChatServiceSendExt on AIChatService {
         )) {
           throw StateError('Request was superseded by retry.');
         }
+        final Map<String, String> localEvidencePathsForTool =
+            <String, String>{};
         final Stopwatch toolSw = Stopwatch()..start();
         final List<AIMessage> rawToolMsgs = await _executeToolCall(
           call,
@@ -3342,7 +3453,11 @@ extension AIChatServiceSendExt on AIChatService {
           toolEndMs: toolEndMs,
           conversationCid: cid,
           assistantCreatedAtMs: uiAssistantCreatedAtMs,
+          localEvidencePaths: localEvidencePathsForTool,
         );
+        if (localEvidencePathsForTool.isNotEmpty) {
+          localEvidencePathsThisTurn.addAll(localEvidencePathsForTool);
+        }
         Map<String, dynamic>? rawToolPayload;
         List<String> generatedImageMarkersForUi = const <String>[];
         if (rawToolMsgs.isNotEmpty) {
@@ -3457,6 +3572,15 @@ extension AIChatServiceSendExt on AIChatService {
             'Finished tool #$totalToolCalls: $call.name$summarySuffix (${toolSw.elapsedMilliseconds}ms)',
           ),
         );
+        if (localEvidencePathsForTool.isNotEmpty) {
+          _emitUi(emitEvent, <String, dynamic>{
+            'type': 'evidence_path_map',
+            'call_id': call.id,
+            'tool_name': call.name,
+            'count': localEvidencePathsForTool.length,
+            'paths': localEvidencePathsForTool,
+          });
+        }
         _emitUi(emitEvent, <String, dynamic>{
           'type': 'tool_call_end',
           'call_id': call.id,
@@ -3905,6 +4029,7 @@ extension AIChatServiceSendExt on AIChatService {
       uiThinkingJson: uiJson,
       responseDuration: responseSw.elapsed,
       rawTurnTranscript: rawTurnTranscript,
+      localEvidencePaths: localEvidencePathsThisTurn,
     );
 
     if (persistHistory) {

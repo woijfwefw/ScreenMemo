@@ -11,12 +11,36 @@ Future<void> _prepareChatDb(Directory root, {required String cid}) async {
   await ScreenshotDatabase.instance.initializeForDesktop(root.path);
   final db = await ScreenshotDatabase.instance.database;
   final int now = DateTime.now().millisecondsSinceEpoch;
+  await _insertConversation(db, cid: cid, now: now);
+  await db.insert('ai_messages', <String, Object?>{
+    'conversation_id': cid,
+    'role': 'user',
+    'content': 'before',
+    'created_at': 1000,
+  });
+  await db.insert('ai_messages', <String, Object?>{
+    'conversation_id': cid,
+    'role': 'assistant',
+    'content': 'old answer',
+    'created_at': 2000,
+  });
+}
+
+Future<void> _insertConversation(
+  Database db, {
+  required String cid,
+  required int now,
+  String title = 'retry-test',
+}) async {
   await db.insert('ai_conversations', <String, Object?>{
     'cid': cid,
-    'title': 'retry-test',
+    'title': title,
     'created_at': now,
     'updated_at': now,
   });
+}
+
+Future<void> _insertMessage(Database db, {required String cid}) async {
   await db.insert('ai_messages', <String, Object?>{
     'conversation_id': cid,
     'role': 'user',
@@ -102,4 +126,65 @@ void main() {
       }
     }
   });
+
+  test(
+    'deleting active conversation selects another cid and broadcasts delete',
+    () async {
+      final Directory tmp = await Directory.systemTemp.createTemp(
+        'screen_memo_delete_active_conversation_',
+      );
+      final List<String> events = <String>[];
+      StreamSubscription<String>? sub;
+      try {
+        final Directory root = Directory(p.join(tmp.path, 'root'));
+        await root.create(recursive: true);
+        await ScreenshotDatabase.instance.initializeForDesktop(root.path);
+        final db = await ScreenshotDatabase.instance.database;
+        final int now = DateTime.now().millisecondsSinceEpoch;
+        await _insertConversation(
+          db,
+          cid: 'deleted-cid',
+          now: now,
+          title: 'deleted',
+        );
+        await _insertMessage(db, cid: 'deleted-cid');
+        await _insertConversation(
+          db,
+          cid: 'next-cid',
+          now: now + 1,
+          title: 'next',
+        );
+        await ScreenshotDatabase.instance.setAiSetting(
+          'chat_active_cid',
+          'deleted-cid',
+        );
+
+        sub = AISettingsService.instance.onContextChanged.listen(events.add);
+        final bool deleted = await AISettingsService.instance
+            .deleteConversation('deleted-cid');
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        expect(deleted, isTrue);
+        expect(
+          await AISettingsService.instance.getActiveConversationCid(),
+          'next-cid',
+        );
+        expect(events, contains('chat:deleted'));
+
+        final rows = await ScreenshotDatabase.instance.getAiMessagesTail(
+          'deleted-cid',
+          limit: 10,
+        );
+        expect(rows, isEmpty);
+      } finally {
+        await sub?.cancel();
+        try {
+          await ScreenshotDatabase.instance.disposeDesktop();
+        } catch (_) {}
+        if (await tmp.exists()) {
+          await tmp.delete(recursive: true);
+        }
+      }
+    },
+  );
 }

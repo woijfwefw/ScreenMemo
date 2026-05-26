@@ -1,10 +1,32 @@
 part of 'ai_chat_service.dart';
 
 extension AIChatServiceToolExecExt on AIChatService {
+  void _recordLocalEvidencePath(
+    Map<String, String>? out,
+    String filename,
+    String path,
+  ) {
+    if (out == null) return;
+    final String name = filename.trim();
+    final String filePath = path.trim();
+    if (name.isEmpty || filePath.isEmpty) return;
+    out[name] = filePath;
+  }
+
+  void _recordLocalEvidencePathFromPath(
+    Map<String, String>? out,
+    String path,
+  ) {
+    final String filePath = path.trim();
+    if (filePath.isEmpty) return;
+    _recordLocalEvidencePath(out, _basename(filePath), filePath);
+  }
+
   Future<List<AIMessage>> _executeGenerateImageTool(
     AIToolCall call, {
     required String conversationCid,
     int? assistantCreatedAtMs,
+    Map<String, String>? localEvidencePaths,
   }) async {
     try {
       final Map<String, dynamic> args = _safeJsonObject(call.argumentsJson);
@@ -17,6 +39,13 @@ extension AIChatServiceToolExecExt on AIChatService {
             assistantCreatedAtMs: assistantCreatedAtMs,
             toolCallId: call.id,
           );
+      for (final Map<String, dynamic> image in result.images) {
+        _recordLocalEvidencePath(
+          localEvidencePaths,
+          (image['filename'] ?? '').toString(),
+          (image['file_path'] ?? '').toString(),
+        );
+      }
       return <AIMessage>[
         AIMessage(
           role: 'tool',
@@ -39,7 +68,10 @@ extension AIChatServiceToolExecExt on AIChatService {
     }
   }
 
-  Future<List<AIMessage>> _executeGetImagesTool(AIToolCall call) async {
+  Future<List<AIMessage>> _executeGetImagesTool(
+    AIToolCall call, {
+    Map<String, String>? localEvidencePaths,
+  }) async {
     final Map<String, dynamic> args = _safeJsonObject(call.argumentsJson);
     final dynamic raw = args['filenames'];
     final List<String> names = <String>[];
@@ -106,6 +138,7 @@ extension AIChatServiceToolExecExt on AIChatService {
           missing.add(name);
           continue;
         }
+        _recordLocalEvidencePath(localEvidencePaths, name, path);
         final int rawLen = await f.length();
         final _AIImageSendPayload? payload =
             await _prepareImagePayloadForAiSend(
@@ -481,6 +514,7 @@ extension AIChatServiceToolExecExt on AIChatService {
     AIToolCall call, {
     int? toolStartMs,
     int? toolEndMs,
+    Map<String, String>? localEvidencePaths,
   }) async {
     final Map<String, dynamic> args = _safeJsonObject(call.argumentsJson);
     final String query = (args['query'] as String?)?.trim() ?? '';
@@ -549,6 +583,7 @@ extension AIChatServiceToolExecExt on AIChatService {
         call,
         toolStartMs: toolStartMs,
         toolEndMs: toolEndMs,
+        localEvidencePaths: localEvidencePaths,
       );
       if (msgs.isEmpty) return msgs;
       final Map<String, dynamic> payload = _safeJsonObject(msgs.first.content);
@@ -687,6 +722,7 @@ extension AIChatServiceToolExecExt on AIChatService {
         call,
         toolStartMs: toolStartMs,
         toolEndMs: toolEndMs,
+        localEvidencePaths: localEvidencePaths,
       );
       if (msgs.isEmpty) return msgs;
       final Map<String, dynamic> payload = _safeJsonObject(msgs.first.content);
@@ -768,6 +804,7 @@ extension AIChatServiceToolExecExt on AIChatService {
     AIToolCall call, {
     int? toolStartMs,
     int? toolEndMs,
+    Map<String, String>? localEvidencePaths,
   }) async {
     final Map<String, dynamic> args = _safeJsonObject(call.argumentsJson);
     final String query = (args['query'] as String?)?.trim() ?? '';
@@ -981,6 +1018,7 @@ extension AIChatServiceToolExecExt on AIChatService {
 
     for (final ScreenshotRecord r in normalizedShots) {
       final String fp = r.filePath.trim();
+      _recordLocalEvidencePathFromPath(localEvidencePaths, fp);
       final Map<String, dynamic>? sample = pathToSample[fp];
       final int sid = (sample?['segment_id'] as int?) ?? 0;
       final int captureMs = r.captureTime.millisecondsSinceEpoch;
@@ -1248,7 +1286,10 @@ extension AIChatServiceToolExecExt on AIChatService {
     ];
   }
 
-  Future<List<AIMessage>> _executeGetSegmentSamplesTool(AIToolCall call) async {
+  Future<List<AIMessage>> _executeGetSegmentSamplesTool(
+    AIToolCall call, {
+    Map<String, String>? localEvidencePaths,
+  }) async {
     final Map<String, dynamic> args = _safeJsonObject(call.argumentsJson);
     final int sid = _toInt(args['segment_id']) ?? 0;
     int limit = (_toInt(args['limit']) ?? 24).clamp(1, 60);
@@ -1271,6 +1312,7 @@ extension AIChatServiceToolExecExt on AIChatService {
     for (final r in rows.take(limit)) {
       final Map<String, dynamic> m = Map<String, dynamic>.from(r);
       final String fp = (m['file_path'] as String?) ?? '';
+      _recordLocalEvidencePathFromPath(localEvidencePaths, fp);
       final int captureMs = (m['capture_time'] as int?) ?? 0;
       samples.add(<String, dynamic>{
         'sample_id': m['id'],
@@ -1303,6 +1345,7 @@ extension AIChatServiceToolExecExt on AIChatService {
     AIToolCall call, {
     int? toolStartMs,
     int? toolEndMs,
+    Map<String, String>? localEvidencePaths,
   }) async {
     final Map<String, dynamic> args = _safeJsonObject(call.argumentsJson);
     final String query = (args['query'] as String?)?.trim() ?? '';
@@ -1450,6 +1493,7 @@ extension AIChatServiceToolExecExt on AIChatService {
 
     final List<Map<String, dynamic>> results = rows.map((r) {
       final String fp = r.filePath;
+      _recordLocalEvidencePathFromPath(localEvidencePaths, fp);
       final int captureMs = r.captureTime.millisecondsSinceEpoch;
       return <String, dynamic>{
         'id': r.id,
@@ -1550,6 +1594,7 @@ extension AIChatServiceToolExecExt on AIChatService {
     AIToolCall call, {
     int? toolStartMs,
     int? toolEndMs,
+    Map<String, String>? localEvidencePaths,
   }) async {
     final Map<String, dynamic> args = _safeJsonObject(call.argumentsJson);
     final String query = (args['query'] as String?)?.trim() ?? '';
@@ -1690,6 +1735,7 @@ extension AIChatServiceToolExecExt on AIChatService {
     for (final r in rows) {
       final Map<String, dynamic> row = Map<String, dynamic>.from(r);
       final String fp = (row['file_path'] as String?)?.trim() ?? '';
+      _recordLocalEvidencePathFromPath(localEvidencePaths, fp);
       final String filename = fp.isEmpty ? '' : _basename(fp);
       final int captureMs = (row['capture_time'] as int?) ?? 0;
       results.add(<String, dynamic>{
@@ -1773,6 +1819,7 @@ extension AIChatServiceToolExecExt on AIChatService {
     int? toolEndMs,
     String? conversationCid,
     int? assistantCreatedAtMs,
+    Map<String, String>? localEvidencePaths,
   }) async {
     switch (call.name) {
       case 'generate_image':
@@ -1782,30 +1829,40 @@ extension AIChatServiceToolExecExt on AIChatService {
               ? 'default'
               : conversationCid!.trim(),
           assistantCreatedAtMs: assistantCreatedAtMs,
+          localEvidencePaths: localEvidencePaths,
         );
       case 'get_images':
-        return _executeGetImagesTool(call);
+        return _executeGetImagesTool(
+          call,
+          localEvidencePaths: localEvidencePaths,
+        );
       case 'search_segments':
         return _executeSearchSegmentsTool(
           call,
           toolStartMs: toolStartMs,
           toolEndMs: toolEndMs,
+          localEvidencePaths: localEvidencePaths,
         );
       case 'get_segment_result':
         return _executeGetSegmentResultTool(call);
       case 'get_segment_samples':
-        return _executeGetSegmentSamplesTool(call);
+        return _executeGetSegmentSamplesTool(
+          call,
+          localEvidencePaths: localEvidencePaths,
+        );
       case 'search_screenshots_ocr':
         return _executeSearchScreenshotsOcrTool(
           call,
           toolStartMs: toolStartMs,
           toolEndMs: toolEndMs,
+          localEvidencePaths: localEvidencePaths,
         );
       case 'search_ai_image_meta':
         return _executeSearchAiImageMetaTool(
           call,
           toolStartMs: toolStartMs,
           toolEndMs: toolEndMs,
+          localEvidencePaths: localEvidencePaths,
         );
       default:
         return <AIMessage>[

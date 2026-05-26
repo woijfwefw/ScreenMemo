@@ -163,6 +163,13 @@ class AIImageGenerationResult {
   final bool partial;
 
   Map<String, dynamic> toToolJson() {
+    final List<Map<String, dynamic>> providerImages = images
+        .map((Map<String, dynamic> image) {
+          final Map<String, dynamic> out = <String, dynamic>{...image};
+          out.remove('file_path');
+          return out;
+        })
+        .toList(growable: false);
     return <String, dynamic>{
       'tool': 'generate_image',
       'ok': ok,
@@ -179,7 +186,7 @@ class AIImageGenerationResult {
       if (model != null && model!.trim().isNotEmpty) 'model': model,
       if (providerId != null) 'provider_id': providerId,
       'count': images.length,
-      'images': images,
+      'images': providerImages,
       if (images.isNotEmpty)
         'markers': images
             .map((e) => (e['marker'] ?? '').toString())

@@ -1560,9 +1560,14 @@ ORDER BY day ASC
     String filename, {
     bool includeDeleted = false,
   }) async {
+    final Stopwatch sw = Stopwatch()..start();
     final String name = filename.trim();
     if (name.isEmpty || name.contains('/') || name.contains('\\')) return null;
     try {
+      _logDatabaseAiChatPerf(
+        'GeneratedImage.lookupFilename.start',
+        detail: 'name=$name includeDeleted=$includeDeleted',
+      );
       final db = await database;
       await _createAiGeneratedImagesTable(db);
       final String where = includeDeleted
@@ -1578,8 +1583,13 @@ ORDER BY day ASC
       unawaited(
         FlutterLogger.nativeInfo(
           'AI_IMAGE',
-          'db.lookup_filename query=$name rows=${rows.length} includeDeleted=$includeDeleted',
+          'db.lookup_filename query=$name rows=${rows.length} includeDeleted=$includeDeleted ms=${sw.elapsedMilliseconds}',
         ),
+      );
+      _logDatabaseAiChatPerf(
+        'GeneratedImage.lookupFilename.query.done',
+        stopwatch: sw,
+        detail: 'name=$name rows=${rows.length} includeDeleted=$includeDeleted',
       );
       for (final row in rows) {
         final map = Map<String, dynamic>.from(row);
@@ -1591,21 +1601,38 @@ ORDER BY day ASC
             'db.lookup_filename.row query=$name basename=$basename path=$path deletedAt=${map['deleted_at']}',
           ),
         );
-        if (basename == name) return map;
+        if (basename == name) {
+          _logDatabaseAiChatPerf(
+            'GeneratedImage.lookupFilename.hit',
+            stopwatch: sw,
+            detail: 'name=$name path=$path',
+          );
+          return map;
+        }
       }
       unawaited(
         FlutterLogger.nativeWarn(
           'AI_IMAGE',
-          'db.lookup_filename.not_found query=$name includeDeleted=$includeDeleted',
+          'db.lookup_filename.not_found query=$name includeDeleted=$includeDeleted ms=${sw.elapsedMilliseconds}',
         ),
+      );
+      _logDatabaseAiChatPerf(
+        'GeneratedImage.lookupFilename.miss',
+        stopwatch: sw,
+        detail: 'name=$name includeDeleted=$includeDeleted',
       );
       return null;
     } catch (e) {
       unawaited(
         FlutterLogger.nativeError(
           'AI_IMAGE',
-          'db.lookup_filename.error query=$name err=$e',
+          'db.lookup_filename.error query=$name err=$e ms=${sw.elapsedMilliseconds}',
         ),
+      );
+      _logDatabaseAiChatPerf(
+        'GeneratedImage.lookupFilename.error',
+        stopwatch: sw,
+        detail: 'name=$name err=$e',
       );
       return null;
     }
@@ -1615,12 +1642,17 @@ ORDER BY day ASC
     Set<String> filenames, {
     bool includeDeleted = false,
   }) async {
+    final Stopwatch sw = Stopwatch()..start();
     final List<String> names = filenames
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty && !e.contains('/') && !e.contains('\\'))
         .toSet()
         .toList();
     if (names.isEmpty) return <String, String>{};
+    _logDatabaseAiChatPerf(
+      'GeneratedImage.lookupMany.start',
+      detail: 'names=${names.length} includeDeleted=$includeDeleted',
+    );
     final Map<String, String> out = <String, String>{};
     for (final String name in names) {
       final row = await getAiGeneratedImageByFilename(
@@ -1636,8 +1668,14 @@ ORDER BY day ASC
     unawaited(
       FlutterLogger.nativeInfo(
         'AI_IMAGE',
-        'db.lookup_many names=${names.join("|")} out=${out.entries.map((e) => '${e.key}=>${e.value}').join("|")} includeDeleted=$includeDeleted',
+        'db.lookup_many names=${names.join("|")} out=${out.entries.map((e) => '${e.key}=>${e.value}').join("|")} includeDeleted=$includeDeleted ms=${sw.elapsedMilliseconds}',
       ),
+    );
+    _logDatabaseAiChatPerf(
+      'GeneratedImage.lookupMany.done',
+      stopwatch: sw,
+      detail:
+          'names=${names.length} found=${out.length} includeDeleted=$includeDeleted',
     );
     return out;
   }

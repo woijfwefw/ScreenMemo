@@ -102,4 +102,85 @@ void main() {
       await _deleteTempDir(tmp);
     }
   });
+
+  test('证据图片文件名路径索引会写入、命中并随删除清理', () async {
+    final Directory tmp = await Directory.systemTemp.createTemp(
+      'screen_memo_evidence_lookup_',
+    );
+    try {
+      await ScreenshotDatabase.instance.initializeForDesktop(tmp.path);
+
+      final File imageFile = File(
+        p.join(
+          tmp.path,
+          'output',
+          'screen',
+          'pkg.lookup',
+          '2026-05',
+          '25',
+          'demo_lookup.webp',
+        ),
+      );
+      await imageFile.parent.create(recursive: true);
+      await imageFile.writeAsBytes(<int>[9, 8, 7]);
+
+      final ScreenshotRecord record = ScreenshotRecord(
+        appPackageName: 'pkg.lookup',
+        appName: 'Lookup',
+        filePath: imageFile.path,
+        captureTime: DateTime(2026, 5, 25, 22, 5, 28),
+        fileSize: 0,
+      );
+
+      final int? gid = await ScreenshotDatabase.instance
+          .insertScreenshotIfNotExists(record)
+          .timeout(const Duration(seconds: 3));
+      expect(gid, isNotNull);
+
+      final String? byName = await ScreenshotDatabase.instance
+          .findScreenshotPathByBasename('demo_lookup.webp');
+      expect(byName, imageFile.path);
+
+      final String? byStem = await ScreenshotDatabase.instance
+          .findScreenshotPathByBasename('demo_lookup');
+      expect(byStem, imageFile.path);
+
+      final ScreenshotRecord? byPath = await ScreenshotDatabase.instance
+          .getScreenshotByPath(imageFile.path);
+      expect(byPath?.filePath, imageFile.path);
+      expect(byPath?.appPackageName, 'pkg.lookup');
+
+      final db = await ScreenshotDatabase.instance.database;
+      final List<Map<String, Object?>> rows = await db.query(
+        'screenshot_path_lookup',
+        where: 'file_path = ?',
+        whereArgs: <Object>[imageFile.path],
+      );
+      expect(rows, hasLength(1));
+      expect(rows.single['filename_key'], 'demo_lookup.webp');
+      expect(rows.single['filename_stem_key'], 'demo_lookup');
+      expect(rows.single['app_package_name'], 'pkg.lookup');
+
+      final bool deleted = await ScreenshotDatabase.instance.deleteScreenshot(
+        gid!,
+        'pkg.lookup',
+      );
+      expect(deleted, isTrue);
+      expect(await imageFile.exists(), isFalse);
+
+      final List<Map<String, Object?>> rowsAfterDelete = await db.query(
+        'screenshot_path_lookup',
+        where: 'file_path = ?',
+        whereArgs: <Object>[imageFile.path],
+      );
+      expect(rowsAfterDelete, isEmpty);
+
+      final String? afterDelete = await ScreenshotDatabase.instance
+          .findScreenshotPathByBasename('demo_lookup.webp');
+      expect(afterDelete, isNull);
+    } finally {
+      await ScreenshotDatabase.instance.disposeDesktop();
+      await _deleteTempDir(tmp);
+    }
+  });
 }

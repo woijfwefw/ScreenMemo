@@ -60,6 +60,9 @@ List<AIRequestTrace> parseAiTraceMessages(
       case _AiTraceBlock.streamErr:
         _parseAiTraceStreamErrBlock(lines, b);
         break;
+      case _AiTraceBlock.usageRecord:
+        _parseAiTraceUsageRecordBlock(lines, b);
+        break;
     }
   }
 
@@ -160,6 +163,14 @@ GatewayLogParseResult parseGatewayLogTextDetailed(String text) {
         key: 'completionTokens',
       );
       current!.usageTotalTokens = _parseIntToken(rest, key: 'totalTokens');
+      current!.usageCacheHitTokens = _parseIntToken(
+        rest,
+        key: 'cacheHitTokens',
+      );
+      current!.usageCacheMissTokens = _parseIntToken(
+        rest,
+        key: 'cacheMissTokens',
+      );
       current!.ttftMs = _parseIntToken(rest, key: 'ttftMs');
       lastSection = _GatewaySection.none;
       continue;
@@ -345,7 +356,7 @@ List<AIRequestTrace> parseSegmentTrace({
 
 // ===== AITrace block parsing =====
 
-enum _AiTraceBlock { req, resp, streamDone, streamErr }
+enum _AiTraceBlock { req, resp, streamDone, streamErr, usageRecord }
 
 _AiTraceBlock? _parseAiTraceBlockKind(String firstLine) {
   final String t = firstLine.trimLeft();
@@ -353,12 +364,17 @@ _AiTraceBlock? _parseAiTraceBlockKind(String firstLine) {
   if (t.startsWith('RESP ')) return _AiTraceBlock.resp;
   if (t.startsWith('STREAM_DONE ')) return _AiTraceBlock.streamDone;
   if (t.startsWith('STREAM_ERR ')) return _AiTraceBlock.streamErr;
+  if (t.startsWith('USAGE_RECORD ')) return _AiTraceBlock.usageRecord;
   return null;
 }
 
 String? _parseFirstTokenAfterKind(String firstLine) {
   final List<String> parts = firstLine.trimLeft().split(RegExp(r'\s+'));
   if (parts.length < 2) return null;
+  if (parts.first == 'USAGE_RECORD') {
+    final String? cid = _parseTokenValue(firstLine, key: 'cid');
+    return cid == null || cid.trim().isEmpty ? null : 'usage:${cid.trim()}';
+  }
   return parts[1];
 }
 
@@ -441,6 +457,31 @@ void _parseAiTraceStreamErrBlock(List<String> lines, _TraceBuilder b) {
   }
 }
 
+void _parseAiTraceUsageRecordBlock(List<String> lines, _TraceBuilder b) {
+  final String first = lines.first.trimLeft();
+  b.logContext ??= 'chat';
+  final int? isToolLoop = _parseIntToken(first, key: 'isToolLoop');
+  if (isToolLoop != null) {
+    b.callPhase ??= isToolLoop == 1 ? 'tool_loop' : 'final_answer';
+  }
+
+  for (final String line in lines.skip(1)) {
+    final String t = line.trimRight();
+    _parseCommonAiTraceLine(t, b);
+    if (t.startsWith('usagePrompt=')) {
+      b.usagePromptTokens ??= _parseNullableIntToken(t, key: 'usagePrompt');
+      b.usageCompletionTokens ??= _parseNullableIntToken(
+        t,
+        key: 'usageCompletion',
+      );
+      b.usageTotalTokens ??= _parseNullableIntToken(t, key: 'usageTotal');
+      b.usageCacheHitTokens ??= _parseNullableIntToken(t, key: 'cacheHit');
+      b.usageCacheMissTokens ??= _parseNullableIntToken(t, key: 'cacheMiss');
+      b.toolsCount ??= _parseIntToken(t, key: 'tools');
+    }
+  }
+}
+
 void _parseCommonAiTraceLine(String t, _TraceBuilder b) {
   if (t.startsWith('ctx=')) {
     b.logContext = _parseTokenValue(t, key: 'ctx');
@@ -473,11 +514,21 @@ void _parseCommonAiTraceLine(String t, _TraceBuilder b) {
   if (t.startsWith('model=')) {
     final String? model = _parseTokenValue(t, key: 'model');
     if (model != null && model.isNotEmpty) b.model = model;
+    final String? phase = _parseTokenValue(t, key: 'phase');
+    if (phase != null && phase.isNotEmpty && phase != '-') {
+      b.callPhase = phase;
+    }
+    final String? cacheKey = _parseTokenValue(t, key: 'promptCacheKey');
+    if (cacheKey != null && cacheKey.isNotEmpty && cacheKey != '-') {
+      b.promptCacheKey = cacheKey;
+    }
     b.toolsCount ??= _parseIntToken(t, key: 'tools');
     b.imagesCount ??= _parseIntToken(t, key: 'images');
     b.usagePromptTokens ??= _parseIntToken(t, key: 'promptTokens');
     b.usageCompletionTokens ??= _parseIntToken(t, key: 'completionTokens');
     b.usageTotalTokens ??= _parseIntToken(t, key: 'totalTokens');
+    b.usageCacheHitTokens ??= _parseIntToken(t, key: 'cacheHitTokens');
+    b.usageCacheMissTokens ??= _parseIntToken(t, key: 'cacheMissTokens');
     b.ttftMs ??= _parseIntToken(t, key: 'ttftMs');
     b.respBodyLen ??= _parseIntToken(t, key: 'bodyLen');
     b.streamContentLen ??= _parseIntToken(t, key: 'contentLen');
@@ -548,6 +599,12 @@ int? _parseIntToken(String line, {required String key}) {
   return int.tryParse(v);
 }
 
+int? _parseNullableIntToken(String line, {required String key}) {
+  final String? v = _parseTokenValue(line, key: key);
+  if (v == null || v == '-') return null;
+  return int.tryParse(v);
+}
+
 bool? _parseBoolIntToken(String line, {required String key}) {
   final int? v = _parseIntToken(line, key: key);
   if (v == null) return null;
@@ -608,6 +665,10 @@ class _TraceBuilder {
   int? usagePromptTokens;
   int? usageCompletionTokens;
   int? usageTotalTokens;
+  int? usageCacheHitTokens;
+  int? usageCacheMissTokens;
+  String? callPhase;
+  String? promptCacheKey;
   int? ttftMs;
 
   String? error;
@@ -715,6 +776,12 @@ class _TraceBuilder {
       usagePromptTokens: usagePromptTokens,
       usageCompletionTokens: usageCompletionTokens,
       usageTotalTokens: usageTotalTokens,
+      usageCacheHitTokens: usageCacheHitTokens,
+      usageCacheMissTokens: usageCacheMissTokens,
+      callPhase: (callPhase ?? '').trim().isEmpty ? null : callPhase,
+      promptCacheKey: (promptCacheKey ?? '').trim().isEmpty
+          ? null
+          : promptCacheKey,
       ttftMs: ttftMs,
       request: req,
       response: resp,

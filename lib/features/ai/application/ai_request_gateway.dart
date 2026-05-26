@@ -252,6 +252,7 @@ class AIRequestGateway {
     AIReasoningLevel reasoningLevel = AIReasoningLevel.auto,
     bool forceChatCompletions = false,
     bool trackKeyStats = true,
+    String? promptCacheKey,
   }) async {
     if (endpoints.isEmpty) {
       throw Exception('No AI endpoints configured');
@@ -277,6 +278,7 @@ class AIRequestGateway {
             toolChoice: toolChoice,
             reasoningLevel: reasoningLevel,
             useResponsesApiOverride: forceChatCompletions ? false : null,
+            promptCacheKey: promptCacheKey,
           );
           final _GatewayAggregate aggregate = await _performStreaming(
             endpoint: effectiveEndpoint,
@@ -345,6 +347,7 @@ class AIRequestGateway {
             toolChoice: toolChoice,
             reasoningLevel: level,
             useResponsesApiOverride: forceChatCompletions ? false : null,
+            promptCacheKey: promptCacheKey,
           );
           return _performNonStreaming(
             endpoint: effectiveEndpoint,
@@ -439,6 +442,7 @@ class AIRequestGateway {
               toolChoice: toolChoice,
               reasoningLevel: reasoningLevel,
               useResponsesApiOverride: false,
+              promptCacheKey: promptCacheKey,
             );
             final _GatewayAggregate aggregate = await _performNonStreaming(
               endpoint: chatEndpoint,
@@ -499,6 +503,7 @@ class AIRequestGateway {
                 toolChoice: flattenedToolChoice,
                 reasoningLevel: reasoningLevel,
                 useResponsesApiOverride: false,
+                promptCacheKey: promptCacheKey,
               );
               final _GatewayAggregate aggregate = await _performNonStreaming(
                 endpoint: chatEndpoint,
@@ -546,6 +551,7 @@ class AIRequestGateway {
     AIReasoningLevel reasoningLevel = AIReasoningLevel.auto,
     bool forceChatCompletions = false,
     bool trackKeyStats = true,
+    String? promptCacheKey,
   }) {
     if (endpoints.isEmpty) {
       final StreamController<AIGatewayEvent> empty =
@@ -593,6 +599,7 @@ class AIRequestGateway {
             toolChoice: toolChoice,
             reasoningLevel: reasoningLevel,
             useResponsesApiOverride: forceChatCompletions ? false : null,
+            promptCacheKey: promptCacheKey,
           );
 
           final _GatewayAggregate aggregate = await _performStreaming(
@@ -677,6 +684,7 @@ class AIRequestGateway {
               tools: tools,
               toolChoice: toolChoice,
               reasoningLevel: reasoningLevel,
+              promptCacheKey: promptCacheKey,
             );
             final _GatewayAggregate aggregate = await _performNonStreaming(
               endpoint: endpoint,
@@ -775,6 +783,7 @@ class AIRequestGateway {
     Object? toolChoice,
     AIReasoningLevel reasoningLevel = AIReasoningLevel.auto,
     bool? useResponsesApiOverride,
+    String? promptCacheKey,
   }) {
     final String trimmedBase = endpoint.baseUrl.trim();
     final Uri baseUri = _resolveBaseUri(trimmedBase);
@@ -813,6 +822,7 @@ class AIRequestGateway {
         isGoogle: true,
         hasTools: false,
         useResponsesApi: false,
+        promptCacheKey: null,
       );
     }
 
@@ -843,6 +853,14 @@ class AIRequestGateway {
             toolChoice: toolChoice,
             reasoningLevel: reasoningLevel,
           );
+    final String? effectivePromptCacheKey = _effectivePromptCacheKey(
+      endpoint: endpoint,
+      baseUri: baseUri,
+      promptCacheKey: promptCacheKey,
+    );
+    if (effectivePromptCacheKey != null) {
+      payload['prompt_cache_key'] = effectivePromptCacheKey;
+    }
     final Map<String, String> headers = <String, String>{
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $apiKey',
@@ -855,6 +873,7 @@ class AIRequestGateway {
       isGoogle: false,
       hasTools: tools.isNotEmpty,
       useResponsesApi: useResponsesApi,
+      promptCacheKey: effectivePromptCacheKey,
     );
   }
 
@@ -873,6 +892,19 @@ class AIRequestGateway {
     if (!t.contains('unknown parameter')) return false;
     if (!t.contains('tool_choice.function')) return false;
     return true;
+  }
+
+  String? _effectivePromptCacheKey({
+    required AIEndpoint endpoint,
+    required Uri baseUri,
+    required String? promptCacheKey,
+  }) {
+    final String key = (promptCacheKey ?? '').trim();
+    if (key.isEmpty) return null;
+    final String host = baseUri.host.toLowerCase();
+    if (host == 'api.openai.com') return key;
+    if (host.endsWith('.api.openai.com')) return key;
+    return null;
   }
 
   AIEndpoint _forceChatCompletionsEndpoint(AIEndpoint endpoint) {
@@ -903,7 +935,7 @@ class AIRequestGateway {
     final List<Map<String, dynamic>> systemParts = <Map<String, dynamic>>[];
     for (final AIMessage m in messages) {
       if (m.role == 'system') {
-        final String text = m.content.trim();
+        final String text = m.providerContent.trim();
         if (text.isNotEmpty) {
           systemParts.add(<String, dynamic>{'text': text});
         }
@@ -924,7 +956,9 @@ class AIRequestGateway {
               .toLowerCase();
 
           if (type == 'text' || type == 'input_text' || type == 'output_text') {
-            final String txt = (map['text'] as String?)?.toString() ?? '';
+            final String txt = AIMessage.sanitizeEvidenceRefsForProvider(
+              (map['text'] as String?)?.toString() ?? '',
+            );
             final String t = txt.trim();
             if (t.isNotEmpty) {
               parts.add(<String, dynamic>{'text': t});
@@ -989,7 +1023,7 @@ class AIRequestGateway {
         }
       }
 
-      final String text = m.content.trim();
+      final String text = m.providerContent.trim();
       if (parts.isEmpty && text.isNotEmpty) {
         parts.add(<String, dynamic>{'text': text});
       }
@@ -1025,20 +1059,17 @@ class AIRequestGateway {
       endpoint: endpoint,
       messages: wireMessages,
     );
+    final List<Map<String, dynamic>> normalizedTools =
+        _normalizeChatCompletionsTools(tools);
     final Map<String, dynamic> payload = <String, dynamic>{
       'model': endpoint.model,
+      if (normalizedTools.isNotEmpty) 'tools': normalizedTools,
+      if (normalizedTools.isNotEmpty && toolChoice != null)
+        'tool_choice': _stableJsonValue(toolChoice),
       'messages': wireMessages,
       'stream': stream,
+      if (stream) 'stream_options': <String, dynamic>{'include_usage': true},
     };
-    if (stream) {
-      payload['stream_options'] = <String, dynamic>{'include_usage': true};
-    }
-    if (tools.isNotEmpty) {
-      payload['tools'] = tools;
-      if (toolChoice != null) {
-        payload['tool_choice'] = toolChoice;
-      }
-    }
     _applyChatCompletionsReasoningPayload(
       payload,
       endpoint: endpoint,
@@ -1146,6 +1177,7 @@ class AIRequestGateway {
   }) {
     final Map<String, dynamic> payload = <String, dynamic>{
       'model': endpoint.model,
+      if (tools.isNotEmpty) 'tools': _normalizeResponsesTools(tools),
       'input': _buildResponsesInputItems(messages),
       'stream': stream,
     };
@@ -1155,12 +1187,11 @@ class AIRequestGateway {
       level: reasoningLevel,
     );
     if (tools.isNotEmpty) {
-      payload['tools'] = _normalizeResponsesTools(tools);
       final Object? normalizedToolChoice = _normalizeResponsesToolChoice(
         toolChoice,
       );
       if (normalizedToolChoice != null) {
-        payload['tool_choice'] = normalizedToolChoice;
+        payload['tool_choice'] = _stableJsonValue(normalizedToolChoice);
       }
     }
     return payload;
@@ -1181,13 +1212,13 @@ class AIRequestGateway {
           items.add(<String, dynamic>{
             'type': 'function_call_output',
             'call_id': callId,
-            'output': message.content,
+            'output': message.providerContent,
           });
         } else {
           final List<Map<String, dynamic>> fallbackParts =
               _buildResponsesContentParts(
                 role: 'user',
-                content: message.content,
+                content: message.providerContent,
                 apiContent: message.apiContent,
               );
           if (fallbackParts.isNotEmpty) {
@@ -1206,7 +1237,7 @@ class AIRequestGateway {
         final List<Map<String, dynamic>> assistantParts =
             _buildResponsesContentParts(
               role: 'assistant',
-              content: message.content,
+              content: message.providerContent,
               apiContent: message.apiContent,
             );
         if (assistantParts.isNotEmpty) {
@@ -1255,7 +1286,7 @@ class AIRequestGateway {
           : 'user';
       final List<Map<String, dynamic>> parts = _buildResponsesContentParts(
         role: normalizedRole,
-        content: message.content,
+        content: message.providerContent,
         apiContent: message.apiContent,
       );
       if (parts.isEmpty) continue;
@@ -1280,7 +1311,9 @@ class AIRequestGateway {
         final String type = (map['type'] as String? ?? '').trim().toLowerCase();
 
         if (type == 'text') {
-          final String text = (map['text'] as String?) ?? '';
+          final String text = AIMessage.sanitizeEvidenceRefsForProvider(
+            (map['text'] as String?) ?? '',
+          );
           if (text.isNotEmpty) {
             parts.add(<String, dynamic>{
               'type': assistant ? 'output_text' : 'input_text',
@@ -1293,10 +1326,19 @@ class AIRequestGateway {
         if (type == 'input_text' ||
             type == 'output_text' ||
             type == 'refusal') {
+          final Map<String, dynamic> sanitizedMap = Map<String, dynamic>.from(
+            map,
+          );
+          final Object? text = sanitizedMap['text'];
+          if (text is String) {
+            sanitizedMap['text'] = AIMessage.sanitizeEvidenceRefsForProvider(
+              text,
+            );
+          }
           if (assistant && (type == 'output_text' || type == 'refusal')) {
-            parts.add(map);
+            parts.add(sanitizedMap);
           } else if (!assistant && type == 'input_text') {
-            parts.add(map);
+            parts.add(sanitizedMap);
           }
           continue;
         }
@@ -1359,7 +1401,8 @@ class AIRequestGateway {
           'name': name,
           if ((fn['description'] as String?)?.trim().isNotEmpty == true)
             'description': (fn['description'] as String).trim(),
-          if (fn['parameters'] != null) 'parameters': fn['parameters'],
+          if (fn['parameters'] != null)
+            'parameters': _stableJsonValue(fn['parameters']),
           if (fn['strict'] != null) 'strict': fn['strict'],
         });
         continue;
@@ -1372,9 +1415,84 @@ class AIRequestGateway {
         'name': name,
         if ((map['description'] as String?)?.trim().isNotEmpty == true)
           'description': (map['description'] as String).trim(),
-        if (map['parameters'] != null) 'parameters': map['parameters'],
+        if (map['parameters'] != null)
+          'parameters': _stableJsonValue(map['parameters']),
         if (map['strict'] != null) 'strict': map['strict'],
       });
+    }
+    out.sort((a, b) => _toolSortKey(a).compareTo(_toolSortKey(b)));
+    return out;
+  }
+
+  List<Map<String, dynamic>> _normalizeChatCompletionsTools(
+    List<Map<String, dynamic>> tools,
+  ) {
+    final List<Map<String, dynamic>> out = <Map<String, dynamic>>[];
+    for (final Map<String, dynamic> raw in tools) {
+      final Map<String, dynamic> map = Map<String, dynamic>.from(raw);
+      final String type = (map['type'] as String? ?? '').trim().toLowerCase();
+      if (type != 'function') {
+        out.add(Map<String, dynamic>.from(_stableJsonObject(map)));
+        continue;
+      }
+
+      final dynamic fnRaw = map['function'];
+      String name = '';
+      String description = '';
+      Object? parameters;
+      Object? strict;
+      if (fnRaw is Map) {
+        final Map<String, dynamic> fn = Map<String, dynamic>.from(fnRaw as Map);
+        name = (fn['name'] as String? ?? '').trim();
+        description = (fn['description'] as String? ?? '').trim();
+        parameters = fn['parameters'];
+        strict = fn['strict'];
+      } else {
+        name = (map['name'] as String? ?? '').trim();
+        description = (map['description'] as String? ?? '').trim();
+        parameters = map['parameters'];
+        strict = map['strict'];
+      }
+      if (name.isEmpty) continue;
+      out.add(<String, dynamic>{
+        'type': 'function',
+        'function': <String, dynamic>{
+          'name': name,
+          if (description.isNotEmpty) 'description': description,
+          if (parameters != null) 'parameters': _stableJsonValue(parameters),
+          if (strict != null) 'strict': strict,
+        },
+      });
+    }
+    out.sort((a, b) => _toolSortKey(a).compareTo(_toolSortKey(b)));
+    return out;
+  }
+
+  String _toolSortKey(Map<String, dynamic> tool) {
+    final dynamic fnRaw = tool['function'];
+    if (fnRaw is Map) {
+      final String name = (fnRaw['name'] as String? ?? '').trim();
+      if (name.isNotEmpty) return 'function:$name';
+    }
+    final String name = (tool['name'] as String? ?? '').trim();
+    final String type = (tool['type'] as String? ?? '').trim();
+    return '$type:$name:${jsonEncode(_stableJsonObject(tool))}';
+  }
+
+  Object? _stableJsonValue(Object? value) {
+    if (value is Map) return _stableJsonObject(value);
+    if (value is List) {
+      return value.map<Object?>((e) => _stableJsonValue(e)).toList();
+    }
+    return value;
+  }
+
+  Map<String, dynamic> _stableJsonObject(Map<dynamic, dynamic> value) {
+    final List<String> keys = value.keys.map((k) => k.toString()).toList()
+      ..sort();
+    final Map<String, dynamic> out = <String, dynamic>{};
+    for (final String key in keys) {
+      out[key] = _stableJsonValue(value[key]);
     }
     return out;
   }
@@ -3221,6 +3339,7 @@ class _PreparedRequest {
     required this.isGoogle,
     required this.hasTools,
     required this.useResponsesApi,
+    required this.promptCacheKey,
   });
 
   final Uri uri;
@@ -3229,6 +3348,7 @@ class _PreparedRequest {
   final bool isGoogle;
   final bool hasTools;
   final bool useResponsesApi;
+  final String? promptCacheKey;
 }
 
 class _GoogleStreamParts {

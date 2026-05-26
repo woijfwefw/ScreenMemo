@@ -109,6 +109,33 @@ void main() {
     expect(AIImageGenerationParams.sizeForAspectRatio('square'), '1024x1024');
   });
 
+  test(
+    'image generation tool JSON keeps local file path out of provider view',
+    () {
+      const String localPath =
+          '/data/user/0/com.fqyw.screen_memo/files/output/ai/demo.png';
+      const AIImageGenerationResult result = AIImageGenerationResult(
+        ok: true,
+        images: <Map<String, dynamic>>[
+          <String, dynamic>{
+            'filename': 'demo.png',
+            'file_path': localPath,
+            'marker': '[generated-image: demo.png]',
+          },
+        ],
+      );
+
+      expect(result.images.single['file_path'], localPath);
+      final Map<String, dynamic> toolJson = result.toToolJson();
+      final Map<String, dynamic> providerImage = Map<String, dynamic>.from(
+        (toolJson['images'] as List).single as Map,
+      );
+      expect(providerImage, isNot(contains('file_path')));
+      expect(providerImage['filename'], 'demo.png');
+      expect(providerImage['marker'], '[generated-image: demo.png]');
+    },
+  );
+
   test('image endpoint URI does not duplicate v1 path', () {
     expect(
       AIImageGenerationService.buildImagesGenerationsUri(
@@ -837,10 +864,7 @@ void main() {
                               'type': 'function',
                               'function': <String, dynamic>{
                                 'name': 'search_screenshots_ocr',
-                                'arguments': jsonEncode(<String, dynamic>{
-                                  'query': '小红书',
-                                  'limit': 1,
-                                }),
+                                'arguments': jsonEncode(<String, dynamic>{'query': '小红书', 'limit': 1}),
                               },
                             },
                           ],
@@ -937,7 +961,8 @@ void main() {
         final Map<String, dynamic> assistant = Map<String, dynamic>.from(
           messages[assistantIdx] as Map,
         );
-        final List<dynamic> toolCalls = assistant['tool_calls'] as List<dynamic>;
+        final List<dynamic> toolCalls =
+            assistant['tool_calls'] as List<dynamic>;
         expect(toolCalls, hasLength(2));
         expect(
           messages

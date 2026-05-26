@@ -19,7 +19,7 @@ void main() {
       '200 https://example.com/v1/chat/completions',
       'ctx=chat api=openai.chat.completions stream=0 tookMs=321',
       'provider=OpenRouter(12) type=openrouter',
-      'model=gpt-4.1 bodyLen=1234 promptTokens=11 completionTokens=22 totalTokens=33',
+      'model=gpt-4.1 bodyLen=1234 promptTokens=11 completionTokens=22 totalTokens=33 cacheHitTokens=7 cacheMissTokens=4',
       'headers={"content-type":"application/json"}',
       'body={"id":"chatcmpl_x","choices":[]}',
     ].join('\n');
@@ -56,6 +56,8 @@ void main() {
     expect(tr.usagePromptTokens, 11);
     expect(tr.usageCompletionTokens, 22);
     expect(tr.usageTotalTokens, 33);
+    expect(tr.usageCacheHitTokens, 7);
+    expect(tr.usageCacheMissTokens, 4);
 
     expect(tr.rawBlocks.length, 2);
   });
@@ -84,7 +86,7 @@ void main() {
       'STREAM_DONE t2',
       'ctx=rebuild api=openai.responses tookMs=987',
       'provider=OpenAI(1) type=openai',
-      'model=gpt-4.1 contentLen=10 reasoningLen=5 toolCalls=1 ttftMs=120 promptTokens=44 completionTokens=55 totalTokens=99',
+      'model=gpt-4.1 contentLen=10 reasoningLen=5 toolCalls=1 ttftMs=120 promptTokens=44 completionTokens=55 totalTokens=99 cacheHitTokens=40 cacheMissTokens=4',
     ].join('\n');
 
     final List<AIRequestTrace> traces = parseAiTraceMessages(<String>[
@@ -104,6 +106,8 @@ void main() {
     expect(tr.usagePromptTokens, 44);
     expect(tr.usageCompletionTokens, 55);
     expect(tr.usageTotalTokens, 99);
+    expect(tr.usageCacheHitTokens, 40);
+    expect(tr.usageCacheMissTokens, 4);
     expect(tr.response?.statusCode, 200);
   });
 
@@ -135,6 +139,28 @@ void main() {
     final AIRequestTrace tr = traces.single;
     expect(tr.isError, isTrue);
     expect(tr.error, contains('boom'));
+  });
+
+  test('AITrace USAGE_RECORD parses phase, cache key and cache tokens', () {
+    final String usage = [
+      '[AITrace] USAGE_RECORD cid=conv-1 source=usage isToolLoop=1',
+      'model=gpt-4.1 phase=tool_loop promptCacheKey=screenmemo_gpt_c123_t456 promptEstBefore=100 promptEstSent=90',
+      'usagePrompt=80 usageCompletion=12 usageTotal=92 cacheHit=64 cacheMiss=16 tools=3 strictFull=1 fallback=0',
+    ].join('\n');
+
+    final AIRequestTrace tr = parseAiTraceMessages(<String>[usage]).single;
+
+    expect(tr.traceId, 'usage:conv-1');
+    expect(tr.logContext, 'chat');
+    expect(tr.model, 'gpt-4.1');
+    expect(tr.callPhase, 'tool_loop');
+    expect(tr.promptCacheKey, 'screenmemo_gpt_c123_t456');
+    expect(tr.usagePromptTokens, 80);
+    expect(tr.usageCompletionTokens, 12);
+    expect(tr.usageTotalTokens, 92);
+    expect(tr.usageCacheHitTokens, 64);
+    expect(tr.usageCacheMissTokens, 16);
+    expect(tr.toolsCount, 3);
   });
 
   test('AITrace provider line parses name/id/type', () {
@@ -187,7 +213,7 @@ void main() {
       r'[12:00:00.021] extra="{\"model\":\"gpt-4.1\"}"',
       '[12:00:01.000] RESP status=200 contentType=application/json bodyLen=456',
       '[12:00:01.001] extra={"headers":{"content-type":"application/json","x-test":"1"}}',
-      '[12:00:01.100] PARSED openai contentLen=10 toolCalls=0 reasoningLen=0 ttftMs=88 promptTokens=8 completionTokens=9 totalTokens=17',
+      '[12:00:01.100] PARSED openai contentLen=10 toolCalls=0 reasoningLen=0 ttftMs=88 promptTokens=8 completionTokens=9 totalTokens=17 cacheHitTokens=5 cacheMissTokens=3',
     ].join('\n');
 
     final GatewayLogParseResult parsed = parseGatewayLogTextDetailed(text);
@@ -215,6 +241,8 @@ void main() {
     expect(tr.usagePromptTokens, 8);
     expect(tr.usageCompletionTokens, 9);
     expect(tr.usageTotalTokens, 17);
+    expect(tr.usageCacheHitTokens, 5);
+    expect(tr.usageCacheMissTokens, 3);
   });
 
   test('segment trace parses request header/prompt/images and response', () {

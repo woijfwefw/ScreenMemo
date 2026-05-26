@@ -1703,6 +1703,7 @@ extension ScreenshotDatabaseMeta on ScreenshotDatabase {
         whereArgs: [localId],
       );
       if (result <= 0) return false;
+      await _deleteScreenshotPathLookupByPath(db, filePath);
       try {
         final file = File(filePath);
         if (await file.exists()) {
@@ -1783,6 +1784,7 @@ extension ScreenshotDatabaseMeta on ScreenshotDatabase {
 
       await _recomputeAppStatForPackage(db, packageName);
       await _deleteFavoriteRowsForScreenshots(db, packageName, ids);
+      await _deleteScreenshotPathLookupsByPaths(db, filePaths);
       await _deleteFilesConcurrently(filePaths, maxConcurrent: 6);
 
       sw.stop();
@@ -1952,6 +1954,7 @@ extension ScreenshotDatabaseMeta on ScreenshotDatabase {
         whereArgs: [appPackageName],
       );
       await _deleteAllFavoriteRowsForApp(db, appPackageName);
+      await _deleteScreenshotPathLookupsByPackage(db, appPackageName);
 
       print('已删除应用 $appPackageName 的 $total 条记录');
       return total;
@@ -2004,6 +2007,7 @@ extension ScreenshotDatabaseMeta on ScreenshotDatabase {
       }
 
       int deletedTotal = 0;
+      final List<String> deletedPaths = <String>[];
       final years = await _listShardYearsForApp(packageName);
       for (final y in years) {
         final shardDb = await _openShardDb(packageName, y);
@@ -2019,10 +2023,32 @@ extension ScreenshotDatabaseMeta on ScreenshotDatabase {
                 'SELECT COUNT(*) as c FROM $t',
               );
               final c = (rows.first['c'] as int?) ?? 0;
+              try {
+                final pathRows = await shardDb.query(
+                  t,
+                  columns: const <String>['file_path'],
+                );
+                for (final row in pathRows) {
+                  final String p = ((row['file_path'] as String?) ?? '').trim();
+                  if (p.isNotEmpty) deletedPaths.add(p);
+                }
+              } catch (_) {}
               await shardDb.execute('DROP TABLE IF EXISTS $t');
               deletedTotal += c;
             } else {
               final placeholders = List.filled(keepSet.length, '?').join(',');
+              try {
+                final pathRows = await shardDb.query(
+                  t,
+                  columns: const <String>['file_path'],
+                  where: 'id NOT IN ($placeholders)',
+                  whereArgs: keepSet.toList(),
+                );
+                for (final row in pathRows) {
+                  final String p = ((row['file_path'] as String?) ?? '').trim();
+                  if (p.isNotEmpty) deletedPaths.add(p);
+                }
+              } catch (_) {}
               final count = await shardDb.rawDelete(
                 'DELETE FROM $t WHERE id NOT IN ($placeholders)',
                 keepSet.toList(),
@@ -2035,6 +2061,7 @@ extension ScreenshotDatabaseMeta on ScreenshotDatabase {
 
       await _recomputeAppStatForPackage(db, packageName);
       await _deleteFavoriteRowsExceptScreenshots(db, packageName, keepIds);
+      await _deleteScreenshotPathLookupsByPaths(db, deletedPaths);
       return deletedTotal;
     } catch (e) {
       print('删除非保留记录失败: $e');
@@ -2043,11 +2070,32 @@ extension ScreenshotDatabaseMeta on ScreenshotDatabase {
   }
 
   Future<ScreenshotRecord?> getScreenshotByPath(String filePath) async {
+    final Stopwatch sw = Stopwatch()..start();
     final db = await database; // 主库
+    int yearsChecked = 0;
+    int tablesChecked = 0;
     try {
-      final packageName = _extractPackageNameFromPath(filePath);
+      int? asInt(Object? value) {
+        if (value is int) return value;
+        if (value is num) return value.toInt();
+        return int.tryParse('${value ?? ''}');
+      }
+
+      final Map<String, Object?>? indexed =
+          await _readScreenshotPathLookupByPath(db, filePath);
+      final String indexedPackageName =
+          ((indexed?['app_package_name'] as String?) ?? '').trim();
+      final int? indexedCaptureTime = asInt(indexed?['capture_time']);
+      final packageName = indexedPackageName.isNotEmpty
+          ? indexedPackageName
+          : _extractPackageNameFromPath(filePath);
       if (packageName == null) {
         print('无法从路径推断包名: $filePath');
+        _logDatabaseAiChatPerf(
+          'EvidenceRecord.getByPath.skip',
+          stopwatch: sw,
+          detail: 'reason=noPackage path=$filePath',
+        );
         return null;
       }
       String appName = packageName;
@@ -2063,42 +2111,97 @@ extension ScreenshotDatabaseMeta on ScreenshotDatabase {
           appName = (info.first['app_name'] as String?) ?? packageName;
       } catch (_) {}
 
-      final years = await _listShardYearsForApp(packageName);
-      for (final y in years) {
-        final shardDb = await _openShardDb(packageName, y);
-        if (shardDb == null) continue;
-        for (int m = 12; m >= 1; m--) {
-          final t = _monthTableName(y, m);
-          if (!await _tableExists(shardDb, t)) continue;
-          try {
-            final maps = await shardDb.query(
-              t,
-              columns: [
-                'id',
-                'file_path',
-                'capture_time',
-                'file_size',
-                'page_url',
-                'ocr_text',
-                'is_deleted',
-              ],
-              where: 'file_path = ?',
-              whereArgs: [filePath],
-              limit: 1,
-            );
-            if (maps.isNotEmpty) {
-              final full = Map<String, dynamic>.from(maps.first);
-              full['app_package_name'] = packageName;
-              full['app_name'] = appName;
-              full['id'] = _encodeGid(y, m, (maps.first['id'] as int?) ?? 0);
-              return ScreenshotRecord.fromMap(full);
-            }
-          } catch (_) {}
+      Future<ScreenshotRecord?> readFromShard({
+        required int year,
+        required int month,
+        required String stage,
+      }) async {
+        final shardDb = await _openShardDb(packageName, year);
+        if (shardDb == null) return null;
+        final t = _monthTableName(year, month);
+        if (!await _tableExists(shardDb, t)) return null;
+        tablesChecked += 1;
+        try {
+          final maps = await shardDb.query(
+            t,
+            columns: const [
+              'id',
+              'file_path',
+              'capture_time',
+              'file_size',
+              'page_url',
+              'ocr_text',
+              'is_deleted',
+            ],
+            where: 'file_path = ?',
+            whereArgs: [filePath],
+            limit: 1,
+          );
+          if (maps.isEmpty) return null;
+          final full = Map<String, dynamic>.from(maps.first);
+          full['app_package_name'] = packageName;
+          full['app_name'] = appName;
+          full['id'] = _encodeGid(year, month, (maps.first['id'] as int?) ?? 0);
+          await _upsertScreenshotPathLookup(
+            db,
+            filePath: filePath,
+            appPackageName: packageName,
+            captureTime: asInt(maps.first['capture_time']),
+          );
+          _logDatabaseAiChatPerf(
+            'EvidenceRecord.getByPath.hit',
+            stopwatch: sw,
+            detail:
+                'stage=$stage package=$packageName year=$year month=$month years=$yearsChecked tables=$tablesChecked path=$filePath',
+          );
+          return ScreenshotRecord.fromMap(full);
+        } catch (_) {
+          return null;
         }
       }
+
+      if (indexedCaptureTime != null && indexedCaptureTime > 0) {
+        yearsChecked += 1;
+        final int indexedYear = _yearFromMillis(indexedCaptureTime);
+        final int indexedMonth = _monthFromMillis(indexedCaptureTime);
+        final ScreenshotRecord? indexedRecord = await readFromShard(
+          year: indexedYear,
+          month: indexedMonth,
+          stage: 'path_lookup',
+        );
+        if (indexedRecord != null) return indexedRecord;
+      }
+
+      final years = await _listShardYearsForApp(packageName);
+      for (final y in years) {
+        yearsChecked += 1;
+        for (int m = 12; m >= 1; m--) {
+          final ScreenshotRecord? record = await readFromShard(
+            year: y,
+            month: m,
+            stage: 'scan',
+          );
+          if (record != null) return record;
+        }
+      }
+      if (indexed != null) {
+        await _deleteScreenshotPathLookupByPath(db, filePath);
+      }
+      _logDatabaseAiChatPerf(
+        'EvidenceRecord.getByPath.miss',
+        stopwatch: sw,
+        detail:
+            'package=$packageName years=$yearsChecked tables=$tablesChecked path=$filePath',
+      );
       return null;
     } catch (e) {
       print('根据路径查询截屏记录失败: $e');
+      _logDatabaseAiChatPerf(
+        'EvidenceRecord.getByPath.error',
+        stopwatch: sw,
+        detail:
+            'years=$yearsChecked tables=$tablesChecked path=$filePath err=$e',
+      );
       return null;
     }
   }
@@ -2197,6 +2300,7 @@ extension ScreenshotDatabaseMeta on ScreenshotDatabase {
 
   /// 通过文件名在所有分库中查找截图的绝对路径（找到一条即返回）
   Future<String?> findScreenshotPathByBasename(String filename) async {
+    final Stopwatch sw = Stopwatch()..start();
     try {
       if (filename.trim().isEmpty) return null;
       String name = filename.trim();
@@ -2208,28 +2312,107 @@ extension ScreenshotDatabaseMeta on ScreenshotDatabase {
         base = name.substring(0, dot);
         ext = name.substring(dot + 1).toLowerCase();
       }
+      final bool hasExtension = ext != null && ext.isNotEmpty;
       final Set<String> extCandidates = <String>{};
-      if (ext != null && ext.isNotEmpty) extCandidates.add(ext);
+      if (hasExtension) extCandidates.add(ext!);
       extCandidates.addAll(<String>{'jpg', 'jpeg', 'png', 'webp'});
       final master = await database;
+      int segmentQueries = 0;
+      int segmentRows = 0;
+      int shardPackages = 0;
+      int shardYears = 0;
+      int shardTables = 0;
+      int shardQueries = 0;
+      int shardRows = 0;
+      int fsEntries = 0;
+
+      String counts() =>
+          'segmentQueries=$segmentQueries segmentRows=$segmentRows shardPackages=$shardPackages shardYears=$shardYears shardTables=$shardTables shardQueries=$shardQueries shardRows=$shardRows fsEntries=$fsEntries';
+
+      int? asInt(Object? value) {
+        if (value is int) return value;
+        if (value is num) return value.toInt();
+        return int.tryParse('${value ?? ''}');
+      }
+
+      Future<String?> hit(
+        String stage,
+        String path, {
+        String? extra,
+        String? appPackageName,
+        int? captureTime,
+        bool remember = true,
+      }) async {
+        if (remember) {
+          await _upsertScreenshotPathLookup(
+            master,
+            filePath: path,
+            appPackageName: appPackageName,
+            captureTime: captureTime,
+          );
+        }
+        _logDatabaseAiChatPerf(
+          'EvidencePath.findByBasename.hit',
+          stopwatch: sw,
+          detail:
+              'stage=$stage name=$name base=$base path=$path ${counts()} ${extra ?? ''}',
+        );
+        return path;
+      }
+
+      String? miss(String stage, {String? extra}) {
+        _logDatabaseAiChatPerf(
+          'EvidencePath.findByBasename.miss',
+          stopwatch: sw,
+          detail:
+              'stage=$stage name=$name base=$base ${counts()} ${extra ?? ''}',
+        );
+        return null;
+      }
+
+      _logDatabaseAiChatPerf(
+        'EvidencePath.findByBasename.start',
+        detail: 'name=$name base=$base exts=${extCandidates.join("|")}',
+      );
+
+      final String? indexedPath = await _pickExistingScreenshotPathLookup(
+        master,
+        filename: name,
+        base: base,
+        hasExtension: hasExtension,
+      );
+      if (indexedPath != null && indexedPath.isNotEmpty) {
+        return await hit('path_lookup', indexedPath, remember: false);
+      }
+
       // 先在 segment_samples（主库）中搜索，按可能扩展名匹配
       for (final e in extCandidates) {
         try {
+          segmentQueries += 1;
           final rows = await master.query(
             'segment_samples',
-            columns: ['file_path'],
-            where: 'file_path LIKE ?',
-            whereArgs: ['%' + base + '.' + e],
+            columns: ['file_path', 'app_package_name', 'capture_time'],
+            where: "file_path LIKE ? ESCAPE '\\'",
+            whereArgs: ['%${_escapeSqlLikePattern('$base.$e')}'],
             // 同名文件可能跨天重复（文件名仅 HHmmss_SSS）；按时间倒序取一批并优先返回仍存在的文件，
             // 以避免 UI 退出/进入后解析到已被清理的旧路径。
             orderBy: 'capture_time DESC, id DESC',
             limit: 20,
           );
+          segmentRows += rows.length;
           for (final r in rows) {
             final p = (r['file_path'] as String?) ?? '';
             if (p.isEmpty) continue;
             try {
-              if (await File(p).exists()) return p;
+              if (await File(p).exists()) {
+                return await hit(
+                  'segment_samples',
+                  p,
+                  extra: 'ext=$e',
+                  appPackageName: (r['app_package_name'] as String?)?.trim(),
+                  captureTime: asInt(r['capture_time']),
+                );
+              }
             } catch (_) {
               // ignore
             }
@@ -2241,7 +2424,7 @@ extension ScreenshotDatabaseMeta on ScreenshotDatabase {
       // 这种情况下，尝试从 segment_samples 中取该段的一张“代表截图”（优先 keyframe）。
       final int? segmentId = int.tryParse(base);
       if (segmentId != null && segmentId > 0) {
-        Future<String?> pickSegmentSamplePath({
+        Future<Map<String, Object?>?> pickSegmentSampleRow({
           required bool keyframesOnly,
         }) async {
           try {
@@ -2259,33 +2442,52 @@ extension ScreenshotDatabaseMeta on ScreenshotDatabase {
             final int target = ((minp + maxp) / 2).round();
 
             final List<Map<String, Object?>> pick = await master.rawQuery(
-              'SELECT file_path FROM segment_samples WHERE $where ORDER BY ABS(position_index - ?) ASC, position_index ASC LIMIT 1',
+              'SELECT file_path, app_package_name, capture_time FROM segment_samples WHERE $where ORDER BY ABS(position_index - ?) ASC, position_index ASC LIMIT 1',
               <Object?>[segmentId, target],
             );
             if (pick.isEmpty) return null;
             final String p = (pick.first['file_path'] as String?) ?? '';
-            return p.isEmpty ? null : p;
+            return p.isEmpty ? null : pick.first;
           } catch (_) {
             return null;
           }
         }
 
-        final String? keyframePath = await pickSegmentSamplePath(
+        final Map<String, Object?>? keyframeRow = await pickSegmentSampleRow(
           keyframesOnly: true,
         );
-        if (keyframePath != null && keyframePath.isNotEmpty)
-          return keyframePath;
+        final String keyframePath =
+            ((keyframeRow?['file_path'] as String?) ?? '').trim();
+        if (keyframePath.isNotEmpty) {
+          return await hit(
+            'segment_sample_keyframe',
+            keyframePath,
+            appPackageName: (keyframeRow?['app_package_name'] as String?)
+                ?.trim(),
+            captureTime: asInt(keyframeRow?['capture_time']),
+          );
+        }
 
-        final String? anyPath = await pickSegmentSamplePath(
+        final Map<String, Object?>? anyRow = await pickSegmentSampleRow(
           keyframesOnly: false,
         );
-        if (anyPath != null && anyPath.isNotEmpty) return anyPath;
+        final String anyPath = ((anyRow?['file_path'] as String?) ?? '').trim();
+        if (anyPath.isNotEmpty) {
+          return await hit(
+            'segment_sample_any',
+            anyPath,
+            appPackageName: (anyRow?['app_package_name'] as String?)?.trim(),
+            captureTime: asInt(anyRow?['capture_time']),
+          );
+        }
 
         // 兜底：若该段没有 segment_samples（例如仅有 AI 结果、样本表为空/被清理），
         // 则尝试用 segments 的时间窗在分库截图表中挑一张“最接近中间时间”的截图作为代表。
         final String? shardPicked =
             await _pickRepresentativeScreenshotPathForSegment(segmentId);
-        if (shardPicked != null && shardPicked.isNotEmpty) return shardPicked;
+        if (shardPicked != null && shardPicked.isNotEmpty) {
+          return await hit('segment_representative_shard', shardPicked);
+        }
       }
 
       // 列出所有应用包（从 shard_registry 或 app_registry 猜测）
@@ -2312,32 +2514,45 @@ extension ScreenshotDatabaseMeta on ScreenshotDatabase {
               .toList();
         } catch (_) {}
       }
-      if (packages.isEmpty) return null;
+      if (packages.isEmpty) return miss('no_packages');
 
       for (final pkg in packages) {
+        shardPackages += 1;
         final years = await _listShardYearsForApp(pkg);
         for (final y in years) {
+          shardYears += 1;
           final shardDb = await _openShardDb(pkg, y);
           if (shardDb == null) continue;
           for (int m = 12; m >= 1; m--) {
             final t = _monthTableName(y, m);
             if (!await _tableExists(shardDb, t)) continue;
+            shardTables += 1;
             try {
               for (final e in extCandidates) {
-                final pattern = '%' + base + '.' + e;
+                final pattern = '%${_escapeSqlLikePattern('$base.$e')}';
+                shardQueries += 1;
                 final rows = await shardDb.query(
                   t,
-                  columns: ['file_path'],
-                  where: 'file_path LIKE ?',
+                  columns: ['file_path', 'capture_time'],
+                  where: "file_path LIKE ? ESCAPE '\\'",
                   whereArgs: [pattern],
                   orderBy: 'capture_time DESC, id DESC',
                   limit: 20,
                 );
+                shardRows += rows.length;
                 for (final r in rows) {
                   final p = (r['file_path'] as String?) ?? '';
                   if (p.isEmpty) continue;
                   try {
-                    if (await File(p).exists()) return p;
+                    if (await File(p).exists()) {
+                      return await hit(
+                        'shard_like',
+                        p,
+                        appPackageName: pkg,
+                        captureTime: asInt(r['capture_time']),
+                        extra: 'package=$pkg year=$y month=$m ext=$e',
+                      );
+                    }
                   } catch (_) {
                     // ignore
                   }
@@ -2351,23 +2566,34 @@ extension ScreenshotDatabaseMeta on ScreenshotDatabase {
       try {
         final root = await PathService.getScreenshotDirectory();
         if (root != null) {
+          _logDatabaseAiChatPerf(
+            'EvidencePath.findByBasename.filesystem.start',
+            stopwatch: sw,
+            detail: 'name=$name base=$base root=${root.path} ${counts()}',
+          );
           final ent = root.list(recursive: true, followLinks: false);
           await for (final e in ent) {
+            fsEntries += 1;
             if (e is File) {
               final String pth = e.path;
               for (final ex in extCandidates) {
                 if (pth.endsWith('/' + base + '.' + ex) ||
                     pth.endsWith('\\' + base + '.' + ex) ||
                     pth.endsWith(base + '.' + ex)) {
-                  return pth;
+                  return await hit('filesystem_scan', pth, extra: 'ext=$ex');
                 }
               }
             }
           }
         }
       } catch (_) {}
-      return null;
-    } catch (_) {
+      return miss('not_found');
+    } catch (e) {
+      _logDatabaseAiChatPerf(
+        'EvidencePath.findByBasename.error',
+        stopwatch: sw,
+        detail: 'filename=$filename err=$e',
+      );
       return null;
     }
   }
@@ -2524,11 +2750,21 @@ extension ScreenshotDatabaseMeta on ScreenshotDatabase {
   Future<Map<String, String>> findPathsByBasenames(
     Set<String> filenames,
   ) async {
+    final Stopwatch sw = Stopwatch()..start();
     final Map<String, String> result = <String, String>{};
+    _logDatabaseAiChatPerf(
+      'EvidencePath.findMany.start',
+      detail: 'names=${filenames.length}',
+    );
     for (final name in filenames) {
       final p = await findScreenshotPathByBasename(name);
       if (p != null && p.isNotEmpty) result[name] = p;
     }
+    _logDatabaseAiChatPerf(
+      'EvidencePath.findMany.done',
+      stopwatch: sw,
+      detail: 'names=${filenames.length} found=${result.length}',
+    );
     return result;
   }
 
@@ -2558,7 +2794,16 @@ extension ScreenshotDatabaseMeta on ScreenshotDatabase {
         where: 'id = ?',
         whereArgs: [localId],
       );
-      return result > 0;
+      if (result > 0) {
+        await _upsertScreenshotPathLookup(
+          db,
+          filePath: record.filePath,
+          appPackageName: record.appPackageName,
+          captureTime: record.captureTime.millisecondsSinceEpoch,
+        );
+        return true;
+      }
+      return false;
     } catch (e) {
       print('更新截屏记录失败: $e');
       return false;

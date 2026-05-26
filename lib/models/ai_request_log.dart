@@ -69,6 +69,10 @@ class AIRequestTrace {
     this.usagePromptTokens,
     this.usageCompletionTokens,
     this.usageTotalTokens,
+    this.usageCacheHitTokens,
+    this.usageCacheMissTokens,
+    this.callPhase,
+    this.promptCacheKey,
     this.ttftMs,
     this.request,
     this.response,
@@ -95,6 +99,10 @@ class AIRequestTrace {
   final int? usagePromptTokens;
   final int? usageCompletionTokens;
   final int? usageTotalTokens;
+  final int? usageCacheHitTokens;
+  final int? usageCacheMissTokens;
+  final String? callPhase;
+  final String? promptCacheKey;
   final int? ttftMs;
   final AIRequestHttpRequest? request;
   final AIRequestHttpResponse? response;

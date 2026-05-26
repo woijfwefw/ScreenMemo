@@ -11,14 +11,40 @@ extension AIChatServicePersistenceExt on AIChatService {
     ).aiSystemPromptLanguagePolicy.trim();
     final String chartProtocol = _chartMarkdownProtocolForLocale(locale).trim();
     final String appMarkerContext = buildAppMarkerSystemMessage(locale).trim();
-    final String timeContext = buildCurrentDateTimeSystemMessage(locale).trim();
     final List<String> blocks = <String>[
       if (languagePolicy.isNotEmpty) languagePolicy,
       if (allowCharts && chartProtocol.isNotEmpty) chartProtocol,
       if (appMarkerContext.isNotEmpty) appMarkerContext,
-      if (timeContext.isNotEmpty) timeContext,
     ];
     return blocks.join('\n\n');
+  }
+
+  String _currentDateTimeSystemMessageForLocale() {
+    return buildCurrentDateTimeSystemMessage(_effectivePromptLocale()).trim();
+  }
+
+  bool _isDynamicRequestContextMessage(String text) {
+    final String t = text.trim();
+    return t.startsWith('当前设备本地日期时间') ||
+        t.startsWith('Current device-local datetime');
+  }
+
+  List<String> _withDynamicRequestContextExtras(
+    Iterable<String> extraSystemMessages,
+  ) {
+    final List<String> out = <String>[];
+    bool hasTimeContext = false;
+    for (final String raw in extraSystemMessages) {
+      final String t = raw.trim();
+      if (t.isEmpty) continue;
+      if (_isDynamicRequestContextMessage(t)) hasTimeContext = true;
+      out.add(t);
+    }
+    if (!hasTimeContext) {
+      final String timeContext = _currentDateTimeSystemMessageForLocale();
+      if (timeContext.isNotEmpty) out.add(timeContext);
+    }
+    return out;
   }
 
   String _chartMarkdownProtocolForLocale(Locale locale) {
@@ -259,11 +285,23 @@ Rules:
     bool includeHistory = true,
     int? historyMaxTokens,
   }) {
+    final List<String> stableExtras = <String>[];
+    final List<String> lateExtras = <String>[];
+    for (final String raw in _withDynamicRequestContextExtras(
+      extraSystemMessages,
+    )) {
+      final String t = raw.trim();
+      if (t.isEmpty) continue;
+      if (_isDynamicRequestContextMessage(t)) {
+        lateExtras.add(t);
+      } else {
+        stableExtras.add(t);
+      }
+    }
+
     final List<AIMessage> messages = <AIMessage>[
       AIMessage(role: 'system', content: systemMessage),
-      ...extraSystemMessages
-          .where((msg) => msg.trim().isNotEmpty)
-          .map((msg) => AIMessage(role: 'system', content: msg.trim())),
+      ...stableExtras.map((msg) => AIMessage(role: 'system', content: msg)),
     ];
     if (includeHistory && history.isNotEmpty) {
       final int maxTokens =
@@ -289,6 +327,9 @@ Rules:
         ),
       );
     }
+    messages.addAll(
+      lateExtras.map((msg) => AIMessage(role: 'system', content: msg)),
+    );
     messages.add(
       AIMessage(role: 'user', content: userMessage, apiContent: userApiContent),
     );

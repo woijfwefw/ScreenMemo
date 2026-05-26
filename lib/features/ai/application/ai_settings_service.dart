@@ -1284,6 +1284,12 @@ class AISettingsService {
 
 /// 简单的对话消息模型
 class AIMessage {
+  static final RegExp _evidenceRefPattern = RegExp(
+    r'\[\s*evidence\s*[:：]\s*([^\]]+?)\s*\]',
+    caseSensitive: false,
+  );
+  static final RegExp _windowsAbsolutePathPattern = RegExp(r'^[A-Za-z]:[\\/]');
+
   final String role; // system | user | assistant
   final String content;
   final DateTime createdAt;
@@ -1324,6 +1330,115 @@ class AIMessage {
     this.toolCallId,
   }) : createdAt = createdAt ?? DateTime.now();
 
+  String get providerContent => sanitizeEvidenceRefsForProvider(content);
+
+  static bool _looksLikeAbsoluteEvidencePath(String value) {
+    final String v = value.trim();
+    if (v.isEmpty) return false;
+    return v.startsWith('/') ||
+        v.startsWith('\\\\') ||
+        _windowsAbsolutePathPattern.hasMatch(v);
+  }
+
+  static bool isAbsoluteEvidencePath(String value) {
+    return _looksLikeAbsoluteEvidencePath(value);
+  }
+
+  static String _basenameFromPathLike(String value) {
+    String v = value.trim();
+    while (v.length > 1 && (v.endsWith('/') || v.endsWith('\\'))) {
+      v = v.substring(0, v.length - 1);
+    }
+    final int slash = v.lastIndexOf('/');
+    final int backslash = v.lastIndexOf('\\');
+    final int idx = slash > backslash ? slash : backslash;
+    if (idx < 0 || idx >= v.length - 1) return v;
+    return v.substring(idx + 1);
+  }
+
+  static String sanitizeEvidenceRefsForProvider(String text) {
+    if (text.isEmpty ||
+        text.startsWith('data:') ||
+        !text.contains('[') ||
+        !_evidenceRefPattern.hasMatch(text)) {
+      return text;
+    }
+    return text.replaceAllMapped(_evidenceRefPattern, (Match match) {
+      final String original = match.group(0) ?? '';
+      final String raw = (match.group(1) ?? '').trim();
+      if (!_looksLikeAbsoluteEvidencePath(raw)) return original;
+      final String basename = _basenameFromPathLike(raw).trim();
+      if (basename.isEmpty) return original;
+      return '[evidence: $basename]';
+    });
+  }
+
+  static Object? sanitizeProviderContent(Object? value) {
+    if (value is String) return sanitizeEvidenceRefsForProvider(value);
+    if (value is List) {
+      return value
+          .map<Object?>((Object? item) => sanitizeProviderContent(item))
+          .toList(growable: false);
+    }
+    if (value is Map) {
+      final Map<String, dynamic> out = <String, dynamic>{};
+      value.forEach((Object? key, Object? raw) {
+        out[key.toString()] = sanitizeProviderContent(raw);
+      });
+      return out;
+    }
+    return value;
+  }
+
+  static List<String> _splitEvidenceTokenList(String raw) {
+    final String normalized = raw.replaceAll(RegExp(r'[，、;；]+'), ',');
+    return normalized
+        .split(RegExp(r'[\s,]+'))
+        .map((String s) => s.trim())
+        .where((String s) => s.isNotEmpty)
+        .map((String s) => s.replaceAll(RegExp(r'^[,，、;；。\.]+'), ''))
+        .map((String s) => s.replaceAll(RegExp(r'[,，、;；。\.]+$'), ''))
+        .where((String s) => s.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  static String resolveEvidenceRefsToLocalPaths(
+    String text,
+    Map<String, String> resolvedPaths,
+  ) {
+    if (text.isEmpty ||
+        resolvedPaths.isEmpty ||
+        !text.contains('[') ||
+        !_evidenceRefPattern.hasMatch(text)) {
+      return text;
+    }
+    return text.replaceAllMapped(_evidenceRefPattern, (Match match) {
+      final String original = match.group(0) ?? '';
+      final String raw = (match.group(1) ?? '').trim();
+      if (raw.isEmpty || _looksLikeAbsoluteEvidencePath(raw)) {
+        return original;
+      }
+      final String? resolved = resolvedPaths[raw];
+      if (resolved != null && resolved.trim().isNotEmpty) {
+        return '[evidence: ${resolved.trim()}]';
+      }
+      final List<String> tokens = _splitEvidenceTokenList(raw);
+      if (tokens.length <= 1) return original;
+      bool changed = false;
+      final List<String> refs = <String>[];
+      for (final String token in tokens) {
+        final String? path = resolvedPaths[token];
+        if (path != null && path.trim().isNotEmpty) {
+          changed = true;
+          refs.add('[evidence: ${path.trim()}]');
+        } else {
+          refs.add('[evidence: $token]');
+        }
+      }
+      return changed ? refs.join(' ') : original;
+    });
+  }
+
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> m = <String, dynamic>{'role': role};
 
@@ -1334,11 +1449,14 @@ class AIMessage {
         content.trim().isEmpty) {
       effectiveContent = null;
     }
+    effectiveContent = sanitizeProviderContent(effectiveContent);
     m['content'] = effectiveContent;
 
     if (toolCalls != null && toolCalls!.isNotEmpty) m['tool_calls'] = toolCalls;
     if ((reasoningContent ?? '').trim().isNotEmpty) {
-      m['reasoning_content'] = reasoningContent!.trim();
+      m['reasoning_content'] = sanitizeEvidenceRefsForProvider(
+        reasoningContent!.trim(),
+      );
     }
     if (toolCallId != null && toolCallId!.trim().isNotEmpty) {
       m['tool_call_id'] = toolCallId!.trim();

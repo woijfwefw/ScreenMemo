@@ -24,6 +24,24 @@ part 'screenshot_database_merge.dart';
 part 'screenshot_database_query.dart';
 part 'screenshot_database_health.dart';
 
+void _logDatabaseAiChatPerf(
+  String name, {
+  String? detail,
+  Stopwatch? stopwatch,
+}) {
+  final String d0 = (detail ?? '').trim();
+  final String d = [
+    if (stopwatch != null) 'ms=${stopwatch.elapsedMilliseconds}',
+    if (d0.isNotEmpty) d0,
+  ].join(' ');
+  unawaited(
+    FlutterLogger.nativeInfo(
+      'AI_CHAT_PERF',
+      d.isEmpty ? 'DB.$name' : 'DB.$name $d',
+    ).catchError((_) {}),
+  );
+}
+
 /// 截屏数据库服务
 class ScreenshotDatabase {
   static ScreenshotDatabase? _instance;
@@ -56,6 +74,7 @@ class ScreenshotDatabase {
       } catch (_) {}
     }
     _shardDbCache.clear();
+    _resetScreenshotPathLookupRuntimeState();
 
     // 设置新的基础路径
     _desktopBasePath = basePath;
@@ -86,6 +105,7 @@ class ScreenshotDatabase {
         } catch (_) {}
       }
       _shardDbCache.clear();
+      _resetScreenshotPathLookupRuntimeState();
       _desktopBasePath = null;
       PathService.debugSetInternalAppDirBaseOverride(null);
     } catch (_) {}
@@ -93,6 +113,11 @@ class ScreenshotDatabase {
 
   // 分库缓存（key: "<package>|<year>")
   static final Map<String, Database> _shardDbCache = {};
+  static const int _dbVersion = 54;
+  static const int _screenshotPathLookupCacheMaxEntries = 4096;
+  static final Map<String, String?> _screenshotPathLookupCache =
+      <String, String?>{};
+  static bool _screenshotPathLookupEnsured = false;
   // 分库根目录（相对外部存储目录）
   static const String _shardsDirRelative = 'output/databases/shards';
 
@@ -118,7 +143,7 @@ class ScreenshotDatabase {
         final path = join(databasesDir.path, 'screenshot_memo.db');
         final db = await openDatabase(
           path,
-          version: 53,
+          version: _dbVersion,
           onConfigure: (db) async {
             try {
               await db.execute('PRAGMA journal_mode=WAL');
@@ -156,7 +181,7 @@ class ScreenshotDatabase {
 
         final db = await openDatabase(
           path,
-          version: 53,
+          version: _dbVersion,
           onConfigure: (db) async {
             // 启用 WAL 提升并发写入与长事务期间读取能力
             try {
@@ -189,7 +214,7 @@ class ScreenshotDatabase {
 
         final db = await openDatabase(
           path,
-          version: 53,
+          version: _dbVersion,
           onConfigure: (db) async {
             try {
               await db.execute('PRAGMA journal_mode=WAL');
@@ -216,7 +241,7 @@ class ScreenshotDatabase {
 
       final db = await openDatabase(
         path,
-        version: 53,
+        version: _dbVersion,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       );
@@ -337,6 +362,265 @@ class ScreenshotDatabase {
     } catch (_) {}
     // 确保 FTS 虚拟表与触发器存在，并完成历史数据回填
     await _ensureMonthFts(shardDb, year, month);
+  }
+
+  static void _resetScreenshotPathLookupRuntimeState() {
+    _screenshotPathLookupCache.clear();
+    _screenshotPathLookupEnsured = false;
+  }
+
+  String _filenameFromPathLike(String value) {
+    final String normalized = value.trim().replaceAll('\\', '/');
+    if (normalized.isEmpty) return '';
+    final int slash = normalized.lastIndexOf('/');
+    return slash >= 0 ? normalized.substring(slash + 1).trim() : normalized;
+  }
+
+  String _filenameKeyFromPathLike(String value) =>
+      _filenameFromPathLike(value).toLowerCase();
+
+  String _filenameStemKeyFromPathLike(String value) {
+    final String filename = _filenameFromPathLike(value);
+    final int dot = filename.lastIndexOf('.');
+    final String stem = dot > 0 ? filename.substring(0, dot) : filename;
+    return stem.trim().toLowerCase();
+  }
+
+  String _escapeSqlLikePattern(String value) => value
+      .replaceAll('\\', r'\\')
+      .replaceAll('%', r'\%')
+      .replaceAll('_', r'\_');
+
+  void _rememberScreenshotPathLookup(String cacheKey, String? filePath) {
+    final String key = cacheKey.trim().toLowerCase();
+    if (key.isEmpty) return;
+    if (_screenshotPathLookupCache.containsKey(key)) {
+      _screenshotPathLookupCache.remove(key);
+    }
+    _screenshotPathLookupCache[key] = filePath;
+    while (_screenshotPathLookupCache.length >
+        _screenshotPathLookupCacheMaxEntries) {
+      _screenshotPathLookupCache.remove(_screenshotPathLookupCache.keys.first);
+    }
+  }
+
+  bool _hasScreenshotPathLookupCache(String cacheKey) =>
+      _screenshotPathLookupCache.containsKey(cacheKey.trim().toLowerCase());
+
+  String? _readScreenshotPathLookupCache(String cacheKey) =>
+      _screenshotPathLookupCache[cacheKey.trim().toLowerCase()];
+
+  void _forgetScreenshotPathLookupCacheForName(String filename) {
+    final String key = _filenameKeyFromPathLike(filename);
+    if (key.isNotEmpty) {
+      _screenshotPathLookupCache.remove(key);
+    }
+    final String stemKey = _filenameStemKeyFromPathLike(filename);
+    if (stemKey.isNotEmpty) {
+      _screenshotPathLookupCache.remove(stemKey);
+    }
+  }
+
+  void _forgetScreenshotPathLookupCacheForPath(String filePath) {
+    _forgetScreenshotPathLookupCacheForName(_filenameFromPathLike(filePath));
+  }
+
+  Future<void> _createScreenshotPathLookupTable(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS screenshot_path_lookup (
+        file_path TEXT PRIMARY KEY,
+        filename TEXT NOT NULL,
+        filename_key TEXT NOT NULL,
+        filename_stem_key TEXT NOT NULL DEFAULT '',
+        app_package_name TEXT,
+        capture_time INTEGER,
+        updated_at INTEGER DEFAULT (strftime('%s','now') * 1000)
+      )
+    ''');
+    try {
+      await db.execute(
+        "ALTER TABLE screenshot_path_lookup ADD COLUMN filename_stem_key TEXT NOT NULL DEFAULT ''",
+      );
+    } catch (_) {}
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_screenshot_path_lookup_filename ON screenshot_path_lookup(filename_key, capture_time DESC, updated_at DESC)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_screenshot_path_lookup_stem ON screenshot_path_lookup(filename_stem_key, capture_time DESC, updated_at DESC)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_screenshot_path_lookup_pkg_time ON screenshot_path_lookup(app_package_name, capture_time DESC)',
+    );
+  }
+
+  Future<void> _ensureScreenshotPathLookupTable(DatabaseExecutor db) async {
+    if (_screenshotPathLookupEnsured) return;
+    await _createScreenshotPathLookupTable(db);
+    _screenshotPathLookupEnsured = true;
+  }
+
+  Future<void> _upsertScreenshotPathLookup(
+    DatabaseExecutor db, {
+    required String filePath,
+    String? appPackageName,
+    int? captureTime,
+  }) async {
+    final String path = filePath.trim();
+    if (path.isEmpty) return;
+    final String filename = _filenameFromPathLike(path);
+    final String filenameKey = filename.toLowerCase();
+    final String stemKey = _filenameStemKeyFromPathLike(filename);
+    if (filename.isEmpty || filenameKey.isEmpty) return;
+    try {
+      await _ensureScreenshotPathLookupTable(db);
+      await db.insert('screenshot_path_lookup', <String, Object?>{
+        'file_path': path,
+        'filename': filename,
+        'filename_key': filenameKey,
+        'filename_stem_key': stemKey,
+        'app_package_name':
+            (appPackageName == null || appPackageName.trim().isEmpty)
+            ? _extractPackageNameFromPath(path)
+            : appPackageName.trim(),
+        'capture_time': captureTime,
+        'updated_at': DateTime.now().millisecondsSinceEpoch,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      _forgetScreenshotPathLookupCacheForName(filename);
+    } catch (_) {}
+  }
+
+  Future<void> _deleteScreenshotPathLookupByPath(
+    DatabaseExecutor db,
+    String filePath,
+  ) async {
+    final String path = filePath.trim();
+    if (path.isEmpty) return;
+    try {
+      await _ensureScreenshotPathLookupTable(db);
+      await db.delete(
+        'screenshot_path_lookup',
+        where: 'file_path = ?',
+        whereArgs: <Object?>[path],
+      );
+      _forgetScreenshotPathLookupCacheForPath(path);
+    } catch (_) {}
+  }
+
+  Future<void> _deleteScreenshotPathLookupsByPaths(
+    DatabaseExecutor db,
+    Iterable<String> filePaths,
+  ) async {
+    final List<String> paths = filePaths
+        .map((String e) => e.trim())
+        .where((String e) => e.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+    if (paths.isEmpty) return;
+    try {
+      await _ensureScreenshotPathLookupTable(db);
+      const int chunkSize = 400;
+      for (int i = 0; i < paths.length; i += chunkSize) {
+        final int end = (i + chunkSize) > paths.length
+            ? paths.length
+            : i + chunkSize;
+        final List<String> chunk = paths.sublist(i, end);
+        final String placeholders = List.filled(chunk.length, '?').join(',');
+        await db.delete(
+          'screenshot_path_lookup',
+          where: 'file_path IN ($placeholders)',
+          whereArgs: chunk,
+        );
+        for (final String path in chunk) {
+          _forgetScreenshotPathLookupCacheForPath(path);
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _deleteScreenshotPathLookupsByPackage(
+    DatabaseExecutor db,
+    String appPackageName,
+  ) async {
+    final String packageName = appPackageName.trim();
+    if (packageName.isEmpty) return;
+    try {
+      await _ensureScreenshotPathLookupTable(db);
+      await db.delete(
+        'screenshot_path_lookup',
+        where: 'app_package_name = ?',
+        whereArgs: <Object?>[packageName],
+      );
+      _screenshotPathLookupCache.clear();
+    } catch (_) {}
+  }
+
+  Future<Map<String, Object?>?> _readScreenshotPathLookupByPath(
+    DatabaseExecutor db,
+    String filePath,
+  ) async {
+    final String path = filePath.trim();
+    if (path.isEmpty) return null;
+    try {
+      await _ensureScreenshotPathLookupTable(db);
+      final List<Map<String, Object?>> rows = await db.query(
+        'screenshot_path_lookup',
+        where: 'file_path = ?',
+        whereArgs: <Object?>[path],
+        limit: 1,
+      );
+      return rows.isEmpty ? null : rows.first;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String?> _pickExistingScreenshotPathLookup(
+    DatabaseExecutor db, {
+    required String filename,
+    required String base,
+    required bool hasExtension,
+  }) async {
+    final String nameKey = _filenameKeyFromPathLike(filename);
+    final String stemKey = base.trim().toLowerCase();
+    final String cacheKey = hasExtension ? nameKey : stemKey;
+    if (cacheKey.isEmpty) return null;
+
+    if (_hasScreenshotPathLookupCache(cacheKey)) {
+      final String? cached = _readScreenshotPathLookupCache(cacheKey);
+      if (cached == null || cached.trim().isEmpty) return null;
+      try {
+        if (await File(cached).exists()) return cached;
+      } catch (_) {}
+      await _deleteScreenshotPathLookupByPath(db, cached);
+      return null;
+    }
+
+    try {
+      await _ensureScreenshotPathLookupTable(db);
+      final List<Map<String, Object?>> rows = await db.query(
+        'screenshot_path_lookup',
+        columns: const <String>['file_path'],
+        where: hasExtension ? 'filename_key = ?' : 'filename_stem_key = ?',
+        whereArgs: <Object?>[cacheKey],
+        orderBy: 'capture_time DESC, updated_at DESC',
+        limit: 20,
+      );
+      for (final Map<String, Object?> row in rows) {
+        final String path = ((row['file_path'] as String?) ?? '').trim();
+        if (path.isEmpty) continue;
+        try {
+          if (await File(path).exists()) {
+            _rememberScreenshotPathLookup(cacheKey, path);
+            return path;
+          }
+        } catch (_) {}
+        await _deleteScreenshotPathLookupByPath(db, path);
+      }
+      _rememberScreenshotPathLookup(cacheKey, null);
+      return null;
+    } catch (_) {
+      return null;
+    }
   }
 
   /// 确保每月表具备 FTS（优先 FTS5，回退 FTS4），带触发器与一次性回填
@@ -821,6 +1105,9 @@ class ScreenshotDatabase {
 
     // App 运行状态（结构化健康数据）
     await _createAppHealthTables(db);
+
+    // 截图文件名到绝对路径的轻量索引，用于 AI 对话证据图快速解析。
+    await _ensureScreenshotPathLookupTable(db);
   }
 
   /// 升级回调：按版本增量迁移
@@ -1342,6 +1629,9 @@ class ScreenshotDatabase {
         await _ensureAiProviderKeyStatsColumns(db);
       } catch (_) {}
     }
+    try {
+      await _ensureScreenshotPathLookupTable(db);
+    } catch (_) {}
   }
 
   /// 创建汇总统计表（用于版本升级）
@@ -1452,7 +1742,15 @@ class ScreenshotDatabase {
             whereArgs: [record.filePath],
             limit: 1,
           );
-          if (rows.isNotEmpty) return null;
+          if (rows.isNotEmpty) {
+            await _upsertScreenshotPathLookup(
+              txn,
+              filePath: record.filePath,
+              appPackageName: record.appPackageName,
+              captureTime: ts,
+            );
+            return null;
+          }
         } catch (_) {}
 
         // 计算实际文件大小
@@ -1471,6 +1769,12 @@ class ScreenshotDatabase {
         map.remove('app_package_name');
         map.remove('app_name');
         final localId = await shardDb.insert(tableName, map);
+        await _upsertScreenshotPathLookup(
+          txn,
+          filePath: recordWithSize.filePath,
+          appPackageName: recordWithSize.appPackageName,
+          captureTime: ts,
+        );
 
         // 更新主库聚合
         await _upsertAppStatOnInsert(
@@ -1564,7 +1868,15 @@ class ScreenshotDatabase {
               whereArgs: [record.filePath],
               limit: 1,
             );
-            if (rows.isNotEmpty) continue; // 去重
+            if (rows.isNotEmpty) {
+              await _upsertScreenshotPathLookup(
+                txn,
+                filePath: record.filePath,
+                appPackageName: record.appPackageName,
+                captureTime: ts,
+              );
+              continue; // 去重
+            }
           } catch (_) {}
           final file = File(record.filePath);
           final actualFileSize = await file.exists() ? await file.length() : 0;
@@ -1573,6 +1885,12 @@ class ScreenshotDatabase {
           map.remove('app_package_name');
           map.remove('app_name');
           await shardDb.insert(tableName, map);
+          await _upsertScreenshotPathLookup(
+            txn,
+            filePath: recordWithSize.filePath,
+            appPackageName: recordWithSize.appPackageName,
+            captureTime: ts,
+          );
           if (!packageCounts.containsKey(recordWithSize.appPackageName) &&
               await _isAppStatMissing(txn, recordWithSize.appPackageName)) {
             newPackages.add(recordWithSize.appPackageName);
@@ -1710,6 +2028,14 @@ class ScreenshotDatabase {
               continueOnError: true,
             );
             totalInserted += batchResult.length;
+            for (final ScreenshotRecord r in ym.value) {
+              await _upsertScreenshotPathLookup(
+                txn,
+                filePath: r.filePath,
+                appPackageName: r.appPackageName,
+                captureTime: r.captureTime.millisecondsSinceEpoch,
+              );
+            }
 
             // 重算该应用聚合一次（按包维度即可）
             if (!packageCounts.containsKey(packageName) &&
@@ -1781,6 +2107,7 @@ class ScreenshotDatabase {
       await db.close();
       _database = null;
     }
+    _resetScreenshotPathLookupRuntimeState();
   }
 
   // ======= 聚合表维护辅助 =======
@@ -1913,7 +2240,7 @@ class ScreenshotDatabase {
     // 适配新旧目录结构：
     // 新: .../output/screen/<package>/<yyyy-MM>/<dd>/<file>
     // 旧: .../<package>/screenshots/<file>
-    final parts = filePath.split('/');
+    final parts = filePath.replaceAll('\\', '/').split('/');
     if (parts.length >= 3) {
       for (int i = 0; i < parts.length - 1; i++) {
         final seg = parts[i];
