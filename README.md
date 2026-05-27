@@ -239,6 +239,9 @@ ScreenMemo 可以在手机上手动开启只读的局域网 MCP 服务，让同�
 - 当前内置提供商类型包括 `OpenAI`、`Azure OpenAI`、`Claude`、`Gemini` 和 `Custom`
 - `Custom` 适合接入兼容 OpenAI 风格接口的自建或第三方中转服务
 - 不同 AI 上下文可以分别绑定不同的提供商与模型
+- 当端点使用 Responses API 且模型名属于 GPT / ChatGPT / o 系列时，AI 请求会自动携带 OpenAI `web_search` 内置工具；实际能否联网搜索取决于所配置服务商是否支持该工具
+- 若服务商返回 OpenAI Responses 的 `web_search_call` 与 `url_citation` annotations，聊天气泡会实时展示 `in_progress` / `searching` / `completed` 状态、搜索关键词或打开的网页，并在完成后持久化可点击来源
+- 当前兼容端点通常不会返回 favicon；移动端会用来源域名首字母或网页图标作为降级展示
 </details>
 
 <details>
