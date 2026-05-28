@@ -52,8 +52,6 @@ import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import java.io.File
 import java.io.FileOutputStream
-import java.nio.ByteBuffer
-import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
@@ -66,6 +64,8 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
 import com.google.mlkit.vision.common.InputImage
 import com.google.android.gms.tasks.Tasks
+import com.fqyw.screen_memo.settings.UserSettingsKeysNative
+import com.fqyw.screen_memo.settings.UserSettingsStorage
 
 class ScreenCaptureAccessibilityService : AccessibilityService() {
     
@@ -220,7 +220,7 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
         }
     }
     
-    // 去重：保留裁剪后画面的精确签名（宽高 + SHA-256）
+    // 去重：保留裁剪后画面的版本化签名（兼容旧精确签名）
     private val lastSignatureByApp: MutableMap<String, String> = mutableMapOf()
 
     // 添加WakeLock防止Doze模式
@@ -1261,7 +1261,7 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
                                                         "workerMs=${SystemClock.elapsedRealtime() - workerStartMs} " +
                                                         "totalMs=${SystemClock.elapsedRealtime() - tickStartMs}"
                                                 )
-                                                FileLogger.i(TAG, "检测到重复截图（裁剪系统栏后画面完全一致），已跳过保存: $lockedTarget, duplicateMs=${duplicateMs}, apiMs=${apiMs}, wrapMs=${wrapMs}")
+                                                FileLogger.i(TAG, "检测到重复截图，已跳过保存: $lockedTarget, duplicateMs=${duplicateMs}, apiMs=${apiMs}, wrapMs=${wrapMs}")
                                                 try {
                                                     ScreenCaptureService.updateNotificationState(
                                                         this@ScreenCaptureAccessibilityService,
@@ -1425,8 +1425,29 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
         }
     }
 
+    private fun readScreenshotDedupeMode(): ScreenshotDedupeHelper.Mode {
+        val raw = try {
+            UserSettingsStorage.getString(
+                this,
+                UserSettingsKeysNative.SCREENSHOT_DEDUPE_MODE,
+                defaultValue = ScreenshotDedupeHelper.Mode.BALANCED.rawValue
+            )
+        } catch (_: Exception) {
+            ScreenshotDedupeHelper.Mode.BALANCED.rawValue
+        }
+        return ScreenshotDedupeHelper.Mode.fromRaw(raw)
+    }
+
+    private fun bitmapPixels(bitmap: Bitmap): IntArray {
+        val width = bitmap.width
+        val height = bitmap.height
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+        return pixels
+    }
+
     /**
-     * 基于“自动裁剪系统栏”的精确像素对比：仅当裁剪后画面完全一致时才视为重复。
+     * 基于“自动裁剪系统栏”的近似去重：先比精确签名，再按感知哈希与缩略图差异判断。
      */
     private fun isDuplicateScreenshot(originalBitmap: Bitmap, packageName: String): Boolean {
         // 1) 归一化方向，并确保为可读写（非硬件）位图
@@ -1453,13 +1474,29 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
 
         val roi = try { Bitmap.createBitmap(normalized, 0, roiY, w, roiH) } catch (_: Exception) { normalized }
 
-        // 3) 计算精确签名（宽高 + SHA-256）
-        val currentSignature = computeExactSignature(roi)
+        // 3) 读取模式并构建当前签名特征
+        val mode = readScreenshotDedupeMode()
+        val currentFeatures = try {
+            ScreenshotDedupeHelper.buildFeatures(roi.width, roi.height, bitmapPixels(roi))
+        } catch (e: Exception) {
+            FileLogger.w(TAG, "构建截图去重特征失败，降级为不重复: ${e.message}")
+            if (roi !== normalized && roi !== originalBitmap) {
+                try { roi.recycle() } catch (_: Exception) {}
+            }
+            return false
+        }
 
         // 4) 读取上一张签名（内存优先，其次持久化）
         val previousSignature = lastSignatureByApp[packageName]
             ?: ScreenshotDatabaseHelper.getLastSignature(this, packageName)
-        if (previousSignature != null && previousSignature == currentSignature) {
+        val compareResult = ScreenshotDedupeHelper.shouldSkip(previousSignature, currentFeatures, mode)
+        if (compareResult.duplicate) {
+            FileLogger.i(
+                TAG,
+                "截图去重命中: target=$packageName mode=${mode.rawValue} reason=${compareResult.reason} " +
+                    "hashDistance=${compareResult.hashDistance} changedPixelRatio=${compareResult.changedPixelRatio} " +
+                    "changedBlocks=${compareResult.changedBlocks} changedRows=${compareResult.changedRows} changedCols=${compareResult.changedCols}"
+            )
             if (roi !== normalized && roi !== originalBitmap) {
                 try { roi.recycle() } catch (_: Exception) {}
             }
@@ -1467,6 +1504,7 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
         }
 
         // 5) 更新签名
+        val currentSignature = currentFeatures.toSignature()
         lastSignatureByApp[packageName] = currentSignature
         ScreenshotDatabaseHelper.setLastSignature(this, packageName, null, currentSignature)
         if (roi !== normalized && roi !== originalBitmap) {
@@ -1518,49 +1556,6 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
         } catch (_: Exception) {
             swBitmap
         }
-    }
-
-    /**
-     * 计算裁剪后画面的精确签名（宽高 + 像素 SHA-256）。
-     */
-    private fun computeExactSignature(src: Bitmap): String {
-        val width = src.width
-        val height = src.height
-        if (width <= 0 || height <= 0) {
-            return "${width}x${height}:invalid"
-        }
-
-        val argbBitmap = if (src.config == Bitmap.Config.ARGB_8888) {
-            src
-        } else {
-            try {
-                src.copy(Bitmap.Config.ARGB_8888, false)
-            } catch (_: Exception) {
-                src
-            }
-        }
-
-        val byteCount = try {
-            argbBitmap.byteCount
-        } catch (_: Exception) {
-            width * height * 4
-        }
-
-        val buffer = ByteBuffer.allocate(byteCount)
-        argbBitmap.copyPixelsToBuffer(buffer)
-        val bytes = buffer.array()
-        val length = buffer.position()
-
-        val digest = MessageDigest.getInstance("SHA-256")
-        digest.update(bytes, 0, length)
-        val hashBytes = digest.digest()
-        val hex = hashBytes.joinToString(separator = "") { String.format(Locale.US, "%02x", it) }
-
-        if (argbBitmap !== src) {
-            try { argbBitmap.recycle() } catch (_: Exception) {}
-        }
-
-        return "${width}x${height}:$hex"
     }
 
     private fun getStatusBarHeight(): Int {

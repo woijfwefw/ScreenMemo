@@ -11,6 +11,7 @@ class UserSettingKeys {
   // 截屏基础配置
   static const String screenshotInterval = 'screenshot_interval';
   static const String screenshotEnabled = 'screenshot_enabled';
+  static const String screenshotDedupeMode = 'screenshot_dedupe_mode';
   static const String imageFormat = 'image_format';
   static const String imageQuality = 'image_quality';
   static const String useTargetSize = 'use_target_size';

@@ -5,6 +5,7 @@ object UserSettingsKeysNative {
     const val PRIVACY_MODE_ENABLED = "privacy_mode_enabled"
     const val SCREENSHOT_INTERVAL = "screenshot_interval"
     const val SCREENSHOT_ENABLED = "screenshot_enabled"
+    const val SCREENSHOT_DEDUPE_MODE = "screenshot_dedupe_mode"
     const val IMAGE_FORMAT = "image_format"
     const val IMAGE_QUALITY = "image_quality"
     const val USE_TARGET_SIZE = "use_target_size"

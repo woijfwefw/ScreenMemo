@@ -20,6 +20,48 @@ extension _SettingsScreenshotPart on _SettingsPageState {
     }
   }
 
+  String _normalizeScreenshotDedupeMode(String? value) {
+    switch ((value ?? '').trim().toLowerCase()) {
+      case 'exact':
+        return 'exact';
+      case 'conservative':
+        return 'conservative';
+      case 'aggressive':
+        return 'aggressive';
+      case 'balanced':
+      default:
+        return 'balanced';
+    }
+  }
+
+  String _screenshotDedupeModeLabel(BuildContext context, String value) {
+    final l10n = AppLocalizations.of(context);
+    switch (_normalizeScreenshotDedupeMode(value)) {
+      case 'exact':
+        return l10n.screenshotDedupeModeExact;
+      case 'conservative':
+        return l10n.screenshotDedupeModeConservative;
+      case 'aggressive':
+        return l10n.screenshotDedupeModeAggressive;
+      default:
+        return l10n.screenshotDedupeModeBalanced;
+    }
+  }
+
+  String _screenshotDedupeModeDesc(BuildContext context, String value) {
+    final l10n = AppLocalizations.of(context);
+    switch (_normalizeScreenshotDedupeMode(value)) {
+      case 'exact':
+        return l10n.screenshotDedupeModeExactDesc;
+      case 'conservative':
+        return l10n.screenshotDedupeModeConservativeDesc;
+      case 'aggressive':
+        return l10n.screenshotDedupeModeAggressiveDesc;
+      default:
+        return l10n.screenshotDedupeModeBalancedDesc;
+    }
+  }
+
   String _aiImageSendFormatLabel(BuildContext context, String value) {
     final l10n = AppLocalizations.of(context);
     switch (_normalizeAiImageSendFormat(value)) {
@@ -82,6 +124,64 @@ extension _SettingsScreenshotPart on _SettingsPageState {
           const SizedBox(width: AppTheme.spacing2),
           TextButton(
             onPressed: _showIntervalDialog,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTheme.spacing3,
+                vertical: AppTheme.spacing1 - 1,
+              ),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              minimumSize: Size.zero,
+              visualDensity: VisualDensity.compact,
+            ),
+            child: Text(AppLocalizations.of(context).actionSet),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScreenshotDedupeItem(BuildContext context) {
+    final String label = _screenshotDedupeModeLabel(
+      context,
+      _screenshotDedupeMode,
+    );
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.spacing4,
+        vertical: AppTheme.spacing3 - 2,
+      ),
+      decoration: BoxDecoration(
+        border: Border(bottom: _settingsDividerSide(context)),
+      ),
+      child: Row(
+        children: [
+          _buildSettingsLeadingIcon(context, Icons.filter_none_outlined),
+          const SizedBox(width: AppTheme.spacing3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  AppLocalizations.of(context).screenshotDedupeModeTitle,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  AppLocalizations.of(
+                    context,
+                  ).screenshotDedupeModeCurrent(label),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppTheme.spacing2),
+          TextButton(
+            onPressed: _showScreenshotDedupeModeDialog,
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppTheme.spacing3,
@@ -523,6 +623,70 @@ extension _SettingsScreenshotPart on _SettingsPageState {
     );
   }
 
+  void _showScreenshotDedupeModeDialog() {
+    String selected = _normalizeScreenshotDedupeMode(_screenshotDedupeMode);
+    showUIDialog<void>(
+      context: context,
+      title: AppLocalizations.of(context).screenshotDedupeModeDialogTitle,
+      content: StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          Widget option(String value) {
+            return RadioListTile<String>(
+              value: value,
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(_screenshotDedupeModeLabel(ctx, value)),
+              subtitle: Text(_screenshotDedupeModeDesc(ctx, value)),
+            );
+          }
+
+          return RadioGroup<String>(
+            groupValue: selected,
+            onChanged: (v) {
+              if (v == null) return;
+              setDialogState(() {
+                selected = v;
+              });
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                option('exact'),
+                option('conservative'),
+                option('balanced'),
+                option('aggressive'),
+              ],
+            ),
+          );
+        },
+      ),
+      actions: [
+        UIDialogAction(text: AppLocalizations.of(context).dialogCancel),
+        UIDialogAction(
+          text: AppLocalizations.of(context).dialogOk,
+          style: UIDialogActionStyle.primary,
+          closeOnPress: false,
+          onPressed: (ctx) async {
+            final String normalized = _normalizeScreenshotDedupeMode(selected);
+            _settingsSetState(() {
+              _screenshotDedupeMode = normalized;
+            });
+            await _saveScreenshotDedupeMode(showToast: false);
+            if (ctx.mounted) {
+              Navigator.of(ctx).pop();
+              UINotifier.success(
+                ctx,
+                AppLocalizations.of(ctx).screenshotDedupeModeSaved(
+                  _screenshotDedupeModeLabel(ctx, normalized),
+                ),
+              );
+            }
+          },
+        ),
+      ],
+    );
+  }
+
   Future<void> _loadScreenshotInterval() async {
     final interval = await _appService.getScreenshotInterval();
     if (mounted) {
@@ -537,6 +701,20 @@ extension _SettingsScreenshotPart on _SettingsPageState {
     _settingsSetState(() {
       _screenshotInterval = interval;
     });
+  }
+
+  Future<void> _loadScreenshotDedupeMode() async {
+    try {
+      final String? mode = await UserSettingsService.instance.getString(
+        UserSettingKeys.screenshotDedupeMode,
+        defaultValue: 'balanced',
+      );
+      if (mounted) {
+        _settingsSetState(() {
+          _screenshotDedupeMode = _normalizeScreenshotDedupeMode(mode);
+        });
+      }
+    } catch (_) {}
   }
 
   void _showIntervalDialog() {
@@ -1238,6 +1416,7 @@ extension _SettingsScreenshotPart on _SettingsPageState {
   Future<void> _resyncScreenshotSettingsAfterImport() async {
     await UserSettingsService.instance.resyncScreenshotEncodingSettings();
     await Future.wait([
+      _loadScreenshotDedupeMode(),
       _loadScreenshotQualitySettings(),
       _loadScreenshotExpireSettings(),
     ]);
@@ -1327,6 +1506,31 @@ extension _SettingsScreenshotPart on _SettingsPageState {
         UINotifier.success(
           context,
           AppLocalizations.of(context).screenshotQualitySettingsSaved,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        UINotifier.error(
+          context,
+          AppLocalizations.of(context).saveFailedError(e.toString()),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveScreenshotDedupeMode({bool showToast = true}) async {
+    try {
+      final String mode = _normalizeScreenshotDedupeMode(_screenshotDedupeMode);
+      await UserSettingsService.instance.setString(
+        UserSettingKeys.screenshotDedupeMode,
+        mode,
+      );
+      if (mounted && showToast) {
+        UINotifier.success(
+          context,
+          AppLocalizations.of(context).screenshotDedupeModeSaved(
+            _screenshotDedupeModeLabel(context, mode),
+          ),
         );
       }
     } catch (e) {

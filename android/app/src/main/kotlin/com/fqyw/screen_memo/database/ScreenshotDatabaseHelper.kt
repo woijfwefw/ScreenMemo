@@ -264,7 +264,7 @@ object ScreenshotDatabaseHelper {
                   total_count INTEGER NOT NULL DEFAULT 0,
                   total_size INTEGER NOT NULL DEFAULT 0,
                   last_capture_time INTEGER,
-                  last_dhash INTEGER
+                  last_dhash TEXT
                 )
                 """.trimIndent()
             )

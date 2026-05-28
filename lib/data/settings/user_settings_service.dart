@@ -200,6 +200,7 @@ class UserSettingsService {
       UserSettingKeys.screenshotExpireDays,
       legacyPrefKeys: const <String>['screenshot_expire_days'],
     );
+    await _resaveStringSetting(UserSettingKeys.screenshotDedupeMode);
   }
 
   Future<String?> _getRaw(String key) async {
