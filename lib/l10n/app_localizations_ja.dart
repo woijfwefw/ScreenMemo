@@ -818,6 +818,49 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get screenshotDedupeModeTitle => '画面重複除外の強度';
+
+  @override
+  String screenshotDedupeModeCurrent(Object mode) {
+    return '現在：$mode';
+  }
+
+  @override
+  String get screenshotDedupeModeDialogTitle => '画面重複除外の強度を選択';
+
+  @override
+  String get screenshotDedupeModeExact => 'オフ / 完全一致';
+
+  @override
+  String get screenshotDedupeModeExactDesc => '完全に同一のスクリーンショットだけをスキップします。';
+
+  @override
+  String get screenshotDedupeModeConservative => '控えめ';
+
+  @override
+  String get screenshotDedupeModeConservativeDesc =>
+      'カーソルや細い線の揺れなど、ごく小さな変化だけを無視します。';
+
+  @override
+  String get screenshotDedupeModeBalanced => 'バランス';
+
+  @override
+  String get screenshotDedupeModeBalancedDesc =>
+      'よくある小さなアニメーションや揺れを無視しつつ、内容の変化はできるだけ残します。';
+
+  @override
+  String get screenshotDedupeModeAggressive => '強め';
+
+  @override
+  String get screenshotDedupeModeAggressiveDesc =>
+      'より多くの小範囲の変化をスキップし、保存数を減らします。';
+
+  @override
+  String screenshotDedupeModeSaved(Object mode) {
+    return '画面重複除外の強度を保存しました：$mode';
+  }
+
+  @override
   String get screenshotQualityTitle => 'スクリーンショット品質';
 
   @override
@@ -1282,6 +1325,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get actionRefresh => '更新';
 
   @override
+  String get actionApply => '適用';
+
+  @override
   String get noScreenshotsTitle => 'スクリーンショットはまだありません';
 
   @override
@@ -1337,6 +1383,27 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get actionRetry => 'リトライ';
+
+  @override
+  String get appHealthLoadFailed => 'アプリ健全性の読み込みに失敗しました';
+
+  @override
+  String get appHealthRefreshStatus => '状態を更新';
+
+  @override
+  String get appHealthCustomHours => 'カスタム時間';
+
+  @override
+  String get appHealthCustomRangeTitle => 'カスタム時間範囲';
+
+  @override
+  String get appHealthRecentHoursLabel => '直近の時間数';
+
+  @override
+  String get appHealthRecentHoursHint => '例: 12';
+
+  @override
+  String get appHealthInvalidRangeHours => '時間範囲が無効です';
 
   @override
   String get deleteSelectedTooltip => '選択項目を削除';
@@ -1399,6 +1466,45 @@ class AppLocalizationsJa extends AppLocalizations {
   String loadMoreFailedWithError(Object error) {
     return 'さらにロードできませんでした: $error';
   }
+
+  @override
+  String get dateJumpTitle => '日付へ移動';
+
+  @override
+  String get dateJumpOpenTooltip => '日付へ移動';
+
+  @override
+  String get dateJumpPreviousMonth => '前の月';
+
+  @override
+  String get dateJumpNextMonth => '次の月';
+
+  @override
+  String get dateJumpLoadFailed => '日付の読み込みに失敗しました';
+
+  @override
+  String get dateJumpFailed => '日付への移動に失敗しました';
+
+  @override
+  String get dateJumpWeekdayMon => '月';
+
+  @override
+  String get dateJumpWeekdayTue => '火';
+
+  @override
+  String get dateJumpWeekdayWed => '水';
+
+  @override
+  String get dateJumpWeekdayThu => '木';
+
+  @override
+  String get dateJumpWeekdayFri => '金';
+
+  @override
+  String get dateJumpWeekdaySat => '土';
+
+  @override
+  String get dateJumpWeekdaySun => '日';
 
   @override
   String get confirmDeleteAllTitle => 'すべてのスクリーンショットの削除を確認する';
@@ -2945,6 +3051,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get providerFetchModelsFailedManual => 'モデルの取得に失敗しました。手動で追加できます。';
 
   @override
+  String get providerKeyModelsUpdatedToast => 'モデル一覧を更新しました';
+
+  @override
   String providerDeletedApiKeys(Object count) {
     return '$count 個の API Key を削除しました';
   }
@@ -3013,6 +3122,20 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get dynamicRebuildStopFailed => '動的再構築の停止に失敗しました';
+
+  @override
+  String get dynamicTaskStopping => '停止中...';
+
+  @override
+  String get dynamicTaskExitSuccess => '現在の動的タスクを終了しました';
+
+  @override
+  String get dynamicTaskExitFailed => '動的タスクの終了に失敗しました';
+
+  @override
+  String segmentTimelineNotAvailableForDate(Object date) {
+    return '現在の動的タスクでは $date のタイムラインはまだ利用できません。';
+  }
 
   @override
   String get dynamicRebuildBlockedRetry => '全体再構築中のため、単体の再生成は一時的に無効です。';

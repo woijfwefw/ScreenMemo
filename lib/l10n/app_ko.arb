@@ -353,6 +353,28 @@
       "seconds": {}
     }
   },
+  "screenshotDedupeModeTitle": "화면 중복 제거 강도",
+  "screenshotDedupeModeCurrent": "현재: {mode}",
+  "@screenshotDedupeModeCurrent": {
+    "placeholders": {
+      "mode": {}
+    }
+  },
+  "screenshotDedupeModeDialogTitle": "화면 중복 제거 강도 선택",
+  "screenshotDedupeModeExact": "끄기 / 정확히 일치",
+  "screenshotDedupeModeExactDesc": "완전히 동일한 스크린샷만 건너뜁니다.",
+  "screenshotDedupeModeConservative": "보수적",
+  "screenshotDedupeModeConservativeDesc": "커서나 얇은 선 흔들림 같은 아주 작은 변화만 무시합니다.",
+  "screenshotDedupeModeBalanced": "균형",
+  "screenshotDedupeModeBalancedDesc": "일반적인 작은 애니메이션과 흔들림은 무시하면서 콘텐츠 변화는 최대한 보존합니다.",
+  "screenshotDedupeModeAggressive": "적극적",
+  "screenshotDedupeModeAggressiveDesc": "더 많은 작은 영역 변화를 건너뛰어 저장 수를 줄입니다.",
+  "screenshotDedupeModeSaved": "화면 중복 제거 강도를 저장했습니다: {mode}",
+  "@screenshotDedupeModeSaved": {
+    "placeholders": {
+      "mode": {}
+    }
+  },
   "screenshotQualityTitle": "스크린샷 품질",
   "currentSizeLabel": "현재 크기:",
   "clickToModifyHint": "(숫자를 탭하면 수정 가능)",
@@ -655,6 +677,7 @@
   "imageMissingOrCorrupted": "이미지가 없거나 손상되었습니다.",
   "actionClear": "지우기",
   "actionRefresh": "새로 고침",
+  "actionApply": "적용",
   "noScreenshotsTitle": "스크린샷이 없습니다",
   "noScreenshotsSubtitle": "모니터링을 활성화하면 여기에 이미지가 표시됩니다",
   "confirmDeleteTitle": "삭제 확인",
@@ -674,6 +697,13 @@
   "tapToContinue": "탭하여 계속",
   "appDirUninitialized": "앱 디렉토리가 초기화되지 않았습니다.",
   "actionRetry": "다시 해 보다",
+  "appHealthLoadFailed": "앱 상태를 불러오지 못했습니다",
+  "appHealthRefreshStatus": "상태 새로고침",
+  "appHealthCustomHours": "사용자 지정 시간",
+  "appHealthCustomRangeTitle": "사용자 지정 시간 범위",
+  "appHealthRecentHoursLabel": "최근 몇 시간",
+  "appHealthRecentHoursHint": "예: 12",
+  "appHealthInvalidRangeHours": "잘못된 시간 범위입니다",
   "deleteSelectedTooltip": "선택 항목 삭제",
   "noMatchingResults": "일치하는 결과가 없습니다",
   "dayTabToday": "오늘 {count}",
@@ -727,6 +757,19 @@
       "error": {}
     }
   },
+  "dateJumpTitle": "날짜로 이동",
+  "dateJumpOpenTooltip": "날짜로 이동",
+  "dateJumpPreviousMonth": "이전 달",
+  "dateJumpNextMonth": "다음 달",
+  "dateJumpLoadFailed": "날짜를 불러오지 못했습니다",
+  "dateJumpFailed": "날짜로 이동하지 못했습니다",
+  "dateJumpWeekdayMon": "월",
+  "dateJumpWeekdayTue": "화",
+  "dateJumpWeekdayWed": "수",
+  "dateJumpWeekdayThu": "목",
+  "dateJumpWeekdayFri": "금",
+  "dateJumpWeekdaySat": "토",
+  "dateJumpWeekdaySun": "일",
   "confirmDeleteAllTitle": "모든 스크린샷 삭제 확인",
   "deleteAllMessage": "현재 범위의 모든 {count} 스크린샷을 삭제합니다. 이 작업은 취소할 수 없습니다.",
   "@deleteAllMessage": {
@@ -1534,6 +1577,7 @@
   "providerEditApiKey": "API Key 편집",
   "actionSaving": "저장 중",
   "providerFetchModelsFailedManual": "모델을 가져오지 못했습니다. 수동으로 추가할 수 있습니다.",
+  "providerKeyModelsUpdatedToast": "모델 목록이 업데이트되었습니다",
   "providerDeletedApiKeys": "API Key {count}개를 삭제했습니다",
   "@providerDeletedApiKeys": {
     "placeholders": {
@@ -1570,6 +1614,15 @@
   "dynamicRebuildTaskResumed": "백그라운드 재구축 작업이 재개되었습니다",
   "dynamicRebuildStopped": "동적 재구축이 중지되었습니다",
   "dynamicRebuildStopFailed": "동적 재구축 중지 실패",
+  "dynamicTaskStopping": "중지 중...",
+  "dynamicTaskExitSuccess": "현재 동적 작업에서 나갔습니다",
+  "dynamicTaskExitFailed": "동적 작업 종료 실패",
+  "segmentTimelineNotAvailableForDate": "현재 동적 작업에서는 {date} 타임라인이 아직 열리지 않았습니다.",
+  "@segmentTimelineNotAvailableForDate": {
+    "placeholders": {
+      "date": {}
+    }
+  },
   "dynamicRebuildBlockedRetry": "전체 재구축 중이라 단일 항목 재생성을 일시적으로 사용할 수 없습니다.",
   "dynamicRebuildBlockedForceMerge": "전체 재구축 중이라 수동 강제 병합을 일시적으로 사용할 수 없습니다.",
   "rawResponseRetentionDaysTitle": "보관 일수 설정",

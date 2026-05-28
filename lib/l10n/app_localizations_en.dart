@@ -839,6 +839,50 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get screenshotDedupeModeTitle => 'Visual dedupe strength';
+
+  @override
+  String screenshotDedupeModeCurrent(Object mode) {
+    return 'Current: $mode';
+  }
+
+  @override
+  String get screenshotDedupeModeDialogTitle => 'Choose visual dedupe strength';
+
+  @override
+  String get screenshotDedupeModeExact => 'Off / exact';
+
+  @override
+  String get screenshotDedupeModeExactDesc =>
+      'Only skip screenshots that are exactly identical.';
+
+  @override
+  String get screenshotDedupeModeConservative => 'Conservative';
+
+  @override
+  String get screenshotDedupeModeConservativeDesc =>
+      'Ignore only tiny changes such as cursors and thin-line jitter.';
+
+  @override
+  String get screenshotDedupeModeBalanced => 'Balanced';
+
+  @override
+  String get screenshotDedupeModeBalancedDesc =>
+      'Ignore common small animations and jitter while keeping content changes.';
+
+  @override
+  String get screenshotDedupeModeAggressive => 'Aggressive';
+
+  @override
+  String get screenshotDedupeModeAggressiveDesc =>
+      'Skip more small-area changes to reduce captures further.';
+
+  @override
+  String screenshotDedupeModeSaved(Object mode) {
+    return 'Visual dedupe strength saved: $mode';
+  }
+
+  @override
   String get screenshotQualityTitle => 'Screenshot quality';
 
   @override
@@ -1322,6 +1366,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get actionRefresh => 'Refresh';
 
   @override
+  String get actionApply => 'Apply';
+
+  @override
   String get noScreenshotsTitle => 'No screenshots yet';
 
   @override
@@ -1379,6 +1426,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get actionRetry => 'Retry';
+
+  @override
+  String get appHealthLoadFailed => 'Failed to load app health';
+
+  @override
+  String get appHealthRefreshStatus => 'Refresh status';
+
+  @override
+  String get appHealthCustomHours => 'Custom hours';
+
+  @override
+  String get appHealthCustomRangeTitle => 'Custom time range';
+
+  @override
+  String get appHealthRecentHoursLabel => 'Recent hours';
+
+  @override
+  String get appHealthRecentHoursHint => 'e.g. 12';
+
+  @override
+  String get appHealthInvalidRangeHours => 'Invalid range hours';
 
   @override
   String get deleteSelectedTooltip => 'Delete selected';
@@ -1441,6 +1509,45 @@ class AppLocalizationsEn extends AppLocalizations {
   String loadMoreFailedWithError(Object error) {
     return 'Failed to load more: $error';
   }
+
+  @override
+  String get dateJumpTitle => 'Jump to date';
+
+  @override
+  String get dateJumpOpenTooltip => 'Jump to date';
+
+  @override
+  String get dateJumpPreviousMonth => 'Previous month';
+
+  @override
+  String get dateJumpNextMonth => 'Next month';
+
+  @override
+  String get dateJumpLoadFailed => 'Failed to load dates';
+
+  @override
+  String get dateJumpFailed => 'Failed to jump to date';
+
+  @override
+  String get dateJumpWeekdayMon => 'Mon';
+
+  @override
+  String get dateJumpWeekdayTue => 'Tue';
+
+  @override
+  String get dateJumpWeekdayWed => 'Wed';
+
+  @override
+  String get dateJumpWeekdayThu => 'Thu';
+
+  @override
+  String get dateJumpWeekdayFri => 'Fri';
+
+  @override
+  String get dateJumpWeekdaySat => 'Sat';
+
+  @override
+  String get dateJumpWeekdaySun => 'Sun';
 
   @override
   String get confirmDeleteAllTitle => 'Confirm deleting all screenshots';
@@ -3028,6 +3135,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Failed to fetch models. You can add them manually.';
 
   @override
+  String get providerKeyModelsUpdatedToast => 'Model list updated';
+
+  @override
   String providerDeletedApiKeys(Object count) {
     return 'Deleted $count API Keys';
   }
@@ -3098,6 +3208,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dynamicRebuildStopFailed => 'Failed to stop dynamic rebuild';
+
+  @override
+  String get dynamicTaskStopping => 'Stopping...';
+
+  @override
+  String get dynamicTaskExitSuccess => 'Exited current dynamic task';
+
+  @override
+  String get dynamicTaskExitFailed => 'Failed to exit dynamic task';
+
+  @override
+  String segmentTimelineNotAvailableForDate(Object date) {
+    return 'The current dynamic task has not opened the timeline for $date.';
+  }
 
   @override
   String get dynamicRebuildBlockedRetry =>

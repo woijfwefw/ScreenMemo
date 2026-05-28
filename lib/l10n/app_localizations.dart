@@ -1596,6 +1596,78 @@ abstract class AppLocalizations {
   /// **'Current interval: {seconds}s'**
   String screenshotIntervalDesc(Object seconds);
 
+  /// No description provided for @screenshotDedupeModeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Visual dedupe strength'**
+  String get screenshotDedupeModeTitle;
+
+  /// No description provided for @screenshotDedupeModeCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current: {mode}'**
+  String screenshotDedupeModeCurrent(Object mode);
+
+  /// No description provided for @screenshotDedupeModeDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose visual dedupe strength'**
+  String get screenshotDedupeModeDialogTitle;
+
+  /// No description provided for @screenshotDedupeModeExact.
+  ///
+  /// In en, this message translates to:
+  /// **'Off / exact'**
+  String get screenshotDedupeModeExact;
+
+  /// No description provided for @screenshotDedupeModeExactDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Only skip screenshots that are exactly identical.'**
+  String get screenshotDedupeModeExactDesc;
+
+  /// No description provided for @screenshotDedupeModeConservative.
+  ///
+  /// In en, this message translates to:
+  /// **'Conservative'**
+  String get screenshotDedupeModeConservative;
+
+  /// No description provided for @screenshotDedupeModeConservativeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Ignore only tiny changes such as cursors and thin-line jitter.'**
+  String get screenshotDedupeModeConservativeDesc;
+
+  /// No description provided for @screenshotDedupeModeBalanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Balanced'**
+  String get screenshotDedupeModeBalanced;
+
+  /// No description provided for @screenshotDedupeModeBalancedDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Ignore common small animations and jitter while keeping content changes.'**
+  String get screenshotDedupeModeBalancedDesc;
+
+  /// No description provided for @screenshotDedupeModeAggressive.
+  ///
+  /// In en, this message translates to:
+  /// **'Aggressive'**
+  String get screenshotDedupeModeAggressive;
+
+  /// No description provided for @screenshotDedupeModeAggressiveDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip more small-area changes to reduce captures further.'**
+  String get screenshotDedupeModeAggressiveDesc;
+
+  /// No description provided for @screenshotDedupeModeSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Visual dedupe strength saved: {mode}'**
+  String screenshotDedupeModeSaved(Object mode);
+
   /// No description provided for @screenshotQualityTitle.
   ///
   /// In en, this message translates to:
@@ -2394,6 +2466,12 @@ abstract class AppLocalizations {
   /// **'Refresh'**
   String get actionRefresh;
 
+  /// No description provided for @actionApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get actionApply;
+
   /// No description provided for @noScreenshotsTitle.
   ///
   /// In en, this message translates to:
@@ -2508,6 +2586,48 @@ abstract class AppLocalizations {
   /// **'Retry'**
   String get actionRetry;
 
+  /// No description provided for @appHealthLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load app health'**
+  String get appHealthLoadFailed;
+
+  /// No description provided for @appHealthRefreshStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh status'**
+  String get appHealthRefreshStatus;
+
+  /// No description provided for @appHealthCustomHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom hours'**
+  String get appHealthCustomHours;
+
+  /// No description provided for @appHealthCustomRangeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom time range'**
+  String get appHealthCustomRangeTitle;
+
+  /// No description provided for @appHealthRecentHoursLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent hours'**
+  String get appHealthRecentHoursLabel;
+
+  /// No description provided for @appHealthRecentHoursHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 12'**
+  String get appHealthRecentHoursHint;
+
+  /// No description provided for @appHealthInvalidRangeHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid range hours'**
+  String get appHealthInvalidRangeHours;
+
   /// No description provided for @deleteSelectedTooltip.
   ///
   /// In en, this message translates to:
@@ -2603,6 +2723,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to load more: {error}'**
   String loadMoreFailedWithError(Object error);
+
+  /// No description provided for @dateJumpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to date'**
+  String get dateJumpTitle;
+
+  /// No description provided for @dateJumpOpenTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to date'**
+  String get dateJumpOpenTooltip;
+
+  /// No description provided for @dateJumpPreviousMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous month'**
+  String get dateJumpPreviousMonth;
+
+  /// No description provided for @dateJumpNextMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Next month'**
+  String get dateJumpNextMonth;
+
+  /// No description provided for @dateJumpLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load dates'**
+  String get dateJumpLoadFailed;
+
+  /// No description provided for @dateJumpFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to jump to date'**
+  String get dateJumpFailed;
+
+  /// No description provided for @dateJumpWeekdayMon.
+  ///
+  /// In en, this message translates to:
+  /// **'Mon'**
+  String get dateJumpWeekdayMon;
+
+  /// No description provided for @dateJumpWeekdayTue.
+  ///
+  /// In en, this message translates to:
+  /// **'Tue'**
+  String get dateJumpWeekdayTue;
+
+  /// No description provided for @dateJumpWeekdayWed.
+  ///
+  /// In en, this message translates to:
+  /// **'Wed'**
+  String get dateJumpWeekdayWed;
+
+  /// No description provided for @dateJumpWeekdayThu.
+  ///
+  /// In en, this message translates to:
+  /// **'Thu'**
+  String get dateJumpWeekdayThu;
+
+  /// No description provided for @dateJumpWeekdayFri.
+  ///
+  /// In en, this message translates to:
+  /// **'Fri'**
+  String get dateJumpWeekdayFri;
+
+  /// No description provided for @dateJumpWeekdaySat.
+  ///
+  /// In en, this message translates to:
+  /// **'Sat'**
+  String get dateJumpWeekdaySat;
+
+  /// No description provided for @dateJumpWeekdaySun.
+  ///
+  /// In en, this message translates to:
+  /// **'Sun'**
+  String get dateJumpWeekdaySun;
 
   /// No description provided for @confirmDeleteAllTitle.
   ///
@@ -5370,6 +5568,12 @@ abstract class AppLocalizations {
   /// **'Failed to fetch models. You can add them manually.'**
   String get providerFetchModelsFailedManual;
 
+  /// No description provided for @providerKeyModelsUpdatedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Model list updated'**
+  String get providerKeyModelsUpdatedToast;
+
   /// No description provided for @providerDeletedApiKeys.
   ///
   /// In en, this message translates to:
@@ -5495,6 +5699,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to stop dynamic rebuild'**
   String get dynamicRebuildStopFailed;
+
+  /// No description provided for @dynamicTaskStopping.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopping...'**
+  String get dynamicTaskStopping;
+
+  /// No description provided for @dynamicTaskExitSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Exited current dynamic task'**
+  String get dynamicTaskExitSuccess;
+
+  /// No description provided for @dynamicTaskExitFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to exit dynamic task'**
+  String get dynamicTaskExitFailed;
+
+  /// No description provided for @segmentTimelineNotAvailableForDate.
+  ///
+  /// In en, this message translates to:
+  /// **'The current dynamic task has not opened the timeline for {date}.'**
+  String segmentTimelineNotAvailableForDate(Object date);
 
   /// No description provided for @dynamicRebuildBlockedRetry.
   ///

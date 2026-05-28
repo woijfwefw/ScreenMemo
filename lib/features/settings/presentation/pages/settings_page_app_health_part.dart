@@ -22,7 +22,10 @@ extension _SettingsAppHealthPart on _SettingsPageState {
       _settingsSetState(() => _appHealthSnapshot = snapshot);
     } catch (e) {
       if (!mounted) return;
-      UINotifier.error(context, 'Failed to load app health');
+      UINotifier.error(
+        context,
+        AppLocalizations.of(context).appHealthLoadFailed,
+      );
     } finally {
       if (mounted) {
         _settingsSetState(() => _appHealthLoading = false);
@@ -93,7 +96,7 @@ extension _SettingsAppHealthPart on _SettingsPageState {
           FilledButton.icon(
             onPressed: () => _loadAppHealthStatus(refresh: true),
             icon: const Icon(Icons.refresh),
-            label: const Text('刷新状态'),
+            label: Text(AppLocalizations.of(context).appHealthRefreshStatus),
           ),
         ],
       ),
@@ -163,7 +166,7 @@ extension _SettingsAppHealthPart on _SettingsPageState {
             _loadAppHealthStatus(refresh: true);
           },
           icon: const Icon(Icons.refresh),
-          label: const Text('刷新状态'),
+          label: Text(AppLocalizations.of(context).appHealthRefreshStatus),
         ),
       ],
     );
@@ -200,7 +203,7 @@ extension _SettingsAppHealthPart on _SettingsPageState {
                 afterApply: afterSelectionChanged,
               ),
               icon: const Icon(Icons.tune_rounded, size: 16),
-              label: const Text('自定义小时'),
+              label: Text(AppLocalizations.of(context).appHealthCustomHours),
             ),
           ],
         ),
@@ -336,25 +339,36 @@ extension _SettingsAppHealthPart on _SettingsPageState {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('自定义时间范围'),
+          title: Text(
+            AppLocalizations.of(dialogContext).appHealthCustomRangeTitle,
+          ),
           content: TextField(
             controller: controller,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: '最近多少小时',
-              hintText: '例如 12',
+            decoration: InputDecoration(
+              labelText: AppLocalizations.of(
+                dialogContext,
+              ).appHealthRecentHoursLabel,
+              hintText: AppLocalizations.of(
+                dialogContext,
+              ).appHealthRecentHoursHint,
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('取消'),
+              child: Text(AppLocalizations.of(dialogContext).dialogCancel),
             ),
             FilledButton(
               onPressed: () {
                 final hours = int.tryParse(controller.text.trim());
                 if (hours == null || hours <= 0) {
-                  UINotifier.error(context, 'Invalid range hours');
+                  UINotifier.error(
+                    context,
+                    AppLocalizations.of(
+                      dialogContext,
+                    ).appHealthInvalidRangeHours,
+                  );
                   return;
                 }
                 Navigator.of(dialogContext).pop();
@@ -363,7 +377,7 @@ extension _SettingsAppHealthPart on _SettingsPageState {
                 );
                 afterApply?.call();
               },
-              child: const Text('应用'),
+              child: Text(AppLocalizations.of(dialogContext).actionApply),
             ),
           ],
         );

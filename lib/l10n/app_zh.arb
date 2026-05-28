@@ -355,6 +355,28 @@
       "seconds": {}
     }
   },
+  "screenshotDedupeModeTitle": "画面去重强度",
+  "screenshotDedupeModeCurrent": "当前：{mode}",
+  "@screenshotDedupeModeCurrent": {
+    "placeholders": {
+      "mode": {}
+    }
+  },
+  "screenshotDedupeModeDialogTitle": "选择画面去重强度",
+  "screenshotDedupeModeExact": "关闭/精确",
+  "screenshotDedupeModeExactDesc": "只跳过完全一致的截图。",
+  "screenshotDedupeModeConservative": "保守",
+  "screenshotDedupeModeConservativeDesc": "只忽略光标、细线抖动等很轻微变化。",
+  "screenshotDedupeModeBalanced": "均衡",
+  "screenshotDedupeModeBalancedDesc": "忽略常见小动画和抖动，同时尽量保留内容变化。",
+  "screenshotDedupeModeAggressive": "激进",
+  "screenshotDedupeModeAggressiveDesc": "跳过更多小范围变化，截图量更少。",
+  "screenshotDedupeModeSaved": "画面去重强度已保存：{mode}",
+  "@screenshotDedupeModeSaved": {
+    "placeholders": {
+      "mode": {}
+    }
+  },
   "screenshotQualityTitle": "截图质量",
   "currentSizeLabel": "当前大小：",
   "clickToModifyHint": "（点击数字可修改）",
@@ -657,6 +679,7 @@
   "imageMissingOrCorrupted": "图片丢失或损坏",
   "actionClear": "清除",
   "actionRefresh": "刷新",
+  "actionApply": "应用",
   "noScreenshotsTitle": "暂无截图",
   "noScreenshotsSubtitle": "开启截图监控后，截图将显示在这里",
   "confirmDeleteTitle": "确认删除",
@@ -676,6 +699,13 @@
   "tapToContinue": "轻触继续",
   "appDirUninitialized": "应用目录未初始化",
   "actionRetry": "重试",
+  "appHealthLoadFailed": "加载 App 运行状态失败",
+  "appHealthRefreshStatus": "刷新状态",
+  "appHealthCustomHours": "自定义小时",
+  "appHealthCustomRangeTitle": "自定义时间范围",
+  "appHealthRecentHoursLabel": "最近多少小时",
+  "appHealthRecentHoursHint": "例如 12",
+  "appHealthInvalidRangeHours": "时间范围无效",
   "noMatchingResults": "无匹配结果",
   "deleteSelectedTooltip": "删除所选",
   "screenshotDeletedToast": "截图已删除",
@@ -729,6 +759,19 @@
       "error": {}
     }
   },
+  "dateJumpTitle": "跳转日期",
+  "dateJumpOpenTooltip": "跳转日期",
+  "dateJumpPreviousMonth": "上个月",
+  "dateJumpNextMonth": "下个月",
+  "dateJumpLoadFailed": "日期加载失败",
+  "dateJumpFailed": "跳转日期失败",
+  "dateJumpWeekdayMon": "周一",
+  "dateJumpWeekdayTue": "周二",
+  "dateJumpWeekdayWed": "周三",
+  "dateJumpWeekdayThu": "周四",
+  "dateJumpWeekdayFri": "周五",
+  "dateJumpWeekdaySat": "周六",
+  "dateJumpWeekdaySun": "周日",
   "confirmDeleteAllTitle": "确认删除所有截图",
   "deleteAllMessage": "将删除当前范围内的所有 {count} 张截图及其文件夹，此操作不可恢复。",
   "@deleteAllMessage": {
@@ -1534,6 +1577,7 @@
   "providerEditApiKey": "编辑 API Key",
   "actionSaving": "保存中",
   "providerFetchModelsFailedManual": "获取模型失败，可以手动添加。",
+  "providerKeyModelsUpdatedToast": "模型列表已更新",
   "providerDeletedApiKeys": "已删除 {count} 个 API Key",
   "@providerDeletedApiKeys": {
     "placeholders": {
@@ -1570,6 +1614,15 @@
   "dynamicRebuildTaskResumed": "后台重建任务已恢复",
   "dynamicRebuildStopped": "动态重建已停止",
   "dynamicRebuildStopFailed": "停止动态重建失败",
+  "dynamicTaskStopping": "停止中...",
+  "dynamicTaskExitSuccess": "已退出当前动态任务",
+  "dynamicTaskExitFailed": "退出动态任务失败",
+  "segmentTimelineNotAvailableForDate": "当前动态任务尚未开放 {date} 的时间线。",
+  "@segmentTimelineNotAvailableForDate": {
+    "placeholders": {
+      "date": {}
+    }
+  },
   "dynamicRebuildBlockedRetry": "全量重建进行中，暂时禁止单条重新生成",
   "dynamicRebuildBlockedForceMerge": "全量重建进行中，暂时禁止手动强制合并",
   "rawResponseRetentionDaysTitle": "设置保留天数",

@@ -355,6 +355,28 @@
       "seconds": {}
     }
   },
+  "screenshotDedupeModeTitle": "Visual dedupe strength",
+  "screenshotDedupeModeCurrent": "Current: {mode}",
+  "@screenshotDedupeModeCurrent": {
+    "placeholders": {
+      "mode": {}
+    }
+  },
+  "screenshotDedupeModeDialogTitle": "Choose visual dedupe strength",
+  "screenshotDedupeModeExact": "Off / exact",
+  "screenshotDedupeModeExactDesc": "Only skip screenshots that are exactly identical.",
+  "screenshotDedupeModeConservative": "Conservative",
+  "screenshotDedupeModeConservativeDesc": "Ignore only tiny changes such as cursors and thin-line jitter.",
+  "screenshotDedupeModeBalanced": "Balanced",
+  "screenshotDedupeModeBalancedDesc": "Ignore common small animations and jitter while keeping content changes.",
+  "screenshotDedupeModeAggressive": "Aggressive",
+  "screenshotDedupeModeAggressiveDesc": "Skip more small-area changes to reduce captures further.",
+  "screenshotDedupeModeSaved": "Visual dedupe strength saved: {mode}",
+  "@screenshotDedupeModeSaved": {
+    "placeholders": {
+      "mode": {}
+    }
+  },
   "screenshotQualityTitle": "Screenshot quality",
   "currentSizeLabel": "Current size: ",
   "clickToModifyHint": "(Click number to modify)",
@@ -657,6 +679,7 @@
   "imageMissingOrCorrupted": "Image missing or corrupted",
   "actionClear": "Clear",
   "actionRefresh": "Refresh",
+  "actionApply": "Apply",
   "noScreenshotsTitle": "No screenshots yet",
   "noScreenshotsSubtitle": "Enable screenshot monitoring to see images here",
   "confirmDeleteTitle": "Confirm deletion",
@@ -676,6 +699,13 @@
   "tapToContinue": "Tap to continue",
   "appDirUninitialized": "App directory not initialized",
   "actionRetry": "Retry",
+  "appHealthLoadFailed": "Failed to load app health",
+  "appHealthRefreshStatus": "Refresh status",
+  "appHealthCustomHours": "Custom hours",
+  "appHealthCustomRangeTitle": "Custom time range",
+  "appHealthRecentHoursLabel": "Recent hours",
+  "appHealthRecentHoursHint": "e.g. 12",
+  "appHealthInvalidRangeHours": "Invalid range hours",
   "deleteSelectedTooltip": "Delete selected",
   "noMatchingResults": "No matching results",
   "dayTabToday": "Today {count}",
@@ -729,6 +759,19 @@
       "error": {}
     }
   },
+  "dateJumpTitle": "Jump to date",
+  "dateJumpOpenTooltip": "Jump to date",
+  "dateJumpPreviousMonth": "Previous month",
+  "dateJumpNextMonth": "Next month",
+  "dateJumpLoadFailed": "Failed to load dates",
+  "dateJumpFailed": "Failed to jump to date",
+  "dateJumpWeekdayMon": "Mon",
+  "dateJumpWeekdayTue": "Tue",
+  "dateJumpWeekdayWed": "Wed",
+  "dateJumpWeekdayThu": "Thu",
+  "dateJumpWeekdayFri": "Fri",
+  "dateJumpWeekdaySat": "Sat",
+  "dateJumpWeekdaySun": "Sun",
   "confirmDeleteAllTitle": "Confirm deleting all screenshots",
   "deleteAllMessage": "Will delete all {count} screenshots in current scope. This action cannot be undone.",
   "@deleteAllMessage": {
@@ -1534,6 +1577,7 @@
   "providerEditApiKey": "Edit API Key",
   "actionSaving": "Saving",
   "providerFetchModelsFailedManual": "Failed to fetch models. You can add them manually.",
+  "providerKeyModelsUpdatedToast": "Model list updated",
   "providerDeletedApiKeys": "Deleted {count} API Keys",
   "@providerDeletedApiKeys": {
     "placeholders": {
@@ -1570,6 +1614,15 @@
   "dynamicRebuildTaskResumed": "Background rebuild task resumed",
   "dynamicRebuildStopped": "Dynamic rebuild stopped",
   "dynamicRebuildStopFailed": "Failed to stop dynamic rebuild",
+  "dynamicTaskStopping": "Stopping...",
+  "dynamicTaskExitSuccess": "Exited current dynamic task",
+  "dynamicTaskExitFailed": "Failed to exit dynamic task",
+  "segmentTimelineNotAvailableForDate": "The current dynamic task has not opened the timeline for {date}.",
+  "@segmentTimelineNotAvailableForDate": {
+    "placeholders": {
+      "date": {}
+    }
+  },
   "dynamicRebuildBlockedRetry": "Full rebuild is running. Single-item regeneration is temporarily disabled.",
   "dynamicRebuildBlockedForceMerge": "Full rebuild is running. Manual force merge is temporarily disabled.",
   "rawResponseRetentionDaysTitle": "Set retention days",

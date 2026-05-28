@@ -803,6 +803,46 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get screenshotDedupeModeTitle => '画面去重强度';
+
+  @override
+  String screenshotDedupeModeCurrent(Object mode) {
+    return '当前：$mode';
+  }
+
+  @override
+  String get screenshotDedupeModeDialogTitle => '选择画面去重强度';
+
+  @override
+  String get screenshotDedupeModeExact => '关闭/精确';
+
+  @override
+  String get screenshotDedupeModeExactDesc => '只跳过完全一致的截图。';
+
+  @override
+  String get screenshotDedupeModeConservative => '保守';
+
+  @override
+  String get screenshotDedupeModeConservativeDesc => '只忽略光标、细线抖动等很轻微变化。';
+
+  @override
+  String get screenshotDedupeModeBalanced => '均衡';
+
+  @override
+  String get screenshotDedupeModeBalancedDesc => '忽略常见小动画和抖动，同时尽量保留内容变化。';
+
+  @override
+  String get screenshotDedupeModeAggressive => '激进';
+
+  @override
+  String get screenshotDedupeModeAggressiveDesc => '跳过更多小范围变化，截图量更少。';
+
+  @override
+  String screenshotDedupeModeSaved(Object mode) {
+    return '画面去重强度已保存：$mode';
+  }
+
+  @override
   String get screenshotQualityTitle => '截图质量';
 
   @override
@@ -1262,6 +1302,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get actionRefresh => '刷新';
 
   @override
+  String get actionApply => '应用';
+
+  @override
   String get noScreenshotsTitle => '暂无截图';
 
   @override
@@ -1317,6 +1360,27 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get actionRetry => '重试';
+
+  @override
+  String get appHealthLoadFailed => '加载 App 运行状态失败';
+
+  @override
+  String get appHealthRefreshStatus => '刷新状态';
+
+  @override
+  String get appHealthCustomHours => '自定义小时';
+
+  @override
+  String get appHealthCustomRangeTitle => '自定义时间范围';
+
+  @override
+  String get appHealthRecentHoursLabel => '最近多少小时';
+
+  @override
+  String get appHealthRecentHoursHint => '例如 12';
+
+  @override
+  String get appHealthInvalidRangeHours => '时间范围无效';
 
   @override
   String get deleteSelectedTooltip => '删除所选';
@@ -1379,6 +1443,45 @@ class AppLocalizationsZh extends AppLocalizations {
   String loadMoreFailedWithError(Object error) {
     return '加载更多失败: $error';
   }
+
+  @override
+  String get dateJumpTitle => '跳转日期';
+
+  @override
+  String get dateJumpOpenTooltip => '跳转日期';
+
+  @override
+  String get dateJumpPreviousMonth => '上个月';
+
+  @override
+  String get dateJumpNextMonth => '下个月';
+
+  @override
+  String get dateJumpLoadFailed => '日期加载失败';
+
+  @override
+  String get dateJumpFailed => '跳转日期失败';
+
+  @override
+  String get dateJumpWeekdayMon => '周一';
+
+  @override
+  String get dateJumpWeekdayTue => '周二';
+
+  @override
+  String get dateJumpWeekdayWed => '周三';
+
+  @override
+  String get dateJumpWeekdayThu => '周四';
+
+  @override
+  String get dateJumpWeekdayFri => '周五';
+
+  @override
+  String get dateJumpWeekdaySat => '周六';
+
+  @override
+  String get dateJumpWeekdaySun => '周日';
 
   @override
   String get confirmDeleteAllTitle => '确认删除所有截图';
@@ -2912,6 +3015,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerFetchModelsFailedManual => '获取模型失败，可以手动添加。';
 
   @override
+  String get providerKeyModelsUpdatedToast => '模型列表已更新';
+
+  @override
   String providerDeletedApiKeys(Object count) {
     return '已删除 $count 个 API Key';
   }
@@ -2979,6 +3085,20 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get dynamicRebuildStopFailed => '停止动态重建失败';
+
+  @override
+  String get dynamicTaskStopping => '停止中...';
+
+  @override
+  String get dynamicTaskExitSuccess => '已退出当前动态任务';
+
+  @override
+  String get dynamicTaskExitFailed => '退出动态任务失败';
+
+  @override
+  String segmentTimelineNotAvailableForDate(Object date) {
+    return '当前动态任务尚未开放 $date 的时间线。';
+  }
 
   @override
   String get dynamicRebuildBlockedRetry => '全量重建进行中，暂时禁止单条重新生成';

@@ -353,6 +353,28 @@
       "seconds": {}
     }
   },
+  "screenshotDedupeModeTitle": "画面重複除外の強度",
+  "screenshotDedupeModeCurrent": "現在：{mode}",
+  "@screenshotDedupeModeCurrent": {
+    "placeholders": {
+      "mode": {}
+    }
+  },
+  "screenshotDedupeModeDialogTitle": "画面重複除外の強度を選択",
+  "screenshotDedupeModeExact": "オフ / 完全一致",
+  "screenshotDedupeModeExactDesc": "完全に同一のスクリーンショットだけをスキップします。",
+  "screenshotDedupeModeConservative": "控えめ",
+  "screenshotDedupeModeConservativeDesc": "カーソルや細い線の揺れなど、ごく小さな変化だけを無視します。",
+  "screenshotDedupeModeBalanced": "バランス",
+  "screenshotDedupeModeBalancedDesc": "よくある小さなアニメーションや揺れを無視しつつ、内容の変化はできるだけ残します。",
+  "screenshotDedupeModeAggressive": "強め",
+  "screenshotDedupeModeAggressiveDesc": "より多くの小範囲の変化をスキップし、保存数を減らします。",
+  "screenshotDedupeModeSaved": "画面重複除外の強度を保存しました：{mode}",
+  "@screenshotDedupeModeSaved": {
+    "placeholders": {
+      "mode": {}
+    }
+  },
   "screenshotQualityTitle": "スクリーンショット品質",
   "currentSizeLabel": "現在のサイズ：",
   "clickToModifyHint": "（数字をタップして変更）",
@@ -655,6 +677,7 @@
   "imageMissingOrCorrupted": "画像が見つからないか破損しています",
   "actionClear": "クリア",
   "actionRefresh": "更新",
+  "actionApply": "適用",
   "noScreenshotsTitle": "スクリーンショットはまだありません",
   "noScreenshotsSubtitle": "監視を有効にするとここに画像が表示されます",
   "confirmDeleteTitle": "削除の確認",
@@ -674,6 +697,13 @@
   "tapToContinue": "タップして続行",
   "appDirUninitialized": "アプリディレクトリが初期化されていません",
   "actionRetry": "リトライ",
+  "appHealthLoadFailed": "アプリ健全性の読み込みに失敗しました",
+  "appHealthRefreshStatus": "状態を更新",
+  "appHealthCustomHours": "カスタム時間",
+  "appHealthCustomRangeTitle": "カスタム時間範囲",
+  "appHealthRecentHoursLabel": "直近の時間数",
+  "appHealthRecentHoursHint": "例: 12",
+  "appHealthInvalidRangeHours": "時間範囲が無効です",
   "deleteSelectedTooltip": "選択項目を削除",
   "noMatchingResults": "一致する結果はありません",
   "dayTabToday": "今日 {count}",
@@ -727,6 +757,19 @@
       "error": {}
     }
   },
+  "dateJumpTitle": "日付へ移動",
+  "dateJumpOpenTooltip": "日付へ移動",
+  "dateJumpPreviousMonth": "前の月",
+  "dateJumpNextMonth": "次の月",
+  "dateJumpLoadFailed": "日付の読み込みに失敗しました",
+  "dateJumpFailed": "日付への移動に失敗しました",
+  "dateJumpWeekdayMon": "月",
+  "dateJumpWeekdayTue": "火",
+  "dateJumpWeekdayWed": "水",
+  "dateJumpWeekdayThu": "木",
+  "dateJumpWeekdayFri": "金",
+  "dateJumpWeekdaySat": "土",
+  "dateJumpWeekdaySun": "日",
   "confirmDeleteAllTitle": "すべてのスクリーンショットの削除を確認する",
   "deleteAllMessage": "現在のスコープ内のすべての {count} スクリーンショットを削除します。この操作は元に戻すことができません。",
   "@deleteAllMessage": {
@@ -1534,6 +1577,7 @@
   "providerEditApiKey": "API Key を編集",
   "actionSaving": "保存中",
   "providerFetchModelsFailedManual": "モデルの取得に失敗しました。手動で追加できます。",
+  "providerKeyModelsUpdatedToast": "モデル一覧を更新しました",
   "providerDeletedApiKeys": "{count} 個の API Key を削除しました",
   "@providerDeletedApiKeys": {
     "placeholders": {
@@ -1570,6 +1614,15 @@
   "dynamicRebuildTaskResumed": "バックグラウンド再構築タスクを再開しました",
   "dynamicRebuildStopped": "動的再構築を停止しました",
   "dynamicRebuildStopFailed": "動的再構築の停止に失敗しました",
+  "dynamicTaskStopping": "停止中...",
+  "dynamicTaskExitSuccess": "現在の動的タスクを終了しました",
+  "dynamicTaskExitFailed": "動的タスクの終了に失敗しました",
+  "segmentTimelineNotAvailableForDate": "現在の動的タスクでは {date} のタイムラインはまだ利用できません。",
+  "@segmentTimelineNotAvailableForDate": {
+    "placeholders": {
+      "date": {}
+    }
+  },
   "dynamicRebuildBlockedRetry": "全体再構築中のため、単体の再生成は一時的に無効です。",
   "dynamicRebuildBlockedForceMerge": "全体再構築中のため、手動の強制マージは一時的に無効です。",
   "rawResponseRetentionDaysTitle": "保持日数を設定",

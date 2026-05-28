@@ -84,7 +84,7 @@ extension _ChatContextPanelActionsPart on _ChatContextPanelState {
                   }
                   Navigator.of(dialogContext).pop(parsed);
                 },
-                child: Text(ChatContextSheet._loc(dialogContext, '保存', 'Save')),
+                child: Text(AppLocalizations.of(dialogContext).actionSave),
               ),
             ],
           );

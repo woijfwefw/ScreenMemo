@@ -817,6 +817,49 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String get screenshotDedupeModeTitle => '화면 중복 제거 강도';
+
+  @override
+  String screenshotDedupeModeCurrent(Object mode) {
+    return '현재: $mode';
+  }
+
+  @override
+  String get screenshotDedupeModeDialogTitle => '화면 중복 제거 강도 선택';
+
+  @override
+  String get screenshotDedupeModeExact => '끄기 / 정확히 일치';
+
+  @override
+  String get screenshotDedupeModeExactDesc => '완전히 동일한 스크린샷만 건너뜁니다.';
+
+  @override
+  String get screenshotDedupeModeConservative => '보수적';
+
+  @override
+  String get screenshotDedupeModeConservativeDesc =>
+      '커서나 얇은 선 흔들림 같은 아주 작은 변화만 무시합니다.';
+
+  @override
+  String get screenshotDedupeModeBalanced => '균형';
+
+  @override
+  String get screenshotDedupeModeBalancedDesc =>
+      '일반적인 작은 애니메이션과 흔들림은 무시하면서 콘텐츠 변화는 최대한 보존합니다.';
+
+  @override
+  String get screenshotDedupeModeAggressive => '적극적';
+
+  @override
+  String get screenshotDedupeModeAggressiveDesc =>
+      '더 많은 작은 영역 변화를 건너뛰어 저장 수를 줄입니다.';
+
+  @override
+  String screenshotDedupeModeSaved(Object mode) {
+    return '화면 중복 제거 강도를 저장했습니다: $mode';
+  }
+
+  @override
   String get screenshotQualityTitle => '스크린샷 품질';
 
   @override
@@ -1279,6 +1322,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get actionRefresh => '새로 고침';
 
   @override
+  String get actionApply => '적용';
+
+  @override
   String get noScreenshotsTitle => '스크린샷이 없습니다';
 
   @override
@@ -1334,6 +1380,27 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get actionRetry => '다시 해 보다';
+
+  @override
+  String get appHealthLoadFailed => '앱 상태를 불러오지 못했습니다';
+
+  @override
+  String get appHealthRefreshStatus => '상태 새로고침';
+
+  @override
+  String get appHealthCustomHours => '사용자 지정 시간';
+
+  @override
+  String get appHealthCustomRangeTitle => '사용자 지정 시간 범위';
+
+  @override
+  String get appHealthRecentHoursLabel => '최근 몇 시간';
+
+  @override
+  String get appHealthRecentHoursHint => '예: 12';
+
+  @override
+  String get appHealthInvalidRangeHours => '잘못된 시간 범위입니다';
 
   @override
   String get deleteSelectedTooltip => '선택 항목 삭제';
@@ -1396,6 +1463,45 @@ class AppLocalizationsKo extends AppLocalizations {
   String loadMoreFailedWithError(Object error) {
     return '추가 로드 실패: $error';
   }
+
+  @override
+  String get dateJumpTitle => '날짜로 이동';
+
+  @override
+  String get dateJumpOpenTooltip => '날짜로 이동';
+
+  @override
+  String get dateJumpPreviousMonth => '이전 달';
+
+  @override
+  String get dateJumpNextMonth => '다음 달';
+
+  @override
+  String get dateJumpLoadFailed => '날짜를 불러오지 못했습니다';
+
+  @override
+  String get dateJumpFailed => '날짜로 이동하지 못했습니다';
+
+  @override
+  String get dateJumpWeekdayMon => '월';
+
+  @override
+  String get dateJumpWeekdayTue => '화';
+
+  @override
+  String get dateJumpWeekdayWed => '수';
+
+  @override
+  String get dateJumpWeekdayThu => '목';
+
+  @override
+  String get dateJumpWeekdayFri => '금';
+
+  @override
+  String get dateJumpWeekdaySat => '토';
+
+  @override
+  String get dateJumpWeekdaySun => '일';
 
   @override
   String get confirmDeleteAllTitle => '모든 스크린샷 삭제 확인';
@@ -2944,6 +3050,9 @@ class AppLocalizationsKo extends AppLocalizations {
       '모델을 가져오지 못했습니다. 수동으로 추가할 수 있습니다.';
 
   @override
+  String get providerKeyModelsUpdatedToast => '모델 목록이 업데이트되었습니다';
+
+  @override
   String providerDeletedApiKeys(Object count) {
     return 'API Key $count개를 삭제했습니다';
   }
@@ -3012,6 +3121,20 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get dynamicRebuildStopFailed => '동적 재구축 중지 실패';
+
+  @override
+  String get dynamicTaskStopping => '중지 중...';
+
+  @override
+  String get dynamicTaskExitSuccess => '현재 동적 작업에서 나갔습니다';
+
+  @override
+  String get dynamicTaskExitFailed => '동적 작업 종료 실패';
+
+  @override
+  String segmentTimelineNotAvailableForDate(Object date) {
+    return '현재 동적 작업에서는 $date 타임라인이 아직 열리지 않았습니다.';
+  }
 
   @override
   String get dynamicRebuildBlockedRetry =>

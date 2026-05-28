@@ -674,7 +674,10 @@ extension _ProviderEditKeysPart on _ProviderEditPageState {
       );
       await _reloadKeys();
       if (mounted) {
-        UINotifier.success(context, '模型列表已更新');
+        UINotifier.success(
+          context,
+          AppLocalizations.of(context).providerKeyModelsUpdatedToast,
+        );
       }
     } catch (_) {
       if (mounted) {
