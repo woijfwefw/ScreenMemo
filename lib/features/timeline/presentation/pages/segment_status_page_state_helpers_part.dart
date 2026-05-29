@@ -649,18 +649,31 @@ extension _SegmentStatusStateHelpersPart on _SegmentStatusPageState {
       return;
     }
 
+    final SegmentTimelineDayBatch dayBatch = await _db
+        .listSegmentTimelineDayBatch(
+          distinctDayCount: _SegmentStatusPageState._initialDayTabs,
+          pinnedDateKey: normalized,
+          maxDateKeyInclusive: cutoff,
+          requireSamples: true,
+        );
+    if (!mounted) return;
+
+    final List<String> nextDayKeys = dayBatch.dayKeys.isEmpty
+        ? (<String>{..._loadedDayKeys, normalized}.toList()
+            ..sort((String a, String b) => b.compareTo(a)))
+        : dayBatch.dayKeys;
     final int generation = ++_timelineLoadGeneration;
-    final List<String> nextDayKeys = <String>{
-      ..._loadedDayKeys,
-      normalized,
-    }.toList()..sort((String a, String b) => b.compareTo(a));
     _segmentStatusSetState(() {
       _selectedDateKey = normalized;
       _loadedDayKeys = nextDayKeys;
       _maxVisibleDayTabs = nextDayKeys.length;
       _dayCountsByKey = <String, int>{
-        ..._dayCountsByKey,
+        ...dayBatch.dayCountsByKey,
         if (knownCount > 0) normalized: knownCount,
+      };
+      _segmentsByDay = <String, List<Map<String, dynamic>>>{
+        for (final entry in _segmentsByDay.entries)
+          if (nextDayKeys.contains(entry.key)) entry.key: entry.value,
       };
       _loadingDayKeys = <String>{..._loadingDayKeys, normalized};
     });

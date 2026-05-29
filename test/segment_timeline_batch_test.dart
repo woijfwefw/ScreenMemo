@@ -192,6 +192,40 @@ void main() {
     },
   );
 
+  test(
+    'timeline day batch centers pinned date with 14 newer and 15 older tabs',
+    () async {
+      final Directory tmp = await Directory.systemTemp.createTemp(
+        'screen_memo_timeline_pinned_centered_',
+      );
+      try {
+        final Directory root = Directory(p.join(tmp.path, 'root'));
+        await root.create(recursive: true);
+        await _prepareDesktopDbRoot(root);
+        final DateTime latest = DateTime(2024, 4, 30);
+        final List<DateTime> days = List<DateTime>.generate(
+          60,
+          (int index) => latest.subtract(Duration(days: index)),
+        );
+        await _seedTimelineDays(days);
+
+        final SegmentTimelineDayBatch batch = await ScreenshotDatabase.instance
+            .listSegmentTimelineDayBatch(
+              distinctDayCount: 30,
+              pinnedDateKey: '2024-04-01',
+            );
+
+        expect(batch.dayKeys.length, 30);
+        expect(batch.dayKeys.first, '2024-04-15');
+        expect(batch.dayKeys[14], '2024-04-01');
+        expect(batch.dayKeys.last, '2024-03-17');
+        expect(batch.hasMoreOlder, isTrue);
+      } finally {
+        await _disposeAndDeleteTemp(tmp);
+      }
+    },
+  );
+
   test('timeline month day counts only scan the requested month', () async {
     final Directory tmp = await Directory.systemTemp.createTemp(
       'screen_memo_timeline_month_counts_',

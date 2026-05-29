@@ -3468,6 +3468,7 @@ ORDER BY day ASC
       String? minKeyInclusive,
       String? maxKeyInclusive,
       required int limit,
+      bool ascending = false,
     }) async {
       final List<String> whereClauses = buildWhereClauses(
         beforeKey: beforeKey,
@@ -3486,7 +3487,7 @@ ORDER BY day ASC
         FROM segments s
         $whereSql
         GROUP BY day_key
-        ORDER BY day_key DESC
+        ORDER BY day_key ${ascending ? 'ASC' : 'DESC'}
         LIMIT ?
         ''',
         <Object?>[...whereParams, limit],
@@ -3581,6 +3582,49 @@ ORDER BY day ASC
         );
         if (expanded.isNotEmpty) {
           days = expanded;
+        }
+      }
+    }
+
+    if (beforeKey.isEmpty && pinnedKey.isNotEmpty) {
+      final List<SegmentTimelineDayInfo> newerAndPinnedAsc =
+          await queryDayInfos(
+            minKeyInclusive: pinnedKey,
+            maxKeyInclusive: maxKeyInclusive,
+            limit: math.min(1 << 20, safeDayCount),
+            ascending: true,
+          );
+      if (newerAndPinnedAsc.any(
+        (SegmentTimelineDayInfo info) => info.dayKey == pinnedKey,
+      )) {
+        final List<SegmentTimelineDayInfo> older = await queryDayInfos(
+          beforeKey: pinnedKey,
+          maxKeyInclusive: maxKeyInclusive,
+          limit: safeDayCount,
+        );
+        final Map<String, SegmentTimelineDayInfo>
+        byKey = <String, SegmentTimelineDayInfo>{
+          for (final SegmentTimelineDayInfo info in newerAndPinnedAsc.reversed)
+            info.dayKey: info,
+          for (final SegmentTimelineDayInfo info in older) info.dayKey: info,
+        };
+        days = byKey.values.toList(growable: false)
+          ..sort((a, b) => b.dayKey.compareTo(a.dayKey));
+      }
+
+      final int pinnedIndex = days.indexWhere(
+        (SegmentTimelineDayInfo info) => info.dayKey == pinnedKey,
+      );
+      if (pinnedIndex >= 0) {
+        final DateTabWindow<SegmentTimelineDayInfo> window =
+            buildCenteredDateTabWindow<SegmentTimelineDayInfo>(
+              items: days,
+              targetIndex: pinnedIndex,
+              beforeCount: 14,
+              afterCount: safeDayCount <= 1 ? 0 : safeDayCount - 15,
+            );
+        if (window.items.isNotEmpty) {
+          days = window.items;
         }
       }
     }

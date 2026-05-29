@@ -21,6 +21,7 @@ import 'package:scroll_to_index/scroll_to_index.dart';
 import 'package:screen_memo/features/timeline/application/replay_export_service.dart';
 import 'package:screen_memo/core/widgets/screenshot_style_tab_bar.dart';
 import 'package:screen_memo/core/widgets/date_jump_calendar_sheet.dart';
+import 'package:screen_memo/core/utils/date_tab_window.dart';
 import 'package:screen_memo/features/timeline/presentation/widgets/timeline_replay_sheet.dart';
 
 /// 全局时间线页面（骨架）
@@ -82,6 +83,8 @@ class _TimelinePageState extends State<TimelinePage>
   // 日期窗口控制：默认最近14天，每次向前追加14天
   static const int _initialVisibleDayTabs = 14;
   static const int _appendVisibleDayTabs = 14;
+  static const int _jumpWindowTabsBefore = 14;
+  static const int _jumpWindowTabsAfter = 15;
   // 查询窗口：首屏与增量加载回溯天数（按时间窗仅扫描涉及的年月表）
   static const int _initialDayTabsLookbackDays = 120;
   static const int _appendDayTabsLookbackDays = 120;
@@ -1110,6 +1113,131 @@ class _TimelinePageState extends State<TimelinePage>
     return ScreenshotService.instance.listAvailableYearsGlobal();
   }
 
+  Future<void> _ensureTimelineJumpWindow(
+    DateTime targetDay,
+    int knownCount,
+  ) async {
+    final DateTime normalizedTarget = DateTime(
+      targetDay.year,
+      targetDay.month,
+      targetDay.day,
+    );
+    final List<int> years = await _loadTimelineAvailableYears();
+    final DateTime minBound = years.isEmpty
+        ? normalizedTarget.subtract(const Duration(days: 3650))
+        : DateTime(years.reduce(math.min), 1, 1);
+    final DateTime maxBound = years.isEmpty
+        ? normalizedTarget.add(const Duration(days: 3650))
+        : DateTime(years.reduce(math.max), 12, 31);
+    final int fullSpanDays = math.max(
+      _jumpWindowTabsBefore + _jumpWindowTabsAfter + 1,
+      maxBound.difference(minBound).inDays + 1,
+    );
+    final String targetKey = _dateKeyForDay(normalizedTarget);
+    int rangeDays = _jumpWindowTabsBefore + _jumpWindowTabsAfter + 1;
+    List<_DayTabInfo> nearbyTabs = <_DayTabInfo>[];
+
+    for (;;) {
+      DateTime startDay = normalizedTarget.subtract(Duration(days: rangeDays));
+      DateTime endDay = normalizedTarget.add(Duration(days: rangeDays));
+      if (startDay.isBefore(minBound)) startDay = minBound;
+      if (endDay.isAfter(maxBound)) endDay = maxBound;
+
+      final List<Map<String, dynamic>> rows = await ScreenshotService.instance
+          .listAvailableDaysGlobalRange(
+            startMillis: startDay.millisecondsSinceEpoch,
+            endMillis: DateTime(
+              endDay.year,
+              endDay.month,
+              endDay.day,
+              23,
+              59,
+              59,
+            ).millisecondsSinceEpoch,
+          );
+      nearbyTabs = <_DayTabInfo>[];
+      for (final Map<String, dynamic> row in rows) {
+        final String dayKey = (row['date'] as String?) ?? '';
+        final int count = _readInt(row['count']);
+        final DateTime? day = _dateFromKey(dayKey);
+        if (day == null || count <= 0) continue;
+        nearbyTabs.add(
+          _DayTabInfo(
+            day: day,
+            startMillis: DateTime(
+              day.year,
+              day.month,
+              day.day,
+            ).millisecondsSinceEpoch,
+            endMillis: DateTime(
+              day.year,
+              day.month,
+              day.day,
+              23,
+              59,
+              59,
+            ).millisecondsSinceEpoch,
+            count: count,
+          ),
+        );
+      }
+      if (!nearbyTabs.any((tab) => _dateKeyForDay(tab.day) == targetKey) &&
+          knownCount > 0) {
+        nearbyTabs.add(
+          _DayTabInfo(
+            day: normalizedTarget,
+            startMillis: normalizedTarget.millisecondsSinceEpoch,
+            endMillis: DateTime(
+              normalizedTarget.year,
+              normalizedTarget.month,
+              normalizedTarget.day,
+              23,
+              59,
+              59,
+            ).millisecondsSinceEpoch,
+            count: knownCount,
+          ),
+        );
+        nearbyTabs.sort((a, b) => b.startMillis.compareTo(a.startMillis));
+      }
+
+      final int targetIndex = nearbyTabs.indexWhere(
+        (tab) => _dateKeyForDay(tab.day) == targetKey,
+      );
+      final bool coversNewest = !endDay.isBefore(maxBound);
+      final bool coversOldest = !startDay.isAfter(minBound);
+      final bool hasEnoughNewer =
+          targetIndex >= _jumpWindowTabsBefore || coversNewest;
+      final bool hasEnoughOlder =
+          targetIndex >= 0 &&
+          nearbyTabs.length - targetIndex - 1 >= _jumpWindowTabsAfter;
+      if (targetIndex >= 0 &&
+          hasEnoughNewer &&
+          (hasEnoughOlder || coversOldest)) {
+        break;
+      }
+      if (coversNewest && coversOldest) break;
+      final int nextRangeDays = math.min(
+        fullSpanDays,
+        math.max(rangeDays + 1, rangeDays * 3),
+      );
+      if (nextRangeDays <= rangeDays) break;
+      rangeDays = nextRangeDays;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      final Map<String, _DayTabInfo> byKey = <String, _DayTabInfo>{
+        for (final tab in _allDayTabs) _dateKeyForDay(tab.day): tab,
+        for (final tab in nearbyTabs) _dateKeyForDay(tab.day): tab,
+      };
+      _allDayTabs
+        ..clear()
+        ..addAll(byKey.values)
+        ..sort((a, b) => b.startMillis.compareTo(a.startMillis));
+    });
+  }
+
   Future<void> _openDateCalendarSheet() async {
     final DateTime initialDate =
         _dateFromKey(_selectedDateKey()) ??
@@ -1158,8 +1286,8 @@ class _TimelinePageState extends State<TimelinePage>
   Future<void> _jumpToTimelineDate(String dateKey, int knownCount) async {
     final DateTime? targetDay = _dateFromKey(dateKey);
     if (targetDay == null) return;
-    await _ensureTabsIncludeDate(targetDay);
-    if (!mounted || _tabController == null || _dayTabs.isEmpty) return;
+    await _ensureTimelineJumpWindow(targetDay, knownCount);
+    if (!mounted || _allDayTabs.isEmpty) return;
 
     final int targetStart = DateTime(
       targetDay.year,
@@ -1174,17 +1302,40 @@ class _TimelinePageState extends State<TimelinePage>
       59,
       59,
     ).millisecondsSinceEpoch;
-    final int tabIndex = _dayTabs.indexWhere(
+    final int allIndex = _allDayTabs.indexWhere(
       (tab) => tab.startMillis == targetStart && tab.endMillis == targetEnd,
     );
-    if (tabIndex < 0) return;
-    if (knownCount > 0) {
-      setState(() {
-        _dayTabs[tabIndex].count = knownCount;
-      });
-    }
-    _tabController!.index = tabIndex;
-    _onTabChanged();
+    if (allIndex < 0) return;
+
+    final DateTabWindow<_DayTabInfo> window =
+        buildCenteredDateTabWindow<_DayTabInfo>(
+          items: _allDayTabs,
+          targetIndex: allIndex,
+          beforeCount: _jumpWindowTabsBefore,
+          afterCount: _jumpWindowTabsAfter,
+        );
+    if (window.items.isEmpty || window.selectedIndex < 0) return;
+
+    _tabController?.removeListener(_onTabChanged);
+    _tabController?.dispose();
+    setState(() {
+      _resetIndexedTabStateForDayRebuild();
+      _dayTabs
+        ..clear()
+        ..addAll(window.items);
+      _currentTabIndex = window.selectedIndex;
+      _dateStartMillis = _dayTabs[_currentTabIndex].startMillis;
+      _dateEndMillis = _dayTabs[_currentTabIndex].endMillis;
+      _tabController = TabController(
+        length: _dayTabs.length,
+        vsync: this,
+        initialIndex: _currentTabIndex,
+      );
+      _tabController!.addListener(_onTabChanged);
+    });
+    await _reloadForCurrentTab(reset: true);
+    // ignore: unawaited_futures
+    _prefetchAdjacentTabs(window.selectedIndex);
   }
 
   Future<void> _handleJumpRequestIfPossible() async {
@@ -1216,8 +1367,8 @@ class _TimelinePageState extends State<TimelinePage>
         return; // 交由重试处理
       }
 
-      // 确保日期标签包含目标日期（可能超出默认14天）
-      await _ensureTabsIncludeDate(rec.captureTime);
+      // 确保日期标签切换为目标日期附近的 30 个有数据日期。
+      await _jumpToTimelineDate(_dateKeyForDay(rec.captureTime), 1);
 
       // 选择日期标签
       final dt = rec.captureTime;

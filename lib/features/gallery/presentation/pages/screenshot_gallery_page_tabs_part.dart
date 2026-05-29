@@ -226,6 +226,110 @@ extension _ScreenshotGalleryTabsPart on _ScreenshotGalleryPageState {
     return ScreenshotService.instance.listAvailableYearsForApp(_packageName);
   }
 
+  Future<void> _ensureGalleryJumpWindow(
+    DateTime targetDay,
+    int knownCount,
+  ) async {
+    final DateTime normalizedTarget = DateTime(
+      targetDay.year,
+      targetDay.month,
+      targetDay.day,
+    );
+    final List<int> years = await _loadGalleryAvailableYears();
+    final DateTime minBound = years.isEmpty
+        ? normalizedTarget.subtract(const Duration(days: 3650))
+        : DateTime(years.reduce(math.min), 1, 1);
+    final DateTime maxBound = years.isEmpty
+        ? normalizedTarget.add(const Duration(days: 3650))
+        : DateTime(years.reduce(math.max), 12, 31);
+    final int fullSpanDays = math.max(
+      _ScreenshotGalleryPageState._jumpWindowTabsBefore +
+          _ScreenshotGalleryPageState._jumpWindowTabsAfter +
+          1,
+      maxBound.difference(minBound).inDays + 1,
+    );
+    final String targetKey = _dateKeyForDay(normalizedTarget);
+    final int desiredBefore = _ScreenshotGalleryPageState._jumpWindowTabsBefore;
+    final int desiredAfter = _ScreenshotGalleryPageState._jumpWindowTabsAfter;
+    int rangeDays = desiredBefore + desiredAfter + 1;
+    List<_DayTabInfo> nearbyTabs = <_DayTabInfo>[];
+
+    for (;;) {
+      DateTime startDay = normalizedTarget.subtract(Duration(days: rangeDays));
+      DateTime endDay = normalizedTarget.add(Duration(days: rangeDays));
+      if (startDay.isBefore(minBound)) startDay = minBound;
+      if (endDay.isAfter(maxBound)) endDay = maxBound;
+
+      final List<Map<String, dynamic>> rows = await ScreenshotService.instance
+          .listAvailableDaysForAppRange(
+            _packageName,
+            startMillis: startDay.millisecondsSinceEpoch,
+            endMillis: DateTime(
+              endDay.year,
+              endDay.month,
+              endDay.day,
+              23,
+              59,
+              59,
+            ).millisecondsSinceEpoch,
+          );
+      nearbyTabs = _buildDayTabsFromRows(rows);
+      if (!nearbyTabs.any((tab) => _dateKeyForDay(tab.day) == targetKey) &&
+          knownCount > 0) {
+        nearbyTabs.add(
+          _DayTabInfo(
+            day: normalizedTarget,
+            startMillis: normalizedTarget.millisecondsSinceEpoch,
+            endMillis: DateTime(
+              normalizedTarget.year,
+              normalizedTarget.month,
+              normalizedTarget.day,
+              23,
+              59,
+              59,
+            ).millisecondsSinceEpoch,
+            count: knownCount,
+          ),
+        );
+        nearbyTabs.sort((a, b) => b.startMillis.compareTo(a.startMillis));
+      }
+
+      final int targetIndex = nearbyTabs.indexWhere(
+        (tab) => _dateKeyForDay(tab.day) == targetKey,
+      );
+      final bool coversNewest = !endDay.isBefore(maxBound);
+      final bool coversOldest = !startDay.isAfter(minBound);
+      final bool hasEnoughNewer = targetIndex >= desiredBefore || coversNewest;
+      final bool hasEnoughOlder =
+          targetIndex >= 0 &&
+          nearbyTabs.length - targetIndex - 1 >= desiredAfter;
+      if (targetIndex >= 0 &&
+          hasEnoughNewer &&
+          (hasEnoughOlder || coversOldest)) {
+        break;
+      }
+      if (coversNewest && coversOldest) break;
+      final int nextRangeDays = math.min(
+        fullSpanDays,
+        math.max(rangeDays + 1, rangeDays * 3),
+      );
+      if (nextRangeDays <= rangeDays) break;
+      rangeDays = nextRangeDays;
+    }
+
+    if (!mounted) return;
+    _gallerySetState(() {
+      final Map<String, _DayTabInfo> byKey = <String, _DayTabInfo>{
+        for (final tab in _allDayTabs) _dateKeyForDay(tab.day): tab,
+        for (final tab in nearbyTabs) _dateKeyForDay(tab.day): tab,
+      };
+      _allDayTabs
+        ..clear()
+        ..addAll(byKey.values)
+        ..sort((a, b) => b.startMillis.compareTo(a.startMillis));
+    });
+  }
+
   Future<void> _openDateCalendarSheet() async {
     final DateTime initialDate =
         _dateFromKey(_selectedDateKey()) ??
@@ -288,40 +392,42 @@ extension _ScreenshotGalleryTabsPart on _ScreenshotGalleryPageState {
       59,
     ).millisecondsSinceEpoch;
 
-    int index = _dayTabs.indexWhere(
+    await _ensureGalleryJumpWindow(targetDay, knownCount);
+    if (!mounted) return;
+
+    final int allIndex = _allDayTabs.indexWhere(
       (tab) => tab.startMillis == targetStart && tab.endMillis == targetEnd,
     );
-    if (index < 0) {
-      final _DayTabInfo target = _DayTabInfo(
-        day: DateTime(targetDay.year, targetDay.month, targetDay.day),
-        startMillis: targetStart,
-        endMillis: targetEnd,
-        count: knownCount,
-      );
-      _gallerySetState(() {
-        final Map<String, _DayTabInfo> byKey = <String, _DayTabInfo>{
-          for (final tab in _allDayTabs) _dateKeyForDay(tab.day): tab,
-          _dateKeyForDay(target.day): target,
-        };
-        _allDayTabs
-          ..clear()
-          ..addAll(byKey.values)
-          ..sort((a, b) => b.startMillis.compareTo(a.startMillis));
-        _dayTabs
-          ..clear()
-          ..addAll(_allDayTabs);
-      });
-      _tabController?.removeListener(_onTabControllerChanged);
-      _tabController?.dispose();
-      _tabController = TabController(length: _dayTabs.length, vsync: this);
-      _tabController!.addListener(_onTabControllerChanged);
-      index = _dayTabs.indexWhere(
-        (tab) => tab.startMillis == targetStart && tab.endMillis == targetEnd,
-      );
-    }
+    if (allIndex < 0) return;
 
-    if (index < 0 || _tabController == null) return;
-    _tabController!.index = index;
-    await _onTabIndexSelected(index);
+    final DateTabWindow<_DayTabInfo> window =
+        buildCenteredDateTabWindow<_DayTabInfo>(
+          items: _allDayTabs,
+          targetIndex: allIndex,
+          beforeCount: _ScreenshotGalleryPageState._jumpWindowTabsBefore,
+          afterCount: _ScreenshotGalleryPageState._jumpWindowTabsAfter,
+        );
+    if (window.items.isEmpty || window.selectedIndex < 0) return;
+
+    _tabController?.removeListener(_onTabControllerChanged);
+    _tabController?.dispose();
+    _gallerySetState(() {
+      _resetTabDataState();
+      _dayTabs
+        ..clear()
+        ..addAll(window.items);
+      _currentTabIndex = window.selectedIndex;
+      _dateFilterStartMillis = _dayTabs[_currentTabIndex].startMillis;
+      _dateFilterEndMillis = _dayTabs[_currentTabIndex].endMillis;
+      _tabController = TabController(
+        length: _dayTabs.length,
+        vsync: this,
+        initialIndex: _currentTabIndex,
+      );
+      _tabController!.addListener(_onTabControllerChanged);
+    });
+    await _onTabIndexSelected(window.selectedIndex);
+    // ignore: unawaited_futures
+    _prefetchAdjacentTabs(window.selectedIndex);
   }
 }

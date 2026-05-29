@@ -17,6 +17,7 @@ import 'package:screen_memo/core/widgets/search_styles.dart';
 import 'package:screen_memo/core/widgets/screenshot_style_tab_bar.dart';
 import 'package:screen_memo/features/apps/application/app_selection_service.dart';
 import 'package:screen_memo/core/logging/flutter_logger.dart';
+import 'package:screen_memo/core/utils/date_tab_window.dart';
 import 'package:screen_memo/features/favorites/application/favorite_service.dart';
 import 'package:screen_memo/data/platform/path_service.dart';
 import 'package:screen_memo/core/widgets/date_jump_calendar_sheet.dart';
@@ -171,6 +172,8 @@ class _ScreenshotGalleryPageState extends State<ScreenshotGalleryPage>
   // 日期窗口控制：默认最近14天，每次向前追加14天
   static const int _initialVisibleDayTabs = 14;
   static const int _appendVisibleDayTabs = 14;
+  static const int _jumpWindowTabsBefore = 14;
+  static const int _jumpWindowTabsAfter = 15;
   static const int _dayTabsLookbackDays = 120;
   bool _isExpandingDayTabs = false;
   bool _hasMoreDayTabs = false;
