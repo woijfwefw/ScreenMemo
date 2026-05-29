@@ -11,6 +11,8 @@ import com.fqyw.screen_memo.logging.FileLogger
 import com.fqyw.screen_memo.logging.OutputFileLogger
 
 import android.app.Application
+import android.content.Context
+import kotlin.system.exitProcess
 
 class ScreenMemoApplication : Application() {
     companion object {
@@ -20,6 +22,7 @@ class ScreenMemoApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         AppContextProvider.init(this)
+        installUncaughtExceptionLogger(applicationContext)
         FileLogger.init(this)
         try { FileLogger.syncFromFlutterPrefs(this) } catch (_: Exception) {}
         RuntimeDiagnostics.logProcessStart(this, TAG, "application_onCreate", force = true)
@@ -58,6 +61,33 @@ class ScreenMemoApplication : Application() {
             FileLogger.w(TAG, "恢复 App 运行状态调度失败：${e.message}")
         }
 
+    }
+
+    private fun installUncaughtExceptionLogger(context: Context) {
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                val message = buildString {
+                    append("uncaught_exception")
+                    append(" | thread=").append(thread.name)
+                    append(" | threadHash=").append(System.identityHashCode(thread))
+                    append(" | type=").append(throwable.javaClass.name)
+                    append(" | message=").append(throwable.message ?: "-")
+                    append('\n')
+                    append(throwable.stackTraceToString())
+                }
+                OutputFileLogger.errorForce(context, TAG, message)
+            } catch (_: Throwable) {
+                // 崩溃处理器不能再抛异常，否则会覆盖原始崩溃。
+            }
+
+            if (previous != null) {
+                previous.uncaughtException(thread, throwable)
+            } else {
+                android.os.Process.killProcess(android.os.Process.myPid())
+                exitProcess(10)
+            }
+        }
     }
 }
 

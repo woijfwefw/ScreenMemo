@@ -11,6 +11,8 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  _installGlobalErrorHandlers();
+
   // 初始化日志（默认开启；读取用户偏好）
   await FlutterLogger.init();
   await FlutterLogger.info('应用启动');
@@ -18,9 +20,19 @@ Future<void> main() async {
 
   // 提前计算首屏需要用到的首启/引导信息
   final permissionService = PermissionService.instance;
-  final bool onboardingCompleted = await permissionService
-      .isOnboardingCompleted();
-  final bool isFirstLaunch = await permissionService.isFirstLaunch();
+  bool onboardingCompleted = false;
+  bool isFirstLaunch = true;
+  try {
+    onboardingCompleted = await permissionService.isOnboardingCompleted();
+    isFirstLaunch = await permissionService.isFirstLaunch();
+  } catch (e, s) {
+    await FlutterLogger.handle(
+      e,
+      s,
+      tag: 'Startup',
+      message: 'Failed to load onboarding state',
+    );
+  }
   // 开发调试用：通过 --dart-define=FORCE_ONBOARDING=true 强制进入引导页。
   // 仅在非 Release 构建生效，避免正式包误显示引导页。
   const bool forceOnboarding = bool.fromEnvironment('FORCE_ONBOARDING');
@@ -32,26 +44,7 @@ Future<void> main() async {
     // 统一使用 Zone 拦截所有 print，并通过 FlutterLogger 输出
     runZonedGuarded(
       () {
-        // 拦截 debugPrint 与 FlutterError
-        debugPrint = (String? message, {int? wrapWidth}) {
-          if (message == null) return;
-          // ignore: discarded_futures
-          FlutterLogger.debug(message);
-        };
-        FlutterError.onError = (FlutterErrorDetails details) {
-          // ignore: discarded_futures
-          FlutterLogger.handle(
-            details.exception,
-            details.stack ?? StackTrace.current,
-            tag: 'Flutter错误',
-            message: details.exceptionAsString(),
-          );
-        };
-        PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
-          // ignore: discarded_futures
-          FlutterLogger.handle(error, stack, tag: '未捕获异常');
-          return false; // 继续默认处理
-        };
+        _installGlobalErrorHandlers();
 
         // 预先初始化 ScreenshotService，尽早注册 MethodChannel 回调处理器
         // ignore: unnecessary_statements
@@ -88,4 +81,27 @@ Future<void> main() async {
   } else {
     appRunner();
   }
+}
+
+void _installGlobalErrorHandlers() {
+  debugPrint = (String? message, {int? wrapWidth}) {
+    if (message == null) return;
+    unawaited(FlutterLogger.debug(message));
+  };
+
+  FlutterError.onError = (FlutterErrorDetails details) {
+    unawaited(
+      FlutterLogger.handle(
+        details.exception,
+        details.stack ?? StackTrace.current,
+        tag: 'Flutter错误',
+        message: details.exceptionAsString(),
+      ),
+    );
+  };
+
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    unawaited(FlutterLogger.handle(error, stack, tag: '未捕获异常'));
+    return true;
+  };
 }

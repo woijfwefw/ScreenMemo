@@ -2476,10 +2476,30 @@ class MainActivity : FlutterActivity() {
                 "ja" to ComponentName(this, "$packageName.LauncherAliasJa"),
                 "ko" to ComponentName(this, "$packageName.LauncherAliasKo")
             )
+            val manifestDefaults = mapOf(
+                "zh" to true,
+                "en" to false,
+                "ja" to false,
+                "ko" to false
+            )
             val langLower = lang.lowercase()
             val target = aliases[langLower] ?: aliases["en"]!!
             for ((code, component) in aliases) {
-                val state = if (component == target)
+                val shouldEnable = component == target
+                val currentState = pm.getComponentEnabledSetting(component)
+                val currentlyEnabled = when (currentState) {
+                    android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED -> true
+                    android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER,
+                    android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED_UNTIL_USED -> false
+                    else -> manifestDefaults[code] == true
+                }
+                if (currentlyEnabled == shouldEnable) {
+                    try { FileLogger.i(TAG, "Launcher 别名状态无需更新：lang=$code 启用=$shouldEnable") } catch (_: Exception) {}
+                    continue
+                }
+
+                val state = if (shouldEnable)
                     android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
                 else
                     android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED
@@ -2488,7 +2508,7 @@ class MainActivity : FlutterActivity() {
                     state,
                     android.content.pm.PackageManager.DONT_KILL_APP
                 )
-                try { FileLogger.i(TAG, "Launcher 别名状态已更新：lang=$code 启用=${component == target}") } catch (_: Exception) {}
+                try { FileLogger.i(TAG, "Launcher 别名状态已更新：lang=$code 启用=$shouldEnable") } catch (_: Exception) {}
             }
             true
         } catch (e: Exception) {
