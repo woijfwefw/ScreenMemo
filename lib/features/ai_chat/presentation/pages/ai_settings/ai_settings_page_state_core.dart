@@ -253,6 +253,7 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
         required List<AIMessage> tail,
       }) {
         if (full.isEmpty) return List<AIMessage>.from(tail);
+        if (tail.isEmpty) return List<AIMessage>.from(full);
 
         int metaScore(AIMessage m) {
           int score = 0;
@@ -275,6 +276,57 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
           return m.content.contains(
             RegExp(r'\[\[composer-image:[^|\]]+(?:\|[^\]]*)?\]\]'),
           );
+        }
+
+        bool sameHistoryMessage(AIMessage a, AIMessage b) {
+          if (a.role != b.role) return false;
+          final int at = a.createdAt.millisecondsSinceEpoch;
+          final int bt = b.createdAt.millisecondsSinceEpoch;
+          if (at == bt) return true;
+          if ((at - bt).abs() > 2 * 60 * 1000) return false;
+          if (a.content.trim() == b.content.trim()) return true;
+          if (a.role == 'user') {
+            return _stripComposerImageMarkers(a.content) ==
+                _stripComposerImageMarkers(b.content);
+          }
+          return false;
+        }
+
+        int tailAnchorIndex() {
+          final AIMessage firstTail = tail.first;
+          final int tailAt = firstTail.createdAt.millisecondsSinceEpoch;
+          for (int i = 0; i < full.length; i++) {
+            final AIMessage m = full[i];
+            if (m.role == firstTail.role &&
+                m.createdAt.millisecondsSinceEpoch == tailAt) {
+              return i;
+            }
+          }
+          for (int i = full.length - 1; i >= 0; i--) {
+            if (sameHistoryMessage(full[i], firstTail)) return i;
+          }
+          return -1;
+        }
+
+        final int authoritativeTailStart = tailAnchorIndex();
+        if (authoritativeTailStart >= 0) {
+          final List<AIMessage> merged = <AIMessage>[
+            ...full.take(authoritativeTailStart),
+            ...tail,
+          ];
+          final List<AIMessage> cleaned = <AIMessage>[];
+          for (final AIMessage m in merged) {
+            if (m.role == 'user' &&
+                cleaned.isNotEmpty &&
+                cleaned.last.role == 'user' &&
+                (cleaned.last.content.trim() == m.content.trim() ||
+                    _stripComposerImageMarkers(cleaned.last.content) ==
+                        _stripComposerImageMarkers(m.content))) {
+              continue;
+            }
+            cleaned.add(m);
+          }
+          return cleaned;
         }
 
         final Set<int> usedTailIdx = <int>{};

@@ -755,11 +755,15 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
       requestCid = requestCid.trim();
       _inFlightConversationCid = requestCid.isEmpty ? null : requestCid;
       if (isRetry && requestCid.isNotEmpty) {
+        final Future<void> pendingHistorySaves = _chatHistorySaveChain;
         _chatHistoryWriteEpoch++;
         _chat.blockConversationPersistenceBefore(
           cid: requestCid,
           createdAtMs: retryCutoff,
         );
+        try {
+          await pendingHistorySaves;
+        } catch (_) {}
         await _settings.truncateConversationAfterCreatedAt(
           requestCid,
           retryCutoff,

@@ -2100,48 +2100,57 @@ ORDER BY day ASC
     try {
       final db = await database;
       await db.transaction((txn) async {
-        try {
-          await txn.delete(
-            'ai_messages',
-            where: 'conversation_id = ? AND created_at >= ?',
-            whereArgs: <Object?>[cid, cutoffCreatedAtMs],
-          );
-        } catch (_) {}
-        try {
-          await txn.delete(
-            'ai_messages_full',
-            where: 'conversation_id = ? AND created_at >= ?',
-            whereArgs: <Object?>[cid, cutoffCreatedAtMs],
-          );
-        } catch (_) {}
-        try {
-          await txn.delete(
-            'ai_messages_raw',
-            where: 'conversation_id = ? AND created_at >= ?',
-            whereArgs: <Object?>[cid, cutoffCreatedAtMs],
-          );
-        } catch (_) {}
-        try {
-          await txn.delete(
-            'ai_context_events',
-            where: 'conversation_id = ? AND created_at >= ?',
-            whereArgs: <Object?>[cid, cutoffCreatedAtMs],
-          );
-        } catch (_) {}
-        try {
-          await txn.delete(
-            'ai_prompt_usage_events',
-            where: 'conversation_id = ? AND created_at >= ?',
-            whereArgs: <Object?>[cid, cutoffCreatedAtMs],
-          );
-        } catch (_) {}
-        try {
-          await txn.delete(
-            'ai_tool_call_details',
-            where: 'conversation_id = ? AND assistant_created_at >= ?',
-            whereArgs: <Object?>[cid, cutoffCreatedAtMs],
-          );
-        } catch (_) {}
+        Future<int?> firstIdAtOrAfter(String table, String timeColumn) async {
+          try {
+            final rows = await txn.query(
+              table,
+              columns: const <String>['id'],
+              where: 'conversation_id = ? AND COALESCE($timeColumn, 0) >= ?',
+              whereArgs: <Object?>[cid, cutoffCreatedAtMs],
+              orderBy: 'id ASC',
+              limit: 1,
+            );
+            if (rows.isEmpty) return null;
+            final Object? raw = rows.first['id'];
+            if (raw is int) return raw;
+            if (raw is num) return raw.toInt();
+            return int.tryParse(raw?.toString() ?? '');
+          } catch (_) {
+            return null;
+          }
+        }
+
+        Future<void> deleteTimelineRows(
+          String table, {
+          String timeColumn = 'created_at',
+        }) async {
+          try {
+            final int? firstId = await firstIdAtOrAfter(table, timeColumn);
+            if (firstId != null && firstId > 0) {
+              await txn.delete(
+                table,
+                where: 'conversation_id = ? AND id >= ?',
+                whereArgs: <Object?>[cid, firstId],
+              );
+              return;
+            }
+            await txn.delete(
+              table,
+              where: 'conversation_id = ? AND COALESCE($timeColumn, 0) >= ?',
+              whereArgs: <Object?>[cid, cutoffCreatedAtMs],
+            );
+          } catch (_) {}
+        }
+
+        await deleteTimelineRows('ai_messages');
+        await deleteTimelineRows('ai_messages_full');
+        await deleteTimelineRows('ai_messages_raw');
+        await deleteTimelineRows('ai_context_events');
+        await deleteTimelineRows('ai_prompt_usage_events');
+        await deleteTimelineRows(
+          'ai_tool_call_details',
+          timeColumn: 'assistant_created_at',
+        );
         try {
           await txn.execute(
             'UPDATE ai_conversations SET summary = NULL, summary_updated_at = NULL, summary_tokens = NULL, compaction_count = 0, last_compaction_reason = NULL, tool_memory_json = NULL, tool_memory_updated_at = NULL, last_prompt_tokens = NULL, last_prompt_at = NULL, last_prompt_breakdown_json = NULL, updated_at = ? WHERE cid = ?',
