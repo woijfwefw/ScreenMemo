@@ -404,6 +404,93 @@ void main() {
     }
   });
 
+  testWidgets('selected day action starts target day rebuild', (
+    WidgetTester tester,
+  ) async {
+    final Directory tmp = await Directory.systemTemp.createTemp(
+      'screen_memo_segment_page_day_rebuild_',
+    );
+    try {
+      final Directory root = Directory(p.join(tmp.path, 'root'));
+      await root.create(recursive: true);
+      await _prepareDesktopDbRoot(root);
+      final DateTime day = DateTime(2024, 4, 10);
+      await _seedTimelineDays(<DateTime>[day]);
+
+      await tester.pumpWidget(_buildHarness());
+      await _pumpUntilFound(tester, find.text(_summaryText(day)));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      await tester.tap(find.byTooltip('动态任务'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.tap(find.text('重建'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+      expect(find.text('重建当天动态'), findsOneWidget);
+      expect(find.text('重建全部'), findsOneWidget);
+      expect(
+        find.textContaining('只清空并重建 ${_dateKey(day)} 的动态'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('重建当天').last);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(_mockDynamicRebuildStatus['taskMode'], 'rebuild');
+      expect(_mockDynamicRebuildStatus['targetDayKey'], _dateKey(day));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    } finally {
+      _scheduleTempDelete(tmp);
+    }
+  });
+
+  testWidgets('rebuild scope can switch to all days', (
+    WidgetTester tester,
+  ) async {
+    final Directory tmp = await Directory.systemTemp.createTemp(
+      'screen_memo_segment_page_all_rebuild_',
+    );
+    try {
+      final Directory root = Directory(p.join(tmp.path, 'root'));
+      await root.create(recursive: true);
+      await _prepareDesktopDbRoot(root);
+      final DateTime day = DateTime(2024, 4, 10);
+      await _seedTimelineDays(<DateTime>[day]);
+
+      await tester.pumpWidget(_buildHarness());
+      await _pumpUntilFound(tester, find.text(_summaryText(day)));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      await tester.tap(find.byTooltip('动态任务'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.tap(find.text('重建'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+
+      await tester.tap(find.text('重建全部'));
+      await tester.pump();
+      expect(find.text('重建动态'), findsOneWidget);
+      expect(find.textContaining('重建会先清空当前动态'), findsOneWidget);
+
+      await tester.tap(find.text('立即重建'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(_mockDynamicRebuildStatus['taskMode'], 'rebuild');
+      expect(_mockDynamicRebuildStatus['targetDayKey'], '');
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    } finally {
+      _scheduleTempDelete(tmp);
+    }
+  });
+
   testWidgets('backfill scope can switch to all days', (
     WidgetTester tester,
   ) async {

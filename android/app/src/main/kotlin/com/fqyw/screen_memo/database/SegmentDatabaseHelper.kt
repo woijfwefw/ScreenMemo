@@ -12,6 +12,9 @@ import android.database.sqlite.SQLiteDatabase
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 /**
  * 段落与AI结果持久化（原生侧复用主库 screenshot_memo.db）
@@ -2075,6 +2078,187 @@ object SegmentDatabaseHelper {
             try { FileLogger.w(TAG, "重置动态重建相关数据失败：${e.message}") } catch (_: Exception) {}
         } finally {
             try { db?.close() } catch (_: Exception) {}
+        }
+    }
+
+    fun resetDynamicRebuildArtifactsForDay(
+        context: Context,
+        dayKey: String,
+        startMillis: Long,
+        endMillis: Long,
+    ) {
+        val normalizedDayKey = dayKey.trim()
+        if (normalizedDayKey.isBlank() || startMillis > endMillis) return
+        var db: SQLiteDatabase? = null
+        try {
+            db = openMasterDb(context, writable = true) ?: return
+            db.beginTransaction()
+            try {
+                val segmentIds = ArrayList<String>()
+                val samplePaths = ArrayList<String>()
+                var cursor: Cursor? = null
+                try {
+                    cursor = db.rawQuery(
+                        """
+                        SELECT id
+                        FROM segments
+                        WHERE (segment_kind IS NULL OR segment_kind = 'global')
+                          AND start_time >= ? AND start_time <= ?
+                        """.trimIndent(),
+                        arrayOf(startMillis.toString(), endMillis.toString()),
+                    )
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(0)
+                        if (id > 0L) segmentIds.add(id.toString())
+                    }
+                } finally {
+                    try { cursor?.close() } catch (_: Exception) {}
+                }
+                var discovered = true
+                while (discovered) {
+                    discovered = false
+                    for (chunk in segmentIds.distinct().chunked(300)) {
+                        val placeholders = chunk.joinToString(",") { "?" }
+                        var childCursor: Cursor? = null
+                        try {
+                            childCursor = db.rawQuery(
+                                "SELECT id FROM segments WHERE merged_into_id IN ($placeholders)",
+                                chunk.toTypedArray(),
+                            )
+                            while (childCursor.moveToNext()) {
+                                val id = childCursor.getLong(0)
+                                if (id > 0L && !segmentIds.contains(id.toString())) {
+                                    segmentIds.add(id.toString())
+                                    discovered = true
+                                }
+                            }
+                        } finally {
+                            try { childCursor?.close() } catch (_: Exception) {}
+                        }
+                    }
+                }
+
+                if (segmentIds.isNotEmpty()) {
+                    for (chunk in segmentIds.distinct().chunked(300)) {
+                        val placeholders = chunk.joinToString(",") { "?" }
+                        var sampleCursor: Cursor? = null
+                        try {
+                            sampleCursor = db.rawQuery(
+                                "SELECT file_path FROM segment_samples WHERE segment_id IN ($placeholders)",
+                                chunk.toTypedArray(),
+                            )
+                            while (sampleCursor.moveToNext()) {
+                                val path = sampleCursor.getStringOrNull(0)?.trim().orEmpty()
+                                if (path.isNotEmpty()) samplePaths.add(path)
+                            }
+                        } finally {
+                            try { sampleCursor?.close() } catch (_: Exception) {}
+                        }
+                        db.delete("segment_results", "segment_id IN ($placeholders)", chunk.toTypedArray())
+                        db.delete("segment_samples", "segment_id IN ($placeholders)", chunk.toTypedArray())
+                        db.delete("segments", "id IN ($placeholders)", chunk.toTypedArray())
+                    }
+                }
+
+                if (tableExists(db, "ai_image_meta")) {
+                    if (segmentIds.isNotEmpty()) {
+                        for (chunk in segmentIds.chunked(300)) {
+                            val placeholders = chunk.joinToString(",") { "?" }
+                            db.delete(
+                                "ai_image_meta",
+                                "segment_id IN ($placeholders)",
+                                chunk.toTypedArray(),
+                            )
+                        }
+                    }
+                    val normalizedPaths = samplePaths
+                        .asSequence()
+                        .map { it.trim() }
+                        .filter { it.isNotEmpty() }
+                        .distinct()
+                        .toList()
+                    for (chunk in normalizedPaths.chunked(300)) {
+                        val placeholders = chunk.joinToString(",") { "?" }
+                        db.delete(
+                            "ai_image_meta",
+                            "file_path IN ($placeholders)",
+                            chunk.toTypedArray(),
+                        )
+                    }
+                }
+                if (tableExists(db, "daily_summaries")) {
+                    db.delete("daily_summaries", "date_key = ?", arrayOf(normalizedDayKey))
+                }
+                val weekStart = weekStartDateKey(normalizedDayKey)
+                if (tableExists(db, "weekly_summaries") && weekStart.isNotBlank()) {
+                    db.delete("weekly_summaries", "week_start_date = ?", arrayOf(weekStart))
+                }
+                val morningInsightDates = ArrayList<String>()
+                if (tableExists(db, "morning_insights")) {
+                    var morningCursor: Cursor? = null
+                    try {
+                        morningCursor = db.rawQuery(
+                            "SELECT date_key FROM morning_insights WHERE source_date_key = ?",
+                            arrayOf(normalizedDayKey),
+                        )
+                        while (morningCursor.moveToNext()) {
+                            val date = morningCursor.getStringOrNull(0)?.trim().orEmpty()
+                            if (date.isNotEmpty()) morningInsightDates.add(date)
+                        }
+                    } finally {
+                        try { morningCursor?.close() } catch (_: Exception) {}
+                    }
+                    db.delete("morning_insights", "source_date_key = ?", arrayOf(normalizedDayKey))
+                }
+                if (tableExists(db, "search_docs")) {
+                    db.delete(
+                        "search_docs",
+                        "doc_type = ? AND date_key = ?",
+                        arrayOf("daily_summary", normalizedDayKey),
+                    )
+                    if (weekStart.isNotBlank()) {
+                        db.delete(
+                            "search_docs",
+                            "doc_type = ? AND date_key = ?",
+                            arrayOf("weekly_summary", weekStart),
+                        )
+                    }
+                    for (chunk in morningInsightDates.distinct().chunked(300)) {
+                        val placeholders = chunk.joinToString(",") { "?" }
+                        db.delete(
+                            "search_docs",
+                            "doc_type = ? AND date_key IN ($placeholders)",
+                            (listOf("morning_insights") + chunk).toTypedArray(),
+                        )
+                    }
+                }
+                db.setTransactionSuccessful()
+            } finally {
+                try { db.endTransaction() } catch (_: Exception) {}
+            }
+        } catch (e: Exception) {
+            try { FileLogger.w(TAG, "重置当天动态重建相关数据失败：${e.message}") } catch (_: Exception) {}
+        } finally {
+            try { db?.close() } catch (_: Exception) {}
+        }
+    }
+
+    private fun weekStartDateKey(dayKey: String): String {
+        return try {
+            val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            formatter.isLenient = false
+            val date = formatter.parse(dayKey.trim()) ?: return ""
+            val cal = Calendar.getInstance().apply {
+                time = date
+                firstDayOfWeek = Calendar.MONDAY
+                minimalDaysInFirstWeek = 1
+            }
+            while (cal.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
+                cal.add(Calendar.DAY_OF_MONTH, -1)
+            }
+            formatter.format(cal.time)
+        } catch (_: Exception) {
+            ""
         }
     }
 

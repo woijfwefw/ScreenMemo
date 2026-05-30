@@ -197,7 +197,7 @@ class DynamicRebuildService : Service() {
                 currentStageLabel = if (normalizedTaskMode == TASK_MODE_BACKFILL) {
                     if (normalizedTargetDayKey.isNotBlank()) "等待当天补全启动" else "等待补全启动"
                 } else {
-                    "等待后台启动"
+                    if (normalizedTargetDayKey.isNotBlank()) "等待当天重建启动" else "等待后台启动"
                 },
                 currentStageDetail = if (normalizedTaskMode == TASK_MODE_BACKFILL) {
                     if (normalizedTargetDayKey.isNotBlank()) {
@@ -206,7 +206,11 @@ class DynamicRebuildService : Service() {
                         "补全任务已创建，等待后台服务扫描缺漏"
                     }
                 } else {
-                    "任务已创建，等待后台服务开始准备"
+                    if (normalizedTargetDayKey.isNotBlank()) {
+                        "当天重建任务已创建，等待后台服务准备 $normalizedTargetDayKey"
+                    } else {
+                        "任务已创建，等待后台服务开始准备"
+                    }
                 },
                 lastError = null,
                 segmentDurationSec = 0,
@@ -222,7 +226,7 @@ class DynamicRebuildService : Service() {
                         if (normalizedTaskMode == TASK_MODE_BACKFILL) {
                             if (normalizedTargetDayKey.isNotBlank()) "等待当天补全启动" else "等待补全启动"
                         } else {
-                            "等待后台启动"
+                            if (normalizedTargetDayKey.isNotBlank()) "等待当天重建启动" else "等待后台启动"
                         },
                         if (normalizedTaskMode == TASK_MODE_BACKFILL) {
                             if (normalizedTargetDayKey.isNotBlank()) {
@@ -231,7 +235,11 @@ class DynamicRebuildService : Service() {
                                 "补全任务已创建，等待后台服务扫描缺漏"
                             }
                         } else {
-                            "任务已创建，等待后台服务开始准备"
+                            if (normalizedTargetDayKey.isNotBlank()) {
+                                "当天重建任务已创建，等待后台服务准备 $normalizedTargetDayKey"
+                            } else {
+                                "任务已创建，等待后台服务开始准备"
+                            }
                         },
                     ),
                 ),
@@ -573,7 +581,11 @@ class DynamicRebuildService : Service() {
                     "按截图时间逐日扫描，跳过已有动态结果，仅收集缺失窗口"
                 }
             } else {
-                "按截图时间顺序计算全量重建范围，并按日期分组"
+                if (targetDayKey.isNotBlank()) {
+                    "按截图时间计算 $targetDayKey 的重建范围，并按日期分组"
+                } else {
+                    "按截图时间顺序计算全量重建范围，并按日期分组"
+                }
             },
         )
         if (backfillMode) {
@@ -618,9 +630,13 @@ class DynamicRebuildService : Service() {
                 targetDayKey = targetDayKey,
             )
         } else {
-            SegmentSummaryManager.buildFullRebuildWorklist(this, durationSec)
+            SegmentSummaryManager.buildFullRebuildWorklist(
+                this,
+                durationSec,
+                targetDayKey = targetDayKey,
+            )
         }
-        val windows = if (backfillMode && targetDayKey.isNotBlank()) {
+        val windows = if (targetDayKey.isNotBlank()) {
             SegmentSummaryManager.filterDynamicRebuildWindowsForDay(
                 allWindows,
                 targetDayKey,
@@ -660,10 +676,46 @@ class DynamicRebuildService : Service() {
             recordStage(
                 state = state,
                 stage = "prepare_reset",
-                label = "清空旧动态数据",
-                detail = "删除旧的动态、总结与样本，准备重建",
+                label = if (targetDayKey.isNotBlank()) "清空当天动态数据" else "清空旧动态数据",
+                detail = if (targetDayKey.isNotBlank()) {
+                    "删除 $targetDayKey 的旧动态、总结与样本，准备当天重建"
+                } else {
+                    "删除旧的动态、总结与样本，准备重建"
+                },
             )
-            SegmentDatabaseHelper.resetAllDynamicRebuildArtifacts(this)
+            val targetBounds = if (targetDayKey.isNotBlank()) {
+                SegmentSummaryManager.dayBoundsMillis(targetDayKey)
+            } else {
+                null
+            }
+            if (targetDayKey.isNotBlank() && targetBounds == null) {
+                state.status = DynamicRebuildTaskState.STATUS_COMPLETED
+                state.completedAt = System.currentTimeMillis()
+                state.updatedAt = state.completedAt
+                state.currentStage = "completed_empty"
+                state.currentStageLabel = "准备完成"
+                state.currentStageDetail = "当天日期无效，未找到可重建的动态"
+                state.appendRecentLog(
+                    buildStageLogLine(
+                        "准备完成",
+                        "当天日期无效，未找到可重建的动态",
+                    ),
+                )
+                synchronized(stateLock) {
+                    persistStateLocked(state)
+                }
+                return state
+            }
+            if (targetBounds != null) {
+                SegmentDatabaseHelper.resetDynamicRebuildArtifactsForDay(
+                    this,
+                    targetDayKey,
+                    targetBounds.first,
+                    targetBounds.second,
+                )
+            } else {
+                SegmentDatabaseHelper.resetAllDynamicRebuildArtifacts(this)
+            }
         } else {
             recordStage(
                 state = state,
@@ -742,6 +794,8 @@ class DynamicRebuildService : Service() {
             detail =
                 if (backfillMode) {
                     "发现 ${state.totalSegments} 条需补全动态，覆盖 ${state.totalDays()} 天，并发 ${state.dayConcurrency} 天"
+                } else if (targetDayKey.isNotBlank()) {
+                    "发现 ${state.totalSegments} 条当天重建动态，覆盖 ${state.totalDays()} 天，并发 ${state.dayConcurrency} 天"
                 } else {
                     "共 ${state.totalSegments} 条动态，覆盖 ${state.totalDays()} 天，并发 ${state.dayConcurrency} 天"
                 },

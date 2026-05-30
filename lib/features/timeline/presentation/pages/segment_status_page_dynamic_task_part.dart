@@ -1,10 +1,10 @@
 part of 'segment_status_page.dart';
 
 // ========== 动态重建任务控制 ==========
-enum _DynamicBackfillScope { selectedDay, allDays }
+enum _DynamicTaskScope { selectedDay, allDays }
 
-class _DynamicBackfillConfirmCopy {
-  const _DynamicBackfillConfirmCopy({
+class _DynamicTaskConfirmCopy {
+  const _DynamicTaskConfirmCopy({
     required this.title,
     required this.message,
     required this.confirmText,
@@ -78,9 +78,12 @@ extension _SegmentStatusDynamicTaskPart on _SegmentStatusPageState {
         AppLocalizations.of(context).segmentDynamicConcurrencySaveFailed,
       );
     } finally {
-      if (!mounted) return;
-      _segmentStatusSetState(() => _savingDynamicRebuildDayConcurrency = false);
-      _publishDynamicRebuildUiSnapshot();
+      if (mounted) {
+        _segmentStatusSetState(
+          () => _savingDynamicRebuildDayConcurrency = false,
+        );
+        _publishDynamicRebuildUiSnapshot();
+      }
     }
   }
 
@@ -178,9 +181,10 @@ extension _SegmentStatusDynamicTaskPart on _SegmentStatusPageState {
         AppLocalizations.of(context).dynamicAutoRepairToggleFailed,
       );
     } finally {
-      if (!mounted) return;
-      _segmentStatusSetState(() => _togglingDynamicAutoRepair = false);
-      _publishDynamicRebuildUiSnapshot();
+      if (mounted) {
+        _segmentStatusSetState(() => _togglingDynamicAutoRepair = false);
+        _publishDynamicRebuildUiSnapshot();
+      }
     }
   }
 
@@ -818,38 +822,61 @@ extension _SegmentStatusDynamicTaskPart on _SegmentStatusPageState {
     final bool continueExisting =
         _dynamicRebuildTaskStatus.canContinue &&
         _dynamicRebuildTaskStatus.isRebuildMode;
+    if (!continueExisting) {
+      final _DynamicTaskScope? scope = await _pickDynamicTaskScope(
+        backfill: false,
+      );
+      if (scope == null || !mounted) return;
+      await _startDynamicRebuild(
+        targetDayKey: scope == _DynamicTaskScope.selectedDay
+            ? (_selectedDateKey ?? '').trim()
+            : null,
+      );
+      return;
+    }
     final bool ok = await UIDialogs.showConfirm(
       context,
-      title: continueExisting ? '继续重建动态' : '重建动态',
-      message: continueExisting
-          ? '会从上次未完成或失败的日期继续重建，不会重新清空已完成结果。适合任务中断后继续处理。确定继续吗？'
-          : '重建会先清空当前动态、每日/每周总结与相关图片元数据，再从最老截图开始完整生成。适合需要彻底重跑全部动态的情况。确定继续吗？',
-      confirmText: continueExisting ? '继续重建' : '立即重建',
+      title: '继续重建动态',
+      message: '会从上次未完成或失败的日期继续重建，不会重新清空已完成结果。适合任务中断后继续处理。确定继续吗？',
+      confirmText: '继续重建',
       cancelText: '取消',
-      destructive: !continueExisting,
     );
     if (!ok || !mounted) return;
-    if (continueExisting) {
-      await _continueDynamicRebuild();
-    } else {
-      await _startDynamicRebuild();
-    }
+    await _continueDynamicRebuild();
   }
 
-  _DynamicBackfillConfirmCopy _dynamicBackfillConfirmCopy(
-    _DynamicBackfillScope scope,
-    String dateKey,
-  ) {
+  _DynamicTaskConfirmCopy _dynamicTaskConfirmCopy({
+    required bool backfill,
+    required _DynamicTaskScope scope,
+    required String dateKey,
+  }) {
+    if (!backfill) {
+      switch (scope) {
+        case _DynamicTaskScope.selectedDay:
+          return _DynamicTaskConfirmCopy(
+            title: '重建当天动态',
+            message: '只清空并重建 $dateKey 的动态、当日总结和相关图片元数据，其他日期动态不会被删除。确定开始吗？',
+            confirmText: '重建当天',
+          );
+        case _DynamicTaskScope.allDays:
+          return const _DynamicTaskConfirmCopy(
+            title: '重建动态',
+            message:
+                '重建会先清空当前动态、每日/每周总结与相关图片元数据，再从最老截图开始完整生成。适合需要彻底重跑全部动态的情况。确定继续吗？',
+            confirmText: '立即重建',
+          );
+      }
+    }
     switch (scope) {
-      case _DynamicBackfillScope.selectedDay:
-        return _DynamicBackfillConfirmCopy(
+      case _DynamicTaskScope.selectedDay:
+        return _DynamicTaskConfirmCopy(
           title: '补全当天动态',
           message:
               '只补全 $dateKey 缺失动态和缺失总结，不会清空或覆盖已有动态。每条补全结果生成后，仍会检查是否能与上一条动态合并。确定开始吗？',
           confirmText: '补全当天',
         );
-      case _DynamicBackfillScope.allDays:
-        return const _DynamicBackfillConfirmCopy(
+      case _DynamicTaskScope.allDays:
+        return const _DynamicTaskConfirmCopy(
           title: '补全动态',
           message:
               '补全会按截图时间扫描每一天，已被现有动态结果覆盖的窗口会跳过，只把缺失日期、缺失时间窗或缺失总结加入后台队列，不会清空当前动态。每条补全结果生成后，仍会检查是否能与上一条动态合并，但不会重新扫描遗漏窗口。确定继续吗？',
@@ -860,12 +887,12 @@ extension _SegmentStatusDynamicTaskPart on _SegmentStatusPageState {
 
   Widget _buildDynamicBackfillScopeCard(
     BuildContext context, {
-    required _DynamicBackfillScope scope,
-    required _DynamicBackfillScope selectedScope,
+    required _DynamicTaskScope scope,
+    required _DynamicTaskScope selectedScope,
     required String title,
     required String subtitle,
     required bool enabled,
-    required ValueChanged<_DynamicBackfillScope> onSelected,
+    required ValueChanged<_DynamicTaskScope> onSelected,
   }) {
     final ThemeData theme = Theme.of(context);
     final ColorScheme cs = theme.colorScheme;
@@ -941,17 +968,19 @@ extension _SegmentStatusDynamicTaskPart on _SegmentStatusPageState {
     );
   }
 
-  Future<_DynamicBackfillScope?> _pickDynamicBackfillScope() async {
+  Future<_DynamicTaskScope?> _pickDynamicTaskScope({
+    required bool backfill,
+  }) async {
     final String dateKey = (_selectedDateKey ?? '').trim();
-    final bool canBackfillSelectedDay = dateKey.isNotEmpty;
-    _DynamicBackfillScope selectedScope = canBackfillSelectedDay
-        ? _DynamicBackfillScope.selectedDay
-        : _DynamicBackfillScope.allDays;
+    final bool canUseSelectedDay = dateKey.isNotEmpty;
+    _DynamicTaskScope selectedScope = canUseSelectedDay
+        ? _DynamicTaskScope.selectedDay
+        : _DynamicTaskScope.allDays;
 
-    return showGeneralDialog<_DynamicBackfillScope>(
+    return showGeneralDialog<_DynamicTaskScope>(
       context: context,
       barrierDismissible: true,
-      barrierLabel: 'Backfill Scope',
+      barrierLabel: backfill ? 'Backfill Scope' : 'Rebuild Scope',
       barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.50),
       transitionDuration: const Duration(milliseconds: 170),
       pageBuilder: (dialogContext, _, __) {
@@ -965,8 +994,11 @@ extension _SegmentStatusDynamicTaskPart on _SegmentStatusPageState {
             final Color divider = cs.outlineVariant.withValues(
               alpha: isDark ? 0.95 : 1.0,
             );
-            final _DynamicBackfillConfirmCopy copy =
-                _dynamicBackfillConfirmCopy(selectedScope, dateKey);
+            final _DynamicTaskConfirmCopy copy = _dynamicTaskConfirmCopy(
+              backfill: backfill,
+              scope: selectedScope,
+              dateKey: dateKey,
+            );
             return PopScope(
               child: SafeArea(
                 child: Center(
@@ -1035,14 +1067,13 @@ extension _SegmentStatusDynamicTaskPart on _SegmentStatusPageState {
                                       children: [
                                         _buildDynamicBackfillScopeCard(
                                           dialogContext,
-                                          scope:
-                                              _DynamicBackfillScope.selectedDay,
+                                          scope: _DynamicTaskScope.selectedDay,
                                           selectedScope: selectedScope,
-                                          title: '补全当天',
-                                          subtitle: canBackfillSelectedDay
+                                          title: backfill ? '补全当天' : '重建当天',
+                                          subtitle: canUseSelectedDay
                                               ? dateKey
                                               : '当前没有选中日期',
-                                          enabled: canBackfillSelectedDay,
+                                          enabled: canUseSelectedDay,
                                           onSelected: (scope) {
                                             setDialogState(
                                               () => selectedScope = scope,
@@ -1054,10 +1085,12 @@ extension _SegmentStatusDynamicTaskPart on _SegmentStatusPageState {
                                         ),
                                         _buildDynamicBackfillScopeCard(
                                           dialogContext,
-                                          scope: _DynamicBackfillScope.allDays,
+                                          scope: _DynamicTaskScope.allDays,
                                           selectedScope: selectedScope,
-                                          title: '补全全部',
-                                          subtitle: '扫描所有日期',
+                                          title: backfill ? '补全全部' : '重建全部',
+                                          subtitle: backfill
+                                              ? '扫描所有日期'
+                                              : '清空后完整生成',
                                           enabled: true,
                                           onSelected: (scope) {
                                             setDialogState(
@@ -1164,17 +1197,21 @@ extension _SegmentStatusDynamicTaskPart on _SegmentStatusPageState {
     );
   }
 
+  Future<_DynamicTaskScope?> _pickDynamicBackfillScope() {
+    return _pickDynamicTaskScope(backfill: true);
+  }
+
   Future<void> _confirmStartDynamicBackfill() async {
     if (_dynamicRebuildTaskStatus.isActive || _startingDynamicRebuild) return;
     final bool continueExisting =
         _dynamicRebuildTaskStatus.canContinue &&
         _dynamicRebuildTaskStatus.isBackfillMode;
     if (!continueExisting) {
-      final _DynamicBackfillScope? scope = await _pickDynamicBackfillScope();
+      final _DynamicTaskScope? scope = await _pickDynamicBackfillScope();
       if (scope == null || !mounted) return;
       await _startDynamicRebuild(
         taskMode: 'backfill',
-        targetDayKey: scope == _DynamicBackfillScope.selectedDay
+        targetDayKey: scope == _DynamicTaskScope.selectedDay
             ? (_selectedDateKey ?? '').trim()
             : null,
       );
@@ -1224,8 +1261,8 @@ extension _SegmentStatusDynamicTaskPart on _SegmentStatusPageState {
       if (status.isCompleted && status.totalSegments == 0) {
         UINotifier.info(
           context,
-          status.isBackfillMode && status.targetDayKey.trim().isNotEmpty
-              ? '当天没有需要补全的动态'
+          status.targetDayKey.trim().isNotEmpty
+              ? (status.isBackfillMode ? '当天没有需要补全的动态' : '当天没有可重建的动态')
               : status.isBackfillMode
               ? '未发现需要补全的动态'
               : AppLocalizations.of(context).dynamicRebuildNoSegments,
@@ -1245,8 +1282,10 @@ extension _SegmentStatusDynamicTaskPart on _SegmentStatusPageState {
       } else if (status.isActive && !previous.isActive) {
         UINotifier.info(
           context,
-          status.isBackfillMode && status.targetDayKey.trim().isNotEmpty
-              ? '已开始后台补全当天动态，可在通知栏查看进度'
+          status.targetDayKey.trim().isNotEmpty
+              ? (status.isBackfillMode
+                    ? '已开始后台补全当天动态，可在通知栏查看进度'
+                    : '已开始后台重建当天动态，可在通知栏查看进度')
               : status.isBackfillMode
               ? '已开始后台补全，可在通知栏查看进度'
               : AppLocalizations.of(context).dynamicRebuildStartedInBackground,

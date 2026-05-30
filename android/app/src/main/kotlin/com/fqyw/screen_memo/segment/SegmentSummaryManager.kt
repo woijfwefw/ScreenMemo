@@ -5497,16 +5497,44 @@ object SegmentSummaryManager {
         val segmentId: Long = 0L,
     ) : IllegalStateException(message)
 
-    fun buildFullRebuildWorklist(ctx: Context, durationSec: Int): List<DynamicRebuildWindow> {
+    fun buildFullRebuildWorklist(
+        ctx: Context,
+        durationSec: Int,
+        targetDayKey: String? = null,
+    ): List<DynamicRebuildWindow> {
         val safeDurationSec = durationSec.coerceAtLeast(60)
-        val shots = SegmentDatabaseHelper.listAllShotsAscending(ctx)
+        val normalizedTargetDayKey = targetDayKey?.trim().orEmpty()
+        val targetDayBounds = if (normalizedTargetDayKey.isNotBlank()) {
+            dayBoundsMillis(normalizedTargetDayKey)
+        } else {
+            null
+        }
+        if (normalizedTargetDayKey.isNotBlank() && targetDayBounds == null) {
+            logBackfillDiag(
+                ctx,
+                "buildFullRebuildWorklist empty reason=invalid_target_day targetDayKey=$normalizedTargetDayKey",
+            )
+            return emptyList()
+        }
+        val durationMs = safeDurationSec * 1000L
+        val shots = if (targetDayBounds != null) {
+            SegmentDatabaseHelper.listShotsBetween(
+                ctx,
+                targetDayBounds.first,
+                kotlin.math.min(System.currentTimeMillis(), targetDayBounds.second + durationMs),
+                perTableLimit = Int.MAX_VALUE,
+            )
+        } else {
+            SegmentDatabaseHelper.listAllShotsAscending(ctx)
+        }
         if (shots.isEmpty()) return emptyList()
 
         val works = ArrayList<DynamicRebuildWindow>()
         var i = 0
         while (i < shots.size) {
             val start = shots[i].captureTime
-            val end = start + safeDurationSec * 1000L
+            if (targetDayBounds != null && start > targetDayBounds.second) break
+            val end = start + durationMs
             works.add(
                 DynamicRebuildWindow(
                     startTime = start,

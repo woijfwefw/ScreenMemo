@@ -379,6 +379,7 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
     bool targetDay = false,
   }) {
     if (backfill && targetDay) return '当天动态补全';
+    if (!backfill && targetDay) return '当天动态重建';
     return backfill ? '动态补全' : '动态重建';
   }
 
@@ -387,6 +388,7 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
     bool targetDay = false,
   }) {
     if (backfill && targetDay) return '当天补全';
+    if (!backfill && targetDay) return '当天重建';
     return backfill ? '补全' : '重建';
   }
 
