@@ -1302,6 +1302,19 @@
   },
   "deepThinkingLabel": "심층 추론",
   "thinkingInProgress": "생각 중…",
+  "webSearchProcessTitle": "검색 과정",
+  "webSearchProcessSearchingTitle": "검색 과정 · 검색 중",
+  "webSearchProgressSummary": "{siteCount}개 사이트 검색 · {pageCount}개 페이지 확인",
+  "@webSearchProgressSummary": {
+    "placeholders": {
+      "siteCount": {
+        "type": "int"
+      },
+      "pageCount": {
+        "type": "int"
+      }
+    }
+  },
   "requestStoppedInfo": "요청이 중지되었습니다",
   "reasoningLabel": "추리:",
   "answerLabel": "답변:",

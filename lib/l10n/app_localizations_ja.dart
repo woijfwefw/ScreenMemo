@@ -2476,6 +2476,17 @@ class AppLocalizationsJa extends AppLocalizations {
   String get thinkingInProgress => '思考中…';
 
   @override
+  String get webSearchProcessTitle => '検索プロセス';
+
+  @override
+  String get webSearchProcessSearchingTitle => '検索プロセス · 検索中';
+
+  @override
+  String webSearchProgressSummary(int siteCount, int pageCount) {
+    return '$siteCount 件のサイトを検索 · $pageCount ページを表示';
+  }
+
+  @override
   String get requestStoppedInfo => 'リクエストを停止しました';
 
   @override

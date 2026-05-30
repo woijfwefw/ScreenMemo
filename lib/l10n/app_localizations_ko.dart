@@ -2474,6 +2474,17 @@ class AppLocalizationsKo extends AppLocalizations {
   String get thinkingInProgress => '생각 중…';
 
   @override
+  String get webSearchProcessTitle => '검색 과정';
+
+  @override
+  String get webSearchProcessSearchingTitle => '검색 과정 · 검색 중';
+
+  @override
+  String webSearchProgressSummary(int siteCount, int pageCount) {
+    return '$siteCount개 사이트 검색 · $pageCount개 페이지 확인';
+  }
+
+  @override
   String get requestStoppedInfo => '요청이 중지되었습니다';
 
   @override

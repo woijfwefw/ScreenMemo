@@ -2448,6 +2448,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get thinkingInProgress => '思考中…';
 
   @override
+  String get webSearchProcessTitle => '搜索过程';
+
+  @override
+  String get webSearchProcessSearchingTitle => '搜索过程 · 搜索中';
+
+  @override
+  String webSearchProgressSummary(int siteCount, int pageCount) {
+    return '搜索了 $siteCount 个网站 · 查看了 $pageCount 个页面';
+  }
+
+  @override
   String get requestStoppedInfo => '已停止请求';
 
   @override

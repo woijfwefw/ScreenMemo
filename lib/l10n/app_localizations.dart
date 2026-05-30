@@ -4524,6 +4524,24 @@ abstract class AppLocalizations {
   /// **'Thinking…'**
   String get thinkingInProgress;
 
+  /// No description provided for @webSearchProcessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Search process'**
+  String get webSearchProcessTitle;
+
+  /// No description provided for @webSearchProcessSearchingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Search process · Searching'**
+  String get webSearchProcessSearchingTitle;
+
+  /// No description provided for @webSearchProgressSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Sites searched: {siteCount} · Pages viewed: {pageCount}'**
+  String webSearchProgressSummary(int siteCount, int pageCount);
+
   /// No description provided for @requestStoppedInfo.
   ///
   /// In en, this message translates to:

@@ -1302,6 +1302,19 @@
   },
   "deepThinkingLabel": "詳細推論",
   "thinkingInProgress": "思考中…",
+  "webSearchProcessTitle": "検索プロセス",
+  "webSearchProcessSearchingTitle": "検索プロセス · 検索中",
+  "webSearchProgressSummary": "{siteCount} 件のサイトを検索 · {pageCount} ページを表示",
+  "@webSearchProgressSummary": {
+    "placeholders": {
+      "siteCount": {
+        "type": "int"
+      },
+      "pageCount": {
+        "type": "int"
+      }
+    }
+  },
   "requestStoppedInfo": "リクエストを停止しました",
   "reasoningLabel": "推論:",
   "answerLabel": "答え：",

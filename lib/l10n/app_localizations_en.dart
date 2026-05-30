@@ -2536,6 +2536,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get thinkingInProgress => 'Thinking…';
 
   @override
+  String get webSearchProcessTitle => 'Search process';
+
+  @override
+  String get webSearchProcessSearchingTitle => 'Search process · Searching';
+
+  @override
+  String webSearchProgressSummary(int siteCount, int pageCount) {
+    return 'Sites searched: $siteCount · Pages viewed: $pageCount';
+  }
+
+  @override
   String get requestStoppedInfo => 'Request stopped';
 
   @override

@@ -1304,6 +1304,19 @@
   },
   "deepThinkingLabel": "Thinking",
   "thinkingInProgress": "Thinking…",
+  "webSearchProcessTitle": "Search process",
+  "webSearchProcessSearchingTitle": "Search process · Searching",
+  "webSearchProgressSummary": "Sites searched: {siteCount} · Pages viewed: {pageCount}",
+  "@webSearchProgressSummary": {
+    "placeholders": {
+      "siteCount": {
+        "type": "int"
+      },
+      "pageCount": {
+        "type": "int"
+      }
+    }
+  },
   "requestStoppedInfo": "Request stopped",
   "reasoningLabel": "Reasoning:",
   "answerLabel": "Answer:",

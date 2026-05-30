@@ -1304,6 +1304,19 @@
   },
   "deepThinkingLabel": "思考过程",
   "thinkingInProgress": "思考中…",
+  "webSearchProcessTitle": "搜索过程",
+  "webSearchProcessSearchingTitle": "搜索过程 · 搜索中",
+  "webSearchProgressSummary": "搜索了 {siteCount} 个网站 · 查看了 {pageCount} 个页面",
+  "@webSearchProgressSummary": {
+    "placeholders": {
+      "siteCount": {
+        "type": "int"
+      },
+      "pageCount": {
+        "type": "int"
+      }
+    }
+  },
   "requestStoppedInfo": "已停止请求",
   "reasoningLabel": "Reasoning:",
   "answerLabel": "Answer:",

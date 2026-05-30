@@ -176,6 +176,308 @@ String _toolChipTextForDisplay(BuildContext context, _ThinkingToolChip chip) {
   return summary.isEmpty ? normalizedLabel : '$normalizedLabel · $summary';
 }
 
+String _toolProcessSummaryForDisplay(
+  BuildContext context,
+  List<_ThinkingToolChip> tools, {
+  required bool loading,
+}) {
+  final _ToolProcessSummary summary = _ToolProcessSummary.fromTools(tools);
+  return summary.toDisplayText(context, loading: loading);
+}
+
+class _ToolProcessSummary {
+  const _ToolProcessSummary({
+    required this.totalCalls,
+    required this.activeCalls,
+    required this.searchCalls,
+    required this.searchReturned,
+    required this.searchTotal,
+    required this.imageViewCalls,
+    required this.imagesViewed,
+    required this.generateImageCalls,
+    required this.imagesGenerated,
+    required this.segmentDetailCalls,
+    required this.sampleCalls,
+    required this.sampleRows,
+    required this.failedCalls,
+    required this.otherCalls,
+  });
+
+  final int totalCalls;
+  final int activeCalls;
+  final int searchCalls;
+  final int searchReturned;
+  final int searchTotal;
+  final int imageViewCalls;
+  final int imagesViewed;
+  final int generateImageCalls;
+  final int imagesGenerated;
+  final int segmentDetailCalls;
+  final int sampleCalls;
+  final int sampleRows;
+  final int failedCalls;
+  final int otherCalls;
+
+  factory _ToolProcessSummary.fromTools(List<_ThinkingToolChip> tools) {
+    final Map<String, _ThinkingToolChip> byCallId =
+        <String, _ThinkingToolChip>{};
+    for (final _ThinkingToolChip tool in tools) {
+      final String key = tool.callId.trim().isNotEmpty
+          ? tool.callId.trim()
+          : '${tool.toolName}\u0001${tool.label}\u0001${byCallId.length}';
+      byCallId[key] = tool;
+    }
+
+    int activeCalls = 0;
+    int searchCalls = 0;
+    int searchReturned = 0;
+    int searchTotal = 0;
+    int imageViewCalls = 0;
+    int imagesViewed = 0;
+    int generateImageCalls = 0;
+    int imagesGenerated = 0;
+    int segmentDetailCalls = 0;
+    int sampleCalls = 0;
+    int sampleRows = 0;
+    int failedCalls = 0;
+    int otherCalls = 0;
+
+    for (final _ThinkingToolChip tool in byCallId.values) {
+      final String toolName = tool.toolName.trim();
+      final String summary = (tool.resultSummary ?? '').trim();
+      if (tool.active) activeCalls += 1;
+      if (_toolSummaryLooksFailed(summary)) failedCalls += 1;
+
+      if (_isSearchToolName(toolName)) {
+        searchCalls += 1;
+        final _ParsedSearchSummary parsed = _parseSearchSummary(summary);
+        searchReturned += parsed.returned;
+        searchTotal += parsed.total;
+        continue;
+      }
+
+      if (toolName == 'get_images') {
+        imageViewCalls += 1;
+        final int loaded = _parseLoadedImageCount(summary);
+        imagesViewed += loaded > 0 ? loaded : _parseRequestedCount(tool.label);
+        continue;
+      }
+
+      if (toolName == 'generate_image') {
+        generateImageCalls += 1;
+        final int generated = _parseGeneratedImageCount(summary);
+        imagesGenerated += generated > 0
+            ? generated
+            : _parseRequestedCount(tool.label);
+        continue;
+      }
+
+      if (toolName == 'get_segment_result') {
+        segmentDetailCalls += 1;
+        continue;
+      }
+
+      if (toolName == 'get_segment_samples') {
+        sampleCalls += 1;
+        sampleRows += _parseReturnedCount(summary);
+        continue;
+      }
+
+      otherCalls += 1;
+    }
+
+    return _ToolProcessSummary(
+      totalCalls: byCallId.length,
+      activeCalls: activeCalls,
+      searchCalls: searchCalls,
+      searchReturned: searchReturned,
+      searchTotal: searchTotal,
+      imageViewCalls: imageViewCalls,
+      imagesViewed: imagesViewed,
+      generateImageCalls: generateImageCalls,
+      imagesGenerated: imagesGenerated,
+      segmentDetailCalls: segmentDetailCalls,
+      sampleCalls: sampleCalls,
+      sampleRows: sampleRows,
+      failedCalls: failedCalls,
+      otherCalls: otherCalls,
+    );
+  }
+
+  String toDisplayText(BuildContext context, {required bool loading}) {
+    if (totalCalls <= 0) return '';
+    final bool zh = _isZhLocaleUi(context);
+    final List<String> parts = <String>[];
+
+    parts.add(zh ? '调用了 $totalCalls 个工具' : 'Called $totalCalls tools');
+    if (loading && activeCalls > 0) {
+      parts.add(zh ? '$activeCalls 个执行中' : '$activeCalls running');
+    }
+    if (searchCalls > 0) {
+      final String base = zh
+          ? '检索了 $searchCalls 次'
+          : '$searchCalls ${searchCalls == 1 ? 'search' : 'searches'}';
+      if (searchReturned > 0) {
+        String detail = zh
+            ? '$base，返回 $searchReturned 条'
+            : '$base, $searchReturned returned';
+        if (searchTotal > searchReturned) {
+          detail += zh ? '（共 $searchTotal 条）' : ' ($searchTotal total)';
+        }
+        parts.add(detail);
+      } else {
+        parts.add(base);
+      }
+    }
+    if (imageViewCalls > 0) {
+      if (imagesViewed > 0) {
+        parts.add(zh ? '查看了 $imagesViewed 张图片' : 'Viewed $imagesViewed images');
+      } else {
+        parts.add(
+          zh
+              ? '查看图片 $imageViewCalls 次'
+              : '$imageViewCalls image view ${imageViewCalls == 1 ? 'call' : 'calls'}',
+        );
+      }
+    }
+    if (generateImageCalls > 0) {
+      if (imagesGenerated > 0) {
+        parts.add(
+          zh ? '生成了 $imagesGenerated 张图片' : 'Generated $imagesGenerated images',
+        );
+      } else {
+        parts.add(
+          zh
+              ? '生成图片 $generateImageCalls 次'
+              : '$generateImageCalls image generation ${generateImageCalls == 1 ? 'call' : 'calls'}',
+        );
+      }
+    }
+    if (segmentDetailCalls > 0) {
+      parts.add(
+        zh
+            ? '获取了 $segmentDetailCalls 个片段详情'
+            : 'Fetched $segmentDetailCalls segment details',
+      );
+    }
+    if (sampleCalls > 0) {
+      if (sampleRows > 0) {
+        parts.add(zh ? '抽样了 $sampleRows 条样本' : 'Sampled $sampleRows rows');
+      } else {
+        parts.add(
+          zh
+              ? '抽样 $sampleCalls 次'
+              : '$sampleCalls sample ${sampleCalls == 1 ? 'call' : 'calls'}',
+        );
+      }
+    }
+    if (otherCalls > 0) {
+      parts.add(zh ? '其他 $otherCalls 次' : '$otherCalls other calls');
+    }
+    if (failedCalls > 0) {
+      parts.add(zh ? '失败 $failedCalls 个' : '$failedCalls failed');
+    }
+
+    return parts.join(' · ');
+  }
+
+  static bool _isSearchToolName(String toolName) =>
+      toolName.startsWith('search_');
+
+  static bool _toolSummaryLooksFailed(String summary) {
+    final String s = summary.trim();
+    final String low = s.toLowerCase();
+    return s.startsWith('错误') || low.startsWith('error=');
+  }
+
+  static int _parseRequestedCount(String label) {
+    for (final RegExp pattern in <RegExp>[
+      RegExp(r'(\d+)\s*张'),
+      RegExp(r':\s*(\d+)'),
+      RegExp(r'：\s*(\d+)'),
+    ]) {
+      final Match? match = pattern.firstMatch(label);
+      final int value = int.tryParse(match?.group(1) ?? '') ?? 0;
+      if (value > 0) return value;
+    }
+    return 0;
+  }
+
+  static int _parseReturnedCount(String summary) {
+    for (final RegExp pattern in <RegExp>[
+      RegExp(r'返回\s*(\d+)\s*条'),
+      RegExp(r'returned\s+(\d+)', caseSensitive: false),
+    ]) {
+      final Match? match = pattern.firstMatch(summary);
+      final int value = int.tryParse(match?.group(1) ?? '') ?? 0;
+      if (value > 0) return value;
+    }
+    return 0;
+  }
+
+  static int _parseLoadedImageCount(String summary) {
+    for (final RegExp pattern in <RegExp>[
+      RegExp(r'已加载\s*(\d+)\s*张'),
+      RegExp(r'loaded\s+(\d+)', caseSensitive: false),
+      RegExp(r'provided=(\d+)', caseSensitive: false),
+    ]) {
+      final Match? match = pattern.firstMatch(summary);
+      final int value = int.tryParse(match?.group(1) ?? '') ?? 0;
+      if (value > 0) return value;
+    }
+    return 0;
+  }
+
+  static int _parseGeneratedImageCount(String summary) {
+    for (final RegExp pattern in <RegExp>[
+      RegExp(r'已生成\s*(\d+)\s*张'),
+      RegExp(r'generated\s+(\d+)\s+image', caseSensitive: false),
+    ]) {
+      final Match? match = pattern.firstMatch(summary);
+      final int value = int.tryParse(match?.group(1) ?? '') ?? 0;
+      if (value > 0) return value;
+    }
+    return 0;
+  }
+
+  static _ParsedSearchSummary _parseSearchSummary(String summary) {
+    final String s = summary.trim();
+    for (final RegExp pattern in <RegExp>[
+      RegExp(r'找到\s*(\d+)\s*个(?:[（(]\s*本页\s*(\d+)\s*[）)])?'),
+      RegExp(r'found\s+(\d+)(?:\s*\(page\s+(\d+)\))?', caseSensitive: false),
+    ]) {
+      final Match? match = pattern.firstMatch(s);
+      if (match == null) continue;
+      final int total = int.tryParse(match.group(1) ?? '') ?? 0;
+      final int page = int.tryParse(match.group(2) ?? '') ?? 0;
+      return _ParsedSearchSummary(
+        returned: page > 0 ? page : total,
+        total: total,
+      );
+    }
+
+    final Match? countMatch = RegExp(
+      r'count=(\d+)(?:\s+total=(\d+))?',
+      caseSensitive: false,
+    ).firstMatch(s);
+    if (countMatch != null) {
+      final int count = int.tryParse(countMatch.group(1) ?? '') ?? 0;
+      final int total = int.tryParse(countMatch.group(2) ?? '') ?? 0;
+      return _ParsedSearchSummary(returned: count, total: total);
+    }
+
+    final int returned = _parseReturnedCount(s);
+    return _ParsedSearchSummary(returned: returned, total: returned);
+  }
+}
+
+class _ParsedSearchSummary {
+  const _ParsedSearchSummary({required this.returned, required this.total});
+
+  final int returned;
+  final int total;
+}
+
 String _formatToolDurationMs(int? durationMs) {
   final int ms = durationMs ?? 0;
   if (ms <= 0) return '';
@@ -318,12 +620,14 @@ class _WebSearchCallsCardState extends State<_WebSearchCallsCard> {
     final theme = Theme.of(context);
     final List<AIWebSearchCall> visible = _visibleCalls;
     if (visible.isEmpty) return const SizedBox.shrink();
-    final bool zh = _isZhLocaleUi(context);
+    final l10n = AppLocalizations.of(context);
     final bool loading = _isLoading;
     final Color accent = _webSearchBlue(context);
     final String title = loading
-        ? (zh ? '联网搜索 · 搜索中' : 'Web search · Searching')
-        : (zh ? '联网搜索过程' : 'Web search process');
+        ? l10n.webSearchProcessSearchingTitle
+        : l10n.webSearchProcessTitle;
+    final String summary = _summaryLabel(visible, l10n);
+    final String titleLine = summary.isEmpty ? title : '$title · $summary';
     final String duration = _durationLabel(visible, loading);
 
     return Material(
@@ -346,25 +650,18 @@ class _WebSearchCallsCardState extends State<_WebSearchCallsCard> {
                 padding: const EdgeInsets.symmetric(vertical: 1),
                 child: Row(
                   children: [
-                    _Shimmer(
-                      active: loading,
-                      baseColor: accent,
-                      child: Icon(
-                        Icons.travel_explore_rounded,
-                        size: 16,
-                        color: accent,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
                     Expanded(
                       child: _Shimmer(
                         active: loading,
                         baseColor: accent,
                         child: Text(
-                          title,
-                          style: theme.textTheme.bodySmall?.copyWith(
+                          titleLine,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
                             color: accent,
                             fontWeight: FontWeight.w700,
+                            height: 1,
                           ),
                         ),
                       ),
@@ -434,6 +731,61 @@ class _WebSearchCallsCardState extends State<_WebSearchCallsCard> {
       durationMs = DateTime.now().difference(start).inMilliseconds;
     }
     return _formatWebSearchDurationMs(durationMs);
+  }
+
+  String _summaryLabel(List<AIWebSearchCall> calls, AppLocalizations l10n) {
+    final _WebSearchSummary summary = _WebSearchSummary.fromCalls(calls);
+    return l10n.webSearchProgressSummary(summary.siteCount, summary.pageCount);
+  }
+}
+
+class _WebSearchSummary {
+  const _WebSearchSummary({required this.siteCount, required this.pageCount});
+
+  final int siteCount;
+  final int pageCount;
+
+  factory _WebSearchSummary.fromCalls(List<AIWebSearchCall> calls) {
+    final Set<String> sites = <String>{};
+    final Set<String> pages = <String>{};
+
+    void addUrl(String raw) {
+      final String url = raw.trim();
+      if (url.isEmpty) return;
+      final String host = _hostFromUrl(url);
+      if (host.isNotEmpty) sites.add(host.toLowerCase());
+      if (_externalUriFromUrl(url) != null) {
+        pages.add(url);
+      }
+    }
+
+    void addSource(AIWebSearchSource source) {
+      addUrl(source.url);
+      final String title = (source.title ?? '').trim();
+      if (source.url.trim().isEmpty && title.isNotEmpty) {
+        pages.add('title:$title');
+      }
+    }
+
+    for (final AIWebSearchCall call in calls) {
+      addUrl(call.url ?? '');
+      for (final AIWebSearchSource source in call.sources) {
+        addSource(source);
+      }
+      final List<String> querySites = <String>[
+        if ((call.query ?? '').trim().isNotEmpty) call.query!.trim(),
+        ...call.queries,
+      ];
+      for (final String query in querySites) {
+        final _SearchQueryDisplay display = _SearchQueryDisplay.parse(query);
+        for (final String rawSite in (display.site ?? '').split(',')) {
+          final String host = _hostFromText(rawSite);
+          if (host.isNotEmpty) sites.add(host.toLowerCase());
+        }
+      }
+    }
+
+    return _WebSearchSummary(siteCount: sites.length, pageCount: pages.length);
   }
 }
 
@@ -601,7 +953,7 @@ class _WebActionLine extends StatelessWidget {
     final String iconHost = _hostFromText(
       (host ?? '').isNotEmpty ? host! : url,
     );
-    final TextStyle? style = theme.textTheme.bodySmall?.copyWith(
+    final TextStyle? style = theme.textTheme.labelSmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
       height: 1.25,
     );
@@ -685,7 +1037,7 @@ class _SearchQueryLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final String siteHost = _hostFromText(query.site ?? '');
-    final TextStyle? style = theme.textTheme.bodySmall?.copyWith(
+    final TextStyle? style = theme.textTheme.labelSmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
       height: 1.25,
     );
@@ -810,7 +1162,7 @@ class _InlineWebLink extends StatelessWidget {
                 child: Text(
                   label,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
+                  style: theme.textTheme.labelSmall?.copyWith(
                     color: accent,
                     decoration: TextDecoration.underline,
                     decorationColor: accent,
@@ -975,7 +1327,7 @@ class _UrlCitationTile extends StatelessWidget {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
+                style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w700,
                   height: 1.2,
@@ -1117,6 +1469,14 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
     final String titleText = widget.isLoading
         ? l10n.thinkingInProgress
         : l10n.deepThinkingLabel;
+    final String toolSummary = _toolProcessSummaryForDisplay(
+      context,
+      _allToolChips(),
+      loading: widget.isLoading,
+    );
+    final String titleLine = toolSummary.isEmpty
+        ? titleText
+        : '$titleText · $toolSummary';
     final String fallback = (widget.fallbackReasoning ?? '').trim();
 
     final Duration elapsed = (widget.finishedAt ?? DateTime.now()).difference(
@@ -1149,10 +1509,13 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
                         active: widget.isLoading,
                         baseColor: titleColor,
                         child: Text(
-                          titleText,
-                          style: theme.textTheme.bodySmall?.copyWith(
+                          titleLine,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
                             color: titleColor,
                             fontWeight: FontWeight.w600,
+                            height: 1,
                           ),
                         ),
                       ),
@@ -1202,13 +1565,23 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
     return theme.colorScheme.tertiaryContainer.withValues(alpha: alpha);
   }
 
+  List<_ThinkingToolChip> _allToolChips() {
+    final List<_ThinkingToolChip> tools = <_ThinkingToolChip>[];
+    for (final _ThinkingEvent event in widget.events) {
+      if (event.type == _ThinkingEventType.tools) {
+        tools.addAll(event.tools);
+      }
+    }
+    return tools;
+  }
+
   Widget _buildFallbackReasoning(
     BuildContext context,
     String fallback,
     Color textColor,
   ) {
     final theme = Theme.of(context);
-    final TextStyle? bodyStyle = theme.textTheme.bodySmall?.copyWith(
+    final TextStyle? bodyStyle = theme.textTheme.labelSmall?.copyWith(
       color: textColor,
       height: 1.25,
     );
@@ -1316,7 +1689,7 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
                   const SizedBox(width: 8),
                   Text(
                     toggleText,
-                    style: theme.textTheme.labelMedium?.copyWith(
+                    style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.primary,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1375,14 +1748,28 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
     }
 
     final List<Widget> children = <Widget>[];
-    final bool hideEventTitle =
+    final bool isToolEvent =
         e.type == _ThinkingEventType.tools && e.tools.isNotEmpty;
+    final String eventToolSummary = isToolEvent
+        ? _toolProcessSummaryForDisplay(
+            context,
+            e.tools,
+            loading: widget.isLoading,
+          )
+        : '';
+    final bool hideEventTitle = false;
     if (!hideEventTitle) {
+      final String eventTitle = isToolEvent && eventToolSummary.isNotEmpty
+          ? '${e.title} · $eventToolSummary'
+          : e.title;
       Widget title = Text(
-        e.title,
-        style: theme.textTheme.bodySmall?.copyWith(
+        eventTitle,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: theme.textTheme.labelSmall?.copyWith(
           color: titleColor,
           fontWeight: FontWeight.w600,
+          height: 1,
         ),
       );
       // Only shimmer while the block is still loading; stale persisted `active`
@@ -1402,7 +1789,7 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
           padding: const EdgeInsets.only(top: 2),
           child: Text(
             sub,
-            style: theme.textTheme.bodySmall?.copyWith(
+            style: theme.textTheme.labelSmall?.copyWith(
               color: subtitleColor,
               fontWeight: FontWeight.w400,
             ),
@@ -1523,7 +1910,7 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
                   child: Text(
                     label,
                     softWrap: true,
-                    style: theme.textTheme.bodySmall?.copyWith(
+                    style: theme.textTheme.labelSmall?.copyWith(
                       color: fg,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1965,7 +2352,7 @@ class _ToolCallDetailSheetState extends State<_ToolCallDetailSheet> {
                   status,
                   if (duration.isNotEmpty) duration,
                 ].join(' · '),
-                style: theme.textTheme.bodySmall?.copyWith(
+                style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
@@ -2091,7 +2478,7 @@ class _ToolCallDetailSheetState extends State<_ToolCallDetailSheet> {
             if (filenames.isEmpty)
               Text(
                 _loc('没有可预览的图片。', 'No preview images available.'),
-                style: theme.textTheme.bodySmall?.copyWith(
+                style: theme.textTheme.labelSmall?.copyWith(
                   color: cs.onSurfaceVariant,
                 ),
               )
@@ -2113,7 +2500,7 @@ class _ToolCallDetailSheetState extends State<_ToolCallDetailSheet> {
                         '图片文件未找到，可能已移动或删除。',
                         'Image files were not found. They may have moved or been deleted.',
                       ),
-                      style: theme.textTheme.bodySmall?.copyWith(
+                      style: theme.textTheme.labelSmall?.copyWith(
                         color: cs.onSurfaceVariant,
                       ),
                     );
@@ -2188,13 +2575,13 @@ class _ToolCallDetailSheetState extends State<_ToolCallDetailSheet> {
             width: 92,
             child: Text(
               label,
-              style: theme.textTheme.labelMedium?.copyWith(
+              style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ),
           Expanded(
-            child: SelectableText(value, style: theme.textTheme.bodySmall),
+            child: SelectableText(value, style: theme.textTheme.labelSmall),
           ),
         ],
       ),
@@ -2271,11 +2658,11 @@ class _ToolCallDetailSheetState extends State<_ToolCallDetailSheet> {
               shown,
               style:
                   (monospace
-                          ? theme.textTheme.bodySmall?.copyWith(
+                          ? theme.textTheme.labelSmall?.copyWith(
                               fontFamily: 'monospace',
                               height: 1.25,
                             )
-                          : theme.textTheme.bodySmall)
+                          : theme.textTheme.labelSmall)
                       ?.copyWith(color: theme.colorScheme.onSurface),
             ),
           ),
