@@ -2588,6 +2588,68 @@ class AppLocalizationsZh extends AppLocalizations {
   String get editProviderTitle => '编辑提供商';
 
   @override
+  String get providerRequestHeadersTitle => '请求头';
+
+  @override
+  String providerRequestHeadersDesc(
+    Object apiKeyPlaceholder,
+    Object uuidPlaceholder,
+    Object sessionIdPlaceholder,
+    Object threadIdPlaceholder,
+    Object installationIdPlaceholder,
+    Object windowIdPlaceholder,
+    Object timestampMsPlaceholder,
+  ) {
+    return '可选自定义请求头会随聊天、模型刷新、Key 测试和图片生成一起发送。支持 $apiKeyPlaceholder、$uuidPlaceholder、$sessionIdPlaceholder、$threadIdPlaceholder、$installationIdPlaceholder、$windowIdPlaceholder、$timestampMsPlaceholder 占位符。';
+  }
+
+  @override
+  String get providerRequestHeadersEmpty => '暂无自定义请求头，将使用内置鉴权请求头。';
+
+  @override
+  String get providerRequestHeaderApplyTemplate => '应用模板';
+
+  @override
+  String get providerRequestHeaderAdd => '新增请求头';
+
+  @override
+  String get providerRequestHeaderRemove => '删除请求头';
+
+  @override
+  String get providerRequestHeaderNameLabel => '请求头名称';
+
+  @override
+  String get providerRequestHeaderValueLabel => '请求头值';
+
+  @override
+  String get providerRequestHeaderNameHint => 'Authorization';
+
+  @override
+  String providerRequestHeaderValueHint(
+    Object apiKeyPlaceholder,
+    Object uuidPlaceholder,
+  ) {
+    return 'Bearer $apiKeyPlaceholder / $uuidPlaceholder';
+  }
+
+  @override
+  String providerRequestHeaderInvalid(Object name) {
+    return 'Invalid request header: $name';
+  }
+
+  @override
+  String get providerRequestHeaderTemplateOpenAI => 'OpenAI';
+
+  @override
+  String get providerRequestHeaderTemplateAnthropic => 'Anthropic / Claude API';
+
+  @override
+  String get providerRequestHeaderTemplateCodex => 'Codex 兼容';
+
+  @override
+  String get providerRequestHeaderTemplateClaudeCode => 'Claude Code API key';
+
+  @override
   String get deletedToast => '已删除';
 
   @override

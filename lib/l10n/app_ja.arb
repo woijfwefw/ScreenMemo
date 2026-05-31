@@ -1375,6 +1375,43 @@
   "baseUrlHintCustom": "OpenAI 互換の Base URL を入力してください",
   "createProviderTitle": "新規プロバイダー",
   "editProviderTitle": "プロバイダーを編集",
+  "providerRequestHeadersTitle": "リクエストヘッダー",
+  "providerRequestHeadersDesc": "任意のカスタムヘッダーは、チャット、モデル更新、Key テスト、画像生成に送信されます。{apiKeyPlaceholder}、{uuidPlaceholder}、{sessionIdPlaceholder}、{threadIdPlaceholder}、{installationIdPlaceholder}、{windowIdPlaceholder}、{timestampMsPlaceholder} プレースホルダーを使用できます。",
+  "@providerRequestHeadersDesc": {
+    "placeholders": {
+      "apiKeyPlaceholder": {},
+      "uuidPlaceholder": {},
+      "sessionIdPlaceholder": {},
+      "threadIdPlaceholder": {},
+      "installationIdPlaceholder": {},
+      "windowIdPlaceholder": {},
+      "timestampMsPlaceholder": {}
+    }
+  },
+  "providerRequestHeadersEmpty": "カスタムリクエストヘッダーはありません。組み込みの認証ヘッダーを使用します。",
+  "providerRequestHeaderApplyTemplate": "テンプレートを適用",
+  "providerRequestHeaderAdd": "ヘッダーを追加",
+  "providerRequestHeaderRemove": "ヘッダーを削除",
+  "providerRequestHeaderNameLabel": "ヘッダー名",
+  "providerRequestHeaderValueLabel": "ヘッダー値",
+  "providerRequestHeaderNameHint": "Authorization",
+  "providerRequestHeaderValueHint": "Bearer {apiKeyPlaceholder} / {uuidPlaceholder}",
+  "@providerRequestHeaderValueHint": {
+    "placeholders": {
+      "apiKeyPlaceholder": {},
+      "uuidPlaceholder": {}
+    }
+  },
+  "providerRequestHeaderInvalid": "Invalid request header: {name}",
+  "@providerRequestHeaderInvalid": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "providerRequestHeaderTemplateOpenAI": "OpenAI",
+  "providerRequestHeaderTemplateAnthropic": "Anthropic / Claude API",
+  "providerRequestHeaderTemplateCodex": "Codex 互換",
+  "providerRequestHeaderTemplateClaudeCode": "Claude Code API key",
   "deletedToast": "削除しました",
   "providerNotFound": "プロバイダーが見つかりません",
   "conversationsSectionTitle": "会話",

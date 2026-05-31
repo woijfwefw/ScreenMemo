@@ -63,6 +63,12 @@ extension _ProviderEditStatePart on _ProviderEditPageState {
     });
   }
 
+  List<ProviderHeaderEntry> _headerEntriesFromDrafts() {
+    return ProviderRequestHeaders.normalizeEntries(
+      _headerDrafts.map((_HeaderDraft draft) => draft.toEntry()),
+    );
+  }
+
   List<AIProviderKey> get _displayKeys {
     if (_keys.length <= 1) return List<AIProviderKey>.from(_keys);
     final list = List<AIProviderKey>.from(_keys);
@@ -216,25 +222,62 @@ extension _ProviderEditStatePart on _ProviderEditPageState {
     } else {
       _modelsPathCtrl.text = defaultModelsPath;
     }
-    if (t == AIProviderTypes.openai || t == AIProviderTypes.custom) {
-      _chatPathCtrl.text = _chatPathCtrl.text.isEmpty
-          ? '/v1/chat/completions'
-          : _chatPathCtrl.text;
+    if (t != AIProviderTypes.openai && t != AIProviderTypes.custom) {
+      _useResponseApi = false;
     }
+    _chatPathCtrl.text = defaultChatPathForType(
+      t,
+      useResponsesApi: _useResponseApi,
+    );
     _models = <String>[];
     _modelInfoByName.clear();
+  }
+
+  void _addHeaderDraft() {
+    _providerEditSetState(() {
+      _headerDrafts = <_HeaderDraft>[..._headerDrafts, _HeaderDraft()];
+    });
+  }
+
+  void _removeHeaderDraft(int index) {
+    if (index < 0 || index >= _headerDrafts.length) return;
+    _providerEditSetState(() {
+      final List<_HeaderDraft> next = List<_HeaderDraft>.from(_headerDrafts);
+      final _HeaderDraft removed = next.removeAt(index);
+      removed.dispose();
+      _headerDrafts = next;
+    });
+  }
+
+  void _applyHeaderTemplate(ProviderHeaderTemplate template) {
+    _providerEditSetState(() {
+      for (final _HeaderDraft draft in _headerDrafts) {
+        draft.dispose();
+      }
+      _headerDrafts = template.entries
+          .map(_HeaderDraft.fromEntry)
+          .toList(growable: false);
+      _requestBodyStyle = template.bodyStyle;
+      if (template.bodyStyle == ProviderRequestBodyStyles.codexResponses) {
+        _useResponseApi = true;
+        _chatPathCtrl.text = '/v1/responses';
+      } else if (template.bodyStyle ==
+          ProviderRequestBodyStyles.anthropicMessages) {
+        _useResponseApi = false;
+        _chatPathCtrl.text = '/v1/messages';
+      } else if (template.bodyStyle ==
+          ProviderRequestBodyStyles.claudeCodeMessages) {
+        _useResponseApi = false;
+        _chatPathCtrl.text = '/v1/messages?beta=true';
+      }
+    });
   }
 
   bool get _supportsModelsPath {
     return _type == AIProviderTypes.openai ||
         _type == AIProviderTypes.custom ||
-        _type == AIProviderTypes.claude;
-  }
-
-  String _modelsPathHint() {
-    final def = defaultModelsPathForType(_type);
-    if (def.isNotEmpty) return def;
-    return '/v1/models';
+        _type == AIProviderTypes.claude ||
+        _type == AIProviderTypes.gemini;
   }
 
   String _effectiveModelsPath() {
@@ -353,15 +396,24 @@ extension _ProviderEditStatePart on _ProviderEditPageState {
   }
 
   Map<String, dynamic> _buildExtra() {
-    final map = <String, dynamic>{};
+    final map = <String, dynamic>{...?_loaded?.extra};
     if (_type == AIProviderTypes.azureOpenAI) {
       map['azure_api_version'] = _azureApiVerCtrl.text.trim().isEmpty
           ? '2024-02-15'
           : _azureApiVerCtrl.text.trim();
+    } else {
+      map.remove('azure_api_version');
     }
     if (_models.isNotEmpty) {
       map['default_model'] = _models.first;
+    } else {
+      map.remove('default_model');
     }
-    return map;
+    final Map<String, dynamic> withBodyStyle =
+        ProviderRequestHeaders.writeBodyStyleToExtra(map, _requestBodyStyle);
+    return ProviderRequestHeaders.writeEntriesToExtra(
+      withBodyStyle,
+      _headerEntriesFromDrafts(),
+    );
   }
 }

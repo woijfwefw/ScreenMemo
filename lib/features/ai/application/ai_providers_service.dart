@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:screen_memo/data/database/screenshot_database.dart';
 import 'package:screen_memo/core/logging/flutter_logger.dart';
 import 'package:screen_memo/features/ai/application/models_dev_catalog_service.dart';
+import 'package:screen_memo/features/ai/application/provider_request_headers.dart';
 
 String defaultModelsPathForType(String type) {
   final normalized = type.trim().toLowerCase();
@@ -20,6 +21,21 @@ String defaultModelsPathForType(String type) {
       return '/v1beta/models';
     default:
       return '';
+  }
+}
+
+String defaultChatPathForType(String type, {bool useResponsesApi = false}) {
+  final normalized = type.trim().toLowerCase();
+  switch (normalized) {
+    case AIProviderTypes.openai:
+    case AIProviderTypes.custom:
+      return useResponsesApi ? '/v1/responses' : '/v1/chat/completions';
+    case AIProviderTypes.claude:
+      return '/v1/messages';
+    case AIProviderTypes.gemini:
+      return '/v1beta/{model=models/*}:generateContent';
+    default:
+      return '/v1/chat/completions';
   }
 }
 
@@ -1090,29 +1106,53 @@ class AIProvidersService {
     switch (type) {
       case AIProviderTypes.openai:
       case AIProviderTypes.custom:
+        final ProviderRequestIdentity identity =
+            ProviderRequestIdentity.create();
         models = await _fetchOpenAIModels(
           baseUrl: _baseUrlOrDefaultOpenAI(provider.baseUrl),
           apiKey: apiKey,
           modelsPath: provider.modelsPath,
+          requestHeaders: ProviderRequestHeaders.headersFromExtra(
+            provider.extra,
+            apiKey: apiKey,
+            identity: identity,
+          ),
         );
         break;
       case AIProviderTypes.claude:
+        final ProviderRequestIdentity identity =
+            ProviderRequestIdentity.create();
         models = await _fetchClaudeModels(
           baseUrl: _ensureBase(provider.baseUrl, 'https://api.anthropic.com'),
           apiKey: apiKey,
           modelsPath: provider.modelsPath,
+          requestHeaders: ProviderRequestHeaders.headersFromExtra(
+            provider.extra,
+            apiKey: apiKey,
+            identity: identity,
+          ),
         );
         break;
       case AIProviderTypes.gemini:
+        final ProviderRequestIdentity identity =
+            ProviderRequestIdentity.create();
         models = await _fetchGeminiModels(
           baseUrl: _ensureBase(
             provider.baseUrl,
             'https://generativelanguage.googleapis.com',
           ),
           apiKey: apiKey,
+          modelsPath: provider.modelsPath,
+          requestHeaders: ProviderRequestHeaders.headersFromExtra(
+            provider.extra,
+            apiKey: apiKey,
+            identity: identity,
+          ),
         );
         break;
       case AIProviderTypes.azureOpenAI:
+        final ProviderRequestIdentity identity =
+            ProviderRequestIdentity.create();
         final apiVersion =
             (provider.extra['azure_api_version'] as String?) ?? '2024-02-15';
         models = await _fetchAzureOpenAIModels(
@@ -1122,14 +1162,26 @@ class AIProvidersService {
           ),
           apiKey: apiKey,
           apiVersion: apiVersion,
+          requestHeaders: ProviderRequestHeaders.headersFromExtra(
+            provider.extra,
+            apiKey: apiKey,
+            identity: identity,
+          ),
         );
         break;
       default:
+        final ProviderRequestIdentity identity =
+            ProviderRequestIdentity.create();
         // 兜底：按 OpenAI 兼容尝试
         models = await _fetchOpenAIModels(
           baseUrl: _baseUrlOrDefaultOpenAI(provider.baseUrl),
           apiKey: apiKey,
           modelsPath: provider.modelsPath,
+          requestHeaders: ProviderRequestHeaders.headersFromExtra(
+            provider.extra,
+            apiKey: apiKey,
+            identity: identity,
+          ),
         );
         break;
     }
@@ -1166,6 +1218,7 @@ class AIProvidersService {
   Future<List<String>> _fetchOpenAIModels({
     required String baseUrl,
     required String apiKey,
+    Map<String, String> requestHeaders = const <String, String>{},
     String? modelsPath,
   }) async {
     final uri = _resolveModelsUri(
@@ -1175,7 +1228,9 @@ class AIProvidersService {
     );
     final resp = await http.get(
       uri,
-      headers: <String, String>{'Authorization': 'Bearer $apiKey'},
+      headers: ProviderRequestHeaders.mergeHeaders(<String, String>{
+        'Authorization': 'Bearer $apiKey',
+      }, requestHeaders),
     );
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
       throw Exception(
@@ -1188,6 +1243,7 @@ class AIProvidersService {
   Future<List<String>> _fetchClaudeModels({
     required String baseUrl,
     required String apiKey,
+    Map<String, String> requestHeaders = const <String, String>{},
     String? modelsPath,
   }) async {
     final uri = _resolveModelsUri(
@@ -1197,10 +1253,10 @@ class AIProvidersService {
     );
     final resp = await http.get(
       uri,
-      headers: <String, String>{
+      headers: ProviderRequestHeaders.mergeHeaders(<String, String>{
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
-      },
+      }, requestHeaders),
     );
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
       throw Exception(
@@ -1213,11 +1269,19 @@ class AIProvidersService {
   Future<List<String>> _fetchGeminiModels({
     required String baseUrl,
     required String apiKey,
+    Map<String, String> requestHeaders = const <String, String>{},
+    String? modelsPath,
   }) async {
-    final uri = Uri.parse('$baseUrl/v1beta/models');
+    final uri = _resolveModelsUri(
+      baseUrl: baseUrl,
+      modelsPath: modelsPath,
+      fallbackPath: '/v1beta/models',
+    );
     final resp = await http.get(
       uri,
-      headers: <String, String>{'x-goog-api-key': apiKey},
+      headers: ProviderRequestHeaders.mergeHeaders(<String, String>{
+        'x-goog-api-key': apiKey,
+      }, requestHeaders),
     );
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
       try {
@@ -1276,6 +1340,7 @@ class AIProvidersService {
     required String baseUrl,
     required String apiKey,
     required String apiVersion,
+    Map<String, String> requestHeaders = const <String, String>{},
   }) async {
     // 例： https://{resource}.openai.azure.com/openai/deployments?api-version=2024-02-15
     final uri = Uri.parse(
@@ -1283,7 +1348,9 @@ class AIProvidersService {
     );
     final resp = await http.get(
       uri,
-      headers: <String, String>{'api-key': apiKey},
+      headers: ProviderRequestHeaders.mergeHeaders(<String, String>{
+        'api-key': apiKey,
+      }, requestHeaders),
     );
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
       throw Exception(

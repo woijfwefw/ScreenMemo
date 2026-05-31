@@ -1377,6 +1377,43 @@
   "baseUrlHintCustom": "Enter an OpenAI-compatible Base URL",
   "createProviderTitle": "New provider",
   "editProviderTitle": "Edit provider",
+  "providerRequestHeadersTitle": "Request headers",
+  "providerRequestHeadersDesc": "Optional custom headers are sent with chat, model refresh, key tests, and image generation. Supports {apiKeyPlaceholder}, {uuidPlaceholder}, {sessionIdPlaceholder}, {threadIdPlaceholder}, {installationIdPlaceholder}, {windowIdPlaceholder}, and {timestampMsPlaceholder} placeholders.",
+  "@providerRequestHeadersDesc": {
+    "placeholders": {
+      "apiKeyPlaceholder": {},
+      "uuidPlaceholder": {},
+      "sessionIdPlaceholder": {},
+      "threadIdPlaceholder": {},
+      "installationIdPlaceholder": {},
+      "windowIdPlaceholder": {},
+      "timestampMsPlaceholder": {}
+    }
+  },
+  "providerRequestHeadersEmpty": "No custom request headers. Built-in authentication headers will be used.",
+  "providerRequestHeaderApplyTemplate": "Apply template",
+  "providerRequestHeaderAdd": "Add header",
+  "providerRequestHeaderRemove": "Remove header",
+  "providerRequestHeaderNameLabel": "Header name",
+  "providerRequestHeaderValueLabel": "Header value",
+  "providerRequestHeaderNameHint": "Authorization",
+  "providerRequestHeaderValueHint": "Bearer {apiKeyPlaceholder} / {uuidPlaceholder}",
+  "@providerRequestHeaderValueHint": {
+    "placeholders": {
+      "apiKeyPlaceholder": {},
+      "uuidPlaceholder": {}
+    }
+  },
+  "providerRequestHeaderInvalid": "Invalid request header: {name}",
+  "@providerRequestHeaderInvalid": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "providerRequestHeaderTemplateOpenAI": "OpenAI",
+  "providerRequestHeaderTemplateAnthropic": "Anthropic / Claude API",
+  "providerRequestHeaderTemplateCodex": "Codex compatible",
+  "providerRequestHeaderTemplateClaudeCode": "Claude Code API key",
   "deletedToast": "Deleted",
   "providerNotFound": "Provider not found",
   "conversationsSectionTitle": "Conversations",

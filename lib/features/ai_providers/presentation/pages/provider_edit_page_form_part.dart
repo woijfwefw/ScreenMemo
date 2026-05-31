@@ -18,12 +18,241 @@ extension _ProviderEditFormPart on _ProviderEditPageState {
           controller: _baseUrlCtrl,
           hint: _baseUrlHint(),
         ),
+        const SizedBox(height: AppTheme.spacing4),
+        _buildTextInput(
+          label: AppLocalizations.of(context).chatPathOptionalLabel,
+          controller: _chatPathCtrl,
+          hint: defaultChatPathForType(_type, useResponsesApi: _useResponseApi),
+        ),
+        if (_supportsModelsPath) ...[
+          const SizedBox(height: AppTheme.spacing4),
+          _buildTextInput(
+            label: AppLocalizations.of(context).modelsPathOptionalLabel,
+            controller: _modelsPathCtrl,
+            hint: defaultModelsPathForType(_type),
+          ),
+        ],
         if (_type == AIProviderTypes.openai ||
             _type == AIProviderTypes.custom) ...[
           const SizedBox(height: AppTheme.spacing4),
           _buildApiModeCards(),
         ],
+        const SizedBox(height: AppTheme.spacing4),
+        _buildRequestHeadersSection(theme),
       ],
+    );
+  }
+
+  Widget _buildRequestHeadersSection(ThemeData theme) {
+    final List<ProviderHeaderTemplate> templates =
+        ProviderRequestHeaders.templatesForProviderType(_type);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                AppLocalizations.of(context).providerRequestHeadersTitle,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            UIActionMenuButton<String>(
+              tooltip: AppLocalizations.of(
+                context,
+              ).providerRequestHeaderApplyTemplate,
+              selectedValue: '',
+              showSelectedState: false,
+              minWidth: 220,
+              maxWidth: 320,
+              onSelected: (String id) {
+                final ProviderHeaderTemplate template = templates.firstWhere(
+                  (ProviderHeaderTemplate item) => item.id == id,
+                  orElse: () => templates.first,
+                );
+                _applyHeaderTemplate(template);
+              },
+              items: <UIActionMenuItem<String>>[
+                for (final ProviderHeaderTemplate template in templates)
+                  UIActionMenuItem<String>(
+                    value: template.id,
+                    label: _headerTemplateLabel(template),
+                  ),
+              ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.auto_fix_high_outlined,
+                      size: 16,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      AppLocalizations.of(
+                        context,
+                      ).providerRequestHeaderApplyTemplate,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 18,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppTheme.spacing1),
+        Text(
+          AppLocalizations.of(context).providerRequestHeadersDesc(
+            '{api_key}',
+            '{uuid}',
+            '{session_id}',
+            '{thread_id}',
+            '{installation_id}',
+            '{window_id}',
+            '{timestamp_ms}',
+          ),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            height: 1.35,
+          ),
+        ),
+        const SizedBox(height: AppTheme.spacing3),
+        if (_headerDrafts.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppTheme.spacing3),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.24,
+              ),
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              border: Border.all(
+                color: theme.colorScheme.outline.withValues(alpha: 0.35),
+                width: 0.5,
+              ),
+            ),
+            child: Text(
+              AppLocalizations.of(context).providerRequestHeadersEmpty,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          )
+        else
+          Column(
+            children: [
+              for (int i = 0; i < _headerDrafts.length; i++) ...[
+                _buildHeaderDraftRow(theme, i, _headerDrafts[i]),
+                if (i != _headerDrafts.length - 1)
+                  const SizedBox(height: AppTheme.spacing2),
+              ],
+            ],
+          ),
+        const SizedBox(height: AppTheme.spacing2),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: _addHeaderDraft,
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: Text(AppLocalizations.of(context).providerRequestHeaderAdd),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _headerTemplateLabel(ProviderHeaderTemplate template) {
+    final AppLocalizations l10n = AppLocalizations.of(context);
+    switch (template.id) {
+      case 'openai':
+        return l10n.providerRequestHeaderTemplateOpenAI;
+      case 'anthropic':
+        return l10n.providerRequestHeaderTemplateAnthropic;
+      case 'codex_compatible':
+        return l10n.providerRequestHeaderTemplateCodex;
+      case 'claude_code_router':
+        return l10n.providerRequestHeaderTemplateClaudeCode;
+      default:
+        return template.label;
+    }
+  }
+
+  Widget _buildHeaderDraftRow(ThemeData theme, int index, _HeaderDraft draft) {
+    final bool compact = MediaQuery.sizeOf(context).width < 420;
+    final Widget nameField = TextField(
+      controller: draft.nameController,
+      decoration: InputDecoration(
+        labelText: AppLocalizations.of(context).providerRequestHeaderNameLabel,
+        hintText: AppLocalizations.of(context).providerRequestHeaderNameHint,
+        isDense: true,
+      ),
+      onChanged: (_) => _providerEditSetState(() {}),
+    );
+    final Widget valueField = TextField(
+      controller: draft.valueController,
+      decoration: InputDecoration(
+        labelText: AppLocalizations.of(context).providerRequestHeaderValueLabel,
+        hintText: AppLocalizations.of(
+          context,
+        ).providerRequestHeaderValueHint('{api_key}', '{uuid}'),
+        isDense: true,
+      ),
+      onChanged: (_) => _providerEditSetState(() {}),
+    );
+    final Widget removeButton = IconButton(
+      tooltip: AppLocalizations.of(context).providerRequestHeaderRemove,
+      icon: Icon(Icons.delete_outline_rounded, color: theme.colorScheme.error),
+      onPressed: () => _removeHeaderDraft(index),
+    );
+    final Widget fields = compact
+        ? Column(
+            children: [
+              nameField,
+              const SizedBox(height: AppTheme.spacing2),
+              valueField,
+            ],
+          )
+        : Row(
+            children: [
+              Expanded(flex: 4, child: nameField),
+              const SizedBox(width: AppTheme.spacing2),
+              Expanded(flex: 6, child: valueField),
+            ],
+          );
+
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.spacing2),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.35),
+          width: 0.5,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: compact
+            ? CrossAxisAlignment.start
+            : CrossAxisAlignment.center,
+        children: [
+          Expanded(child: fields),
+          const SizedBox(width: AppTheme.spacing1),
+          removeButton,
+        ],
+      ),
     );
   }
 
@@ -523,11 +752,11 @@ extension _ProviderEditFormPart on _ProviderEditPageState {
         value: AIProviderTypes.gemini,
         label: l10n.providerTypeGemini,
       ),
-      UISelectItem<String>(
-        value: AIProviderTypes.custom,
-        label: l10n.customLabel,
-      ),
     ];
+    final String selectedType =
+        items.any((UISelectItem<String> item) => item.value == _type)
+        ? _type
+        : AIProviderTypes.openai;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -559,7 +788,7 @@ extension _ProviderEditFormPart on _ProviderEditPageState {
         ),
         const SizedBox(height: AppTheme.spacing1),
         UISelectField<String>(
-          value: _type,
+          value: selectedType,
           items: items,
           onChanged: (v) {
             if (v == null) return;
@@ -582,14 +811,26 @@ extension _ProviderEditFormPart on _ProviderEditPageState {
           title: l10n.providerApiModeChatTitle,
           icon: Icons.chat_bubble_outline_rounded,
           compact: compact,
-          onTap: () => _providerEditSetState(() => _useResponseApi = false),
+          onTap: () => _providerEditSetState(() {
+            _useResponseApi = false;
+            _chatPathCtrl.text = defaultChatPathForType(
+              _type,
+              useResponsesApi: false,
+            );
+          }),
         );
         final responsesCard = _buildApiModeCard(
           selected: _useResponseApi,
           title: l10n.providerApiModeResponsesTitle,
           icon: Icons.auto_awesome_outlined,
           compact: compact,
-          onTap: () => _providerEditSetState(() => _useResponseApi = true),
+          onTap: () => _providerEditSetState(() {
+            _useResponseApi = true;
+            _chatPathCtrl.text = defaultChatPathForType(
+              _type,
+              useResponsesApi: true,
+            );
+          }),
         );
 
         return IntrinsicHeight(

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:screen_memo/features/ai/application/ai_request_gateway.dart';
 import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
+import 'package:screen_memo/features/ai/application/provider_request_headers.dart';
 
 int _countOccurrences(String haystack, String needle) {
   if (needle.isEmpty) return 0;
@@ -35,6 +36,364 @@ Future<void> _writeSseData(HttpResponse response, Object data) async {
 }
 
 void main() {
+  test('custom endpoint headers override built-in auth header', () async {
+    final HttpServer server = await HttpServer.bind(
+      InternetAddress.loopbackIPv4,
+      0,
+    );
+    Map<String, String>? capturedHeaders;
+
+    final Future<void> serverDone = () async {
+      await for (final HttpRequest req in server) {
+        if (req.method != 'POST' || req.uri.path != '/v1/chat/completions') {
+          req.response.statusCode = HttpStatus.notFound;
+          await req.response.close();
+          continue;
+        }
+        capturedHeaders = <String, String>{
+          HttpHeaders.authorizationHeader:
+              req.headers.value(HttpHeaders.authorizationHeader) ?? '',
+          'x-agent-mode': req.headers.value('x-agent-mode') ?? '',
+        };
+        await utf8.decoder.bind(req).join();
+        req.response.statusCode = HttpStatus.ok;
+        req.response.headers.contentType = ContentType.json;
+        req.response.write(
+          jsonEncode(<String, dynamic>{
+            'choices': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'message': <String, dynamic>{'content': 'ok'},
+              },
+            ],
+          }),
+        );
+        await req.response.close();
+        break;
+      }
+    }();
+
+    final AIGatewayResult result = await AIRequestGateway.instance.complete(
+      endpoints: <AIEndpoint>[
+        AIEndpoint(
+          groupId: null,
+          baseUrl: 'http://127.0.0.1:${server.port}',
+          apiKey: 'builtin-key',
+          model: 'gpt-4o-mini',
+          requestHeaders: const <String, String>{
+            'Authorization': 'Bearer custom-key',
+            'X-Agent-Mode': 'codex',
+          },
+        ),
+      ],
+      messages: <AIMessage>[AIMessage(role: 'user', content: 'ping')],
+      responseStartMarker: '',
+      preferStreaming: false,
+      trackKeyStats: false,
+    );
+
+    await serverDone;
+    await server.close(force: true);
+
+    expect(result.content, 'ok');
+    expect(
+      capturedHeaders?[HttpHeaders.authorizationHeader],
+      'Bearer custom-key',
+    );
+    expect(capturedHeaders?['x-agent-mode'], 'codex');
+  });
+
+  test(
+    'codex request shape sends Codex Responses headers and payload',
+    () async {
+      final HttpServer server = await HttpServer.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+      );
+      Map<String, dynamic>? captured;
+      Map<String, String>? capturedHeaders;
+      String? capturedPath;
+
+      final Future<void> serverDone = () async {
+        await for (final HttpRequest req in server) {
+          capturedPath = req.uri.path;
+          capturedHeaders = <String, String>{
+            HttpHeaders.authorizationHeader:
+                req.headers.value(HttpHeaders.authorizationHeader) ?? '',
+            'originator': req.headers.value('originator') ?? '',
+            HttpHeaders.userAgentHeader:
+                req.headers.value(HttpHeaders.userAgentHeader) ?? '',
+            'session-id': req.headers.value('session-id') ?? '',
+            'thread-id': req.headers.value('thread-id') ?? '',
+            'x-client-request-id':
+                req.headers.value('x-client-request-id') ?? '',
+            'x-codex-window-id': req.headers.value('x-codex-window-id') ?? '',
+          };
+          captured =
+              jsonDecode(await utf8.decoder.bind(req).join())
+                  as Map<String, dynamic>;
+          req.response.statusCode = HttpStatus.ok;
+          req.response.headers.contentType = ContentType.json;
+          req.response.write(
+            jsonEncode(<String, dynamic>{
+              'output': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'type': 'message',
+                  'content': <Map<String, dynamic>>[
+                    <String, dynamic>{'type': 'output_text', 'text': 'ok'},
+                  ],
+                },
+              ],
+            }),
+          );
+          await req.response.close();
+          break;
+        }
+      }();
+
+      final AIGatewayResult result = await AIRequestGateway.instance.complete(
+        endpoints: <AIEndpoint>[
+          AIEndpoint(
+            groupId: null,
+            baseUrl: 'http://127.0.0.1:${server.port}',
+            apiKey: 'codex-key',
+            model: 'gpt-5.2',
+            chatPath: '/v1/chat/completions',
+            requestBodyStyle: ProviderRequestBodyStyles.codexResponses,
+          ),
+        ],
+        messages: <AIMessage>[
+          AIMessage(role: 'system', content: 'be concise'),
+          AIMessage(role: 'user', content: 'ping'),
+        ],
+        responseStartMarker: '',
+        preferStreaming: false,
+        trackKeyStats: false,
+      );
+
+      await serverDone;
+      await server.close(force: true);
+
+      expect(result.content, 'ok');
+      expect(capturedPath, '/v1/responses');
+      expect(
+        capturedHeaders?[HttpHeaders.authorizationHeader],
+        'Bearer codex-key',
+      );
+      expect(capturedHeaders?['originator'], 'codex_cli_rs');
+      expect(
+        capturedHeaders?[HttpHeaders.userAgentHeader],
+        startsWith('codex_cli_rs/'),
+      );
+      expect(capturedHeaders?['session-id'], isNotEmpty);
+      expect(capturedHeaders?['thread-id'], isNotEmpty);
+      expect(
+        capturedHeaders?['x-client-request-id'],
+        capturedHeaders?['thread-id'],
+      );
+      expect(
+        capturedHeaders?['x-codex-window-id'],
+        '${capturedHeaders?['thread-id']}:0',
+      );
+      expect(captured?['model'], 'gpt-5.2');
+      expect(captured?['instructions'], 'be concise');
+      expect(captured?['tools'], isA<List<dynamic>>());
+      expect(captured?['tool_choice'], 'auto');
+      expect(captured?['parallel_tool_calls'], isFalse);
+      expect(captured?.containsKey('reasoning'), isTrue);
+      expect(captured?['reasoning'], isNull);
+      expect(captured?['store'], isFalse);
+      expect(captured?['stream'], isFalse);
+      expect(captured?['include'], isA<List<dynamic>>());
+      expect(captured?['prompt_cache_key'], capturedHeaders?['thread-id']);
+      expect(
+        captured?['client_metadata']?['x-codex-installation-id'],
+        isNotEmpty,
+      );
+      final input = captured?['input'] as List<dynamic>;
+      expect(input.length, 1);
+      expect(input.first['role'], 'user');
+    },
+  );
+
+  test('claude code request shape sends Anthropic Messages shape', () async {
+    final HttpServer server = await HttpServer.bind(
+      InternetAddress.loopbackIPv4,
+      0,
+    );
+    Map<String, dynamic>? captured;
+    Map<String, String>? capturedHeaders;
+    String? capturedPath;
+    String? capturedQuery;
+
+    final Future<void> serverDone = () async {
+      await for (final HttpRequest req in server) {
+        capturedPath = req.uri.path;
+        capturedQuery = req.uri.query;
+        capturedHeaders = <String, String>{
+          HttpHeaders.acceptHeader:
+              req.headers.value(HttpHeaders.acceptHeader) ?? '',
+          HttpHeaders.authorizationHeader:
+              req.headers.value(HttpHeaders.authorizationHeader) ?? '',
+          'x-api-key': req.headers.value('x-api-key') ?? '',
+          'anthropic-version': req.headers.value('anthropic-version') ?? '',
+          'anthropic-beta': req.headers.value('anthropic-beta') ?? '',
+          'x-app': req.headers.value('x-app') ?? '',
+          'x-claude-code-session-id':
+              req.headers.value('x-claude-code-session-id') ?? '',
+          'x-stainless-runtime': req.headers.value('x-stainless-runtime') ?? '',
+        };
+        captured =
+            jsonDecode(await utf8.decoder.bind(req).join())
+                as Map<String, dynamic>;
+        req.response.statusCode = HttpStatus.ok;
+        req.response.headers.contentType = ContentType.json;
+        req.response.write(
+          jsonEncode(<String, dynamic>{
+            'content': <Map<String, dynamic>>[
+              <String, dynamic>{'type': 'text', 'text': 'pong'},
+            ],
+            'usage': <String, dynamic>{'input_tokens': 3, 'output_tokens': 2},
+          }),
+        );
+        await req.response.close();
+        break;
+      }
+    }();
+
+    final AIGatewayResult result = await AIRequestGateway.instance.complete(
+      endpoints: <AIEndpoint>[
+        AIEndpoint(
+          groupId: null,
+          baseUrl: 'http://127.0.0.1:${server.port}',
+          apiKey: 'claude-key',
+          model: 'claude-3-5-haiku-20241022',
+          chatPath: '/v1/chat/completions',
+          requestBodyStyle: ProviderRequestBodyStyles.claudeCodeMessages,
+        ),
+      ],
+      messages: <AIMessage>[
+        AIMessage(role: 'system', content: 'be concise'),
+        AIMessage(role: 'user', content: 'ping'),
+      ],
+      responseStartMarker: '',
+      preferStreaming: false,
+      trackKeyStats: false,
+    );
+
+    await serverDone;
+    await server.close(force: true);
+
+    expect(result.content, 'pong');
+    expect(result.usagePromptTokens, 3);
+    expect(result.usageCompletionTokens, 2);
+    expect(capturedPath, '/v1/messages');
+    expect(capturedQuery, 'beta=true');
+    expect(
+      capturedHeaders?[HttpHeaders.authorizationHeader],
+      'Bearer claude-key',
+    );
+    expect(capturedHeaders?[HttpHeaders.acceptHeader], 'application/json');
+    expect(capturedHeaders?['x-api-key'], 'claude-key');
+    expect(capturedHeaders?['anthropic-version'], '2023-06-01');
+    expect(
+      capturedHeaders?['anthropic-beta'],
+      contains('claude-code-20250219'),
+    );
+    expect(capturedHeaders?['x-app'], 'cli');
+    expect(capturedHeaders?['x-claude-code-session-id'], isNotEmpty);
+    expect(capturedHeaders?['x-stainless-runtime'], 'node');
+    expect(captured?['model'], 'claude-3-5-haiku-20241022');
+    expect(captured?['system']?['text'], 'be concise');
+    expect(captured?['tools'], isA<List<dynamic>>());
+    expect(captured?['max_tokens'], 8192);
+    expect(captured?['stream'], isFalse);
+    expect(captured?['metadata']?['user_id'], isA<String>());
+    final messages = captured?['messages'] as List<dynamic>;
+    expect(messages.length, 1);
+    expect(messages.first['role'], 'user');
+  });
+
+  test(
+    'anthropic request shape sends official Messages headers and payload',
+    () async {
+      final HttpServer server = await HttpServer.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+      );
+      Map<String, dynamic>? captured;
+      Map<String, String>? capturedHeaders;
+      String? capturedPath;
+
+      final Future<void> serverDone = () async {
+        await for (final HttpRequest req in server) {
+          capturedPath = req.uri.path;
+          capturedHeaders = <String, String>{
+            'content-type':
+                req.headers.value(HttpHeaders.contentTypeHeader) ?? '',
+            'x-api-key': req.headers.value('x-api-key') ?? '',
+            'anthropic-version': req.headers.value('anthropic-version') ?? '',
+            HttpHeaders.authorizationHeader:
+                req.headers.value(HttpHeaders.authorizationHeader) ?? '',
+          };
+          captured =
+              jsonDecode(await utf8.decoder.bind(req).join())
+                  as Map<String, dynamic>;
+          req.response.statusCode = HttpStatus.ok;
+          req.response.headers.contentType = ContentType.json;
+          req.response.write(
+            jsonEncode(<String, dynamic>{
+              'content': <Map<String, dynamic>>[
+                <String, dynamic>{'type': 'text', 'text': 'ok'},
+              ],
+              'usage': <String, dynamic>{'input_tokens': 5, 'output_tokens': 4},
+            }),
+          );
+          await req.response.close();
+          break;
+        }
+      }();
+
+      final AIGatewayResult result = await AIRequestGateway.instance.complete(
+        endpoints: <AIEndpoint>[
+          AIEndpoint(
+            groupId: null,
+            baseUrl: 'http://127.0.0.1:${server.port}',
+            apiKey: 'anthropic-key',
+            model: 'claude-sonnet-4-5',
+            requestBodyStyle: ProviderRequestBodyStyles.anthropicMessages,
+          ),
+        ],
+        messages: <AIMessage>[
+          AIMessage(role: 'system', content: 'be concise'),
+          AIMessage(role: 'user', content: 'ping'),
+        ],
+        responseStartMarker: '',
+        preferStreaming: false,
+        trackKeyStats: false,
+      );
+
+      await serverDone;
+      await server.close(force: true);
+
+      expect(result.content, 'ok');
+      expect(result.usagePromptTokens, 5);
+      expect(result.usageCompletionTokens, 4);
+      expect(capturedPath, '/v1/messages');
+      expect(capturedHeaders?['content-type'], contains('application/json'));
+      expect(capturedHeaders?['x-api-key'], 'anthropic-key');
+      expect(capturedHeaders?['anthropic-version'], '2023-06-01');
+      expect(capturedHeaders?[HttpHeaders.authorizationHeader], isEmpty);
+      expect(captured?['model'], 'claude-sonnet-4-5');
+      expect(captured?['system'], 'be concise');
+      expect(captured?['max_tokens'], 8192);
+      expect(captured?['stream'], isFalse);
+      final messages = captured?['messages'] as List<dynamic>;
+      expect(messages.length, 1);
+      expect(messages.first['role'], 'user');
+      expect(messages.first['content'].first['text'], 'ping');
+    },
+  );
+
   test('responses terminal events do not duplicate final content', () async {
     final HttpServer server = await HttpServer.bind(
       InternetAddress.loopbackIPv4,

@@ -246,6 +246,9 @@ ScreenMemo 可以在手机上手动开启只读的局域网 MCP 服务，让同�
 - 当前内置提供商类型包括 `OpenAI`、`Azure OpenAI`、`Claude`、`Gemini` 和 `Custom`
 - `Custom` 适合接入兼容 OpenAI 风格接口的自建或第三方中转服务
 - 不同 AI 上下文可以分别绑定不同的提供商与模型
+- 提供商编辑页支持配置自定义请求头，并提供 `OpenAI`、`Anthropic / Claude API`、`Codex compatible`、`Claude Code API key` 应用模板；模板会在后台自动切换匹配的请求格式，请求头会随聊天、模型刷新、Key 测试和图片生成一起发送，可用 `{api_key}`、`{uuid}`、`{session_id}`、`{thread_id}`、`{installation_id}`、`{window_id}`、`{timestamp_ms}` 占位符引用当前 Key 与同一次请求的动态身份值
+- `Codex compatible` 模板会切换到接近 Codex CLI 的 Responses 请求：路径默认 `/v1/responses`，请求头包含 `originator`、`User-Agent`、`session-id`、`thread-id`、`x-client-request-id`、`x-codex-window-id`，请求体包含 `instructions`、`input`、`tools`、`tool_choice`、`parallel_tool_calls`、`reasoning`、`store`、`stream`、`include`、`prompt_cache_key`、`client_metadata.x-codex-installation-id`
+- `Claude Code API key` 模板按本地 Claude Code 2.1.121 `--bare` + API key 模式抓包整理：请求头包含 `Accept`、`Authorization`、`x-api-key`、`anthropic-version`、`anthropic-beta`、`anthropic-dangerous-direct-browser-access`、`x-app`、`User-Agent`、`X-Claude-Code-Session-Id` 和 `x-stainless-*` SDK 指纹头，请求体使用 `/v1/messages?beta=true` 的 `model`、`messages`、`system`、`tools`、`metadata.user_id`、`max_tokens`、`stream` 结构；不写入 `host`、`content-length`、`connection`、`accept-encoding` 等传输层自动头
 - 当端点使用 Responses API 且模型名属于 GPT / ChatGPT / o 系列时，AI 请求会自动携带 OpenAI `web_search` 内置工具；实际能否联网搜索取决于所配置服务商是否支持该工具
 - 若服务商返回 OpenAI Responses 的 `web_search_call` 与 `url_citation` annotations，聊天气泡会以“搜索过程”实时展示 `in_progress` / `searching` / `completed` 状态、搜索关键词或打开的网页，并在搜索中和完成后显示已搜索网站数、已查看页面数，完成后持久化可点击来源
 - 当前兼容端点通常不会返回 favicon；移动端会用来源域名首字母或网页图标作为降级展示

@@ -2617,6 +2617,69 @@ class AppLocalizationsJa extends AppLocalizations {
   String get editProviderTitle => 'プロバイダーを編集';
 
   @override
+  String get providerRequestHeadersTitle => 'リクエストヘッダー';
+
+  @override
+  String providerRequestHeadersDesc(
+    Object apiKeyPlaceholder,
+    Object uuidPlaceholder,
+    Object sessionIdPlaceholder,
+    Object threadIdPlaceholder,
+    Object installationIdPlaceholder,
+    Object windowIdPlaceholder,
+    Object timestampMsPlaceholder,
+  ) {
+    return '任意のカスタムヘッダーは、チャット、モデル更新、Key テスト、画像生成に送信されます。$apiKeyPlaceholder、$uuidPlaceholder、$sessionIdPlaceholder、$threadIdPlaceholder、$installationIdPlaceholder、$windowIdPlaceholder、$timestampMsPlaceholder プレースホルダーを使用できます。';
+  }
+
+  @override
+  String get providerRequestHeadersEmpty =>
+      'カスタムリクエストヘッダーはありません。組み込みの認証ヘッダーを使用します。';
+
+  @override
+  String get providerRequestHeaderApplyTemplate => 'テンプレートを適用';
+
+  @override
+  String get providerRequestHeaderAdd => 'ヘッダーを追加';
+
+  @override
+  String get providerRequestHeaderRemove => 'ヘッダーを削除';
+
+  @override
+  String get providerRequestHeaderNameLabel => 'ヘッダー名';
+
+  @override
+  String get providerRequestHeaderValueLabel => 'ヘッダー値';
+
+  @override
+  String get providerRequestHeaderNameHint => 'Authorization';
+
+  @override
+  String providerRequestHeaderValueHint(
+    Object apiKeyPlaceholder,
+    Object uuidPlaceholder,
+  ) {
+    return 'Bearer $apiKeyPlaceholder / $uuidPlaceholder';
+  }
+
+  @override
+  String providerRequestHeaderInvalid(Object name) {
+    return 'Invalid request header: $name';
+  }
+
+  @override
+  String get providerRequestHeaderTemplateOpenAI => 'OpenAI';
+
+  @override
+  String get providerRequestHeaderTemplateAnthropic => 'Anthropic / Claude API';
+
+  @override
+  String get providerRequestHeaderTemplateCodex => 'Codex 互換';
+
+  @override
+  String get providerRequestHeaderTemplateClaudeCode => 'Claude Code API key';
+
+  @override
   String get deletedToast => '削除しました';
 
   @override

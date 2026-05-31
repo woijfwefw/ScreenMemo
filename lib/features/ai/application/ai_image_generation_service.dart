@@ -12,6 +12,7 @@ import 'package:screen_memo/data/database/screenshot_database.dart';
 import 'package:screen_memo/data/platform/path_service.dart';
 import 'package:screen_memo/features/ai/application/ai_providers_service.dart';
 import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
+import 'package:screen_memo/features/ai/application/provider_request_headers.dart';
 
 const String kAiImageGenerationContext = 'image_generation';
 const int kAiImageGenerationMaxCount = 10;
@@ -362,10 +363,10 @@ class AIImageGenerationService {
     );
     final http.Response response = await _client.post(
       uri,
-      headers: <String, String>{
+      headers: ProviderRequestHeaders.mergeHeaders(<String, String>{
         'Authorization': 'Bearer $apiKey',
         'Content-Type': 'application/json',
-      },
+      }, endpoint.requestHeaders),
       body: jsonEncode(body),
     );
     unawaited(
@@ -413,7 +414,6 @@ class AIImageGenerationService {
 
     final Uri uri = buildImagesEditsUri(endpoint.baseUrl);
     final http.MultipartRequest request = http.MultipartRequest('POST', uri)
-      ..headers['Authorization'] = 'Bearer $apiKey'
       ..fields['model'] = endpoint.model
       ..fields['prompt'] = params.prompt
       ..fields['n'] = params.count.toString()
@@ -421,6 +421,13 @@ class AIImageGenerationService {
       ..fields['quality'] = params.quality
       ..fields['output_format'] = params.outputFormat
       ..fields['response_format'] = 'b64_json';
+    request.headers.addAll(
+      ProviderRequestHeaders.mergeHeaders(
+        <String, String>{'Authorization': 'Bearer $apiKey'},
+        endpoint.requestHeaders,
+        allowContentTypeOverride: false,
+      ),
+    );
 
     final String imageFieldName = references.length == 1 ? 'image' : 'image[]';
     for (int i = 0; i < references.length; i += 1) {

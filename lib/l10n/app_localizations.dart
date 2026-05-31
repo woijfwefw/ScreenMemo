@@ -4776,6 +4776,107 @@ abstract class AppLocalizations {
   /// **'Edit provider'**
   String get editProviderTitle;
 
+  /// No description provided for @providerRequestHeadersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Request headers'**
+  String get providerRequestHeadersTitle;
+
+  /// No description provided for @providerRequestHeadersDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional custom headers are sent with chat, model refresh, key tests, and image generation. Supports {apiKeyPlaceholder}, {uuidPlaceholder}, {sessionIdPlaceholder}, {threadIdPlaceholder}, {installationIdPlaceholder}, {windowIdPlaceholder}, and {timestampMsPlaceholder} placeholders.'**
+  String providerRequestHeadersDesc(
+    Object apiKeyPlaceholder,
+    Object uuidPlaceholder,
+    Object sessionIdPlaceholder,
+    Object threadIdPlaceholder,
+    Object installationIdPlaceholder,
+    Object windowIdPlaceholder,
+    Object timestampMsPlaceholder,
+  );
+
+  /// No description provided for @providerRequestHeadersEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No custom request headers. Built-in authentication headers will be used.'**
+  String get providerRequestHeadersEmpty;
+
+  /// No description provided for @providerRequestHeaderApplyTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply template'**
+  String get providerRequestHeaderApplyTemplate;
+
+  /// No description provided for @providerRequestHeaderAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add header'**
+  String get providerRequestHeaderAdd;
+
+  /// No description provided for @providerRequestHeaderRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove header'**
+  String get providerRequestHeaderRemove;
+
+  /// No description provided for @providerRequestHeaderNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Header name'**
+  String get providerRequestHeaderNameLabel;
+
+  /// No description provided for @providerRequestHeaderValueLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Header value'**
+  String get providerRequestHeaderValueLabel;
+
+  /// No description provided for @providerRequestHeaderNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization'**
+  String get providerRequestHeaderNameHint;
+
+  /// No description provided for @providerRequestHeaderValueHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Bearer {apiKeyPlaceholder} / {uuidPlaceholder}'**
+  String providerRequestHeaderValueHint(
+    Object apiKeyPlaceholder,
+    Object uuidPlaceholder,
+  );
+
+  /// No description provided for @providerRequestHeaderInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid request header: {name}'**
+  String providerRequestHeaderInvalid(Object name);
+
+  /// No description provided for @providerRequestHeaderTemplateOpenAI.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenAI'**
+  String get providerRequestHeaderTemplateOpenAI;
+
+  /// No description provided for @providerRequestHeaderTemplateAnthropic.
+  ///
+  /// In en, this message translates to:
+  /// **'Anthropic / Claude API'**
+  String get providerRequestHeaderTemplateAnthropic;
+
+  /// No description provided for @providerRequestHeaderTemplateCodex.
+  ///
+  /// In en, this message translates to:
+  /// **'Codex compatible'**
+  String get providerRequestHeaderTemplateCodex;
+
+  /// No description provided for @providerRequestHeaderTemplateClaudeCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Claude Code API key'**
+  String get providerRequestHeaderTemplateClaudeCode;
+
   /// No description provided for @deletedToast.
   ///
   /// In en, this message translates to:

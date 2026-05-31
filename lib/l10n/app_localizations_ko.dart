@@ -2616,6 +2616,69 @@ class AppLocalizationsKo extends AppLocalizations {
   String get editProviderTitle => '프로바이더 편집';
 
   @override
+  String get providerRequestHeadersTitle => '요청 헤더';
+
+  @override
+  String providerRequestHeadersDesc(
+    Object apiKeyPlaceholder,
+    Object uuidPlaceholder,
+    Object sessionIdPlaceholder,
+    Object threadIdPlaceholder,
+    Object installationIdPlaceholder,
+    Object windowIdPlaceholder,
+    Object timestampMsPlaceholder,
+  ) {
+    return '선택적 사용자 지정 헤더는 채팅, 모델 새로고침, Key 테스트, 이미지 생성에 함께 전송됩니다. $apiKeyPlaceholder, $uuidPlaceholder, $sessionIdPlaceholder, $threadIdPlaceholder, $installationIdPlaceholder, $windowIdPlaceholder, $timestampMsPlaceholder 자리표시자를 지원합니다.';
+  }
+
+  @override
+  String get providerRequestHeadersEmpty =>
+      '사용자 지정 요청 헤더가 없습니다. 기본 인증 헤더를 사용합니다.';
+
+  @override
+  String get providerRequestHeaderApplyTemplate => '템플릿 적용';
+
+  @override
+  String get providerRequestHeaderAdd => '헤더 추가';
+
+  @override
+  String get providerRequestHeaderRemove => '헤더 삭제';
+
+  @override
+  String get providerRequestHeaderNameLabel => '헤더 이름';
+
+  @override
+  String get providerRequestHeaderValueLabel => '헤더 값';
+
+  @override
+  String get providerRequestHeaderNameHint => 'Authorization';
+
+  @override
+  String providerRequestHeaderValueHint(
+    Object apiKeyPlaceholder,
+    Object uuidPlaceholder,
+  ) {
+    return 'Bearer $apiKeyPlaceholder / $uuidPlaceholder';
+  }
+
+  @override
+  String providerRequestHeaderInvalid(Object name) {
+    return 'Invalid request header: $name';
+  }
+
+  @override
+  String get providerRequestHeaderTemplateOpenAI => 'OpenAI';
+
+  @override
+  String get providerRequestHeaderTemplateAnthropic => 'Anthropic / Claude API';
+
+  @override
+  String get providerRequestHeaderTemplateCodex => 'Codex 호환';
+
+  @override
+  String get providerRequestHeaderTemplateClaudeCode => 'Claude Code API key';
+
+  @override
   String get deletedToast => '삭제했습니다';
 
   @override

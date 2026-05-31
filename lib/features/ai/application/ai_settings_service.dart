@@ -5,6 +5,7 @@ import 'package:screen_memo/data/database/screenshot_database.dart';
 import 'package:screen_memo/core/localization/locale_service.dart';
 import 'package:screen_memo/features/ai/application/ai_providers_service.dart';
 import 'package:screen_memo/features/ai/application/ai_context_budgets.dart';
+import 'package:screen_memo/features/ai/application/provider_request_headers.dart';
 import 'package:flutter/services.dart'; // Added for MethodChannel
 import 'package:screen_memo/core/constants/user_settings_keys.dart';
 import 'package:screen_memo/core/logging/flutter_logger.dart';
@@ -78,6 +79,9 @@ class AIEndpoint {
   final String model;
   final String chatPath; // 基于 Provider 的可配置路径，默认 /v1/chat/completions
   final bool useResponseApi; // OpenAI Responses API 兼容模式
+  final Map<String, String> requestHeaders; // Provider 级自定义请求头
+  final String requestBodyStyle; // Provider 级模板请求格式
+  final ProviderRequestIdentity? requestIdentity; // 请求指纹占位符使用的同一组动态值
 
   AIEndpoint({
     required this.groupId,
@@ -92,6 +96,9 @@ class AIEndpoint {
     required this.model,
     this.chatPath = '/v1/chat/completions',
     this.useResponseApi = false,
+    this.requestHeaders = const <String, String>{},
+    this.requestBodyStyle = ProviderRequestBodyStyles.defaultStyle,
+    this.requestIdentity,
   });
 }
 
@@ -624,8 +631,8 @@ class AISettingsService {
             final String baseUrl = ((segCfg['baseUrl'] as String?) ?? '')
                 .trim();
             final String model = ((segCfg['model'] as String?) ?? '').trim();
-            final String? apiKey = ((segCfg['apiKey'] as String?) ?? '').trim();
-            if (model.isNotEmpty && (apiKey != null && apiKey.isNotEmpty)) {
+            final String apiKey = ((segCfg['apiKey'] as String?) ?? '').trim();
+            if (model.isNotEmpty && apiKey.isNotEmpty) {
               return <AIEndpoint>[
                 AIEndpoint(
                   groupId: -1,
@@ -707,7 +714,10 @@ class AISettingsService {
         : pSelected.baseUrl!.trim();
     final String chatPath =
         (pSelected.chatPath == null || pSelected.chatPath!.trim().isEmpty)
-        ? '/v1/chat/completions'
+        ? defaultChatPathForType(
+            pSelected.type,
+            useResponsesApi: pSelected.useResponseApi,
+          )
         : pSelected.chatPath!.trim();
     final int groupId = -1 * (pSelected.id ?? 0).abs();
     final int selectedProviderId = pSelected.id ?? 0;
@@ -746,6 +756,19 @@ class AISettingsService {
         pSelected.id!,
       );
       if (legacyKey != null && legacyKey.trim().isNotEmpty) {
+        final ProviderRequestIdentity identity =
+            ProviderRequestIdentity.create();
+        final Map<String, String> requestHeaders =
+            ProviderRequestHeaders.headersFromExtra(
+              pSelected.extra,
+              apiKey: legacyKey,
+              identity: identity,
+            );
+        final String requestBodyStyle =
+            ProviderRequestHeaders.bodyStyleFromExtra(
+              pSelected.extra,
+              providerType: pSelected.type,
+            );
         return <AIEndpoint>[
           AIEndpoint(
             groupId: groupId,
@@ -757,6 +780,9 @@ class AISettingsService {
             model: model,
             chatPath: chatPath,
             useResponseApi: pSelected.useResponseApi,
+            requestHeaders: requestHeaders,
+            requestBodyStyle: requestBodyStyle,
+            requestIdentity: identity,
           ),
         ];
       }
@@ -873,6 +899,17 @@ class AISettingsService {
 
     final endpoints = <AIEndpoint>[];
     for (final key in ordered) {
+      final ProviderRequestIdentity identity = ProviderRequestIdentity.create();
+      final Map<String, String> requestHeaders =
+          ProviderRequestHeaders.headersFromExtra(
+            pSelected.extra,
+            apiKey: key.apiKey,
+            identity: identity,
+          );
+      final String requestBodyStyle = ProviderRequestHeaders.bodyStyleFromExtra(
+        pSelected.extra,
+        providerType: pSelected.type,
+      );
       for (int attempt = 0; attempt < 3; attempt++) {
         endpoints.add(
           AIEndpoint(
@@ -888,6 +925,9 @@ class AISettingsService {
             model: model,
             chatPath: chatPath,
             useResponseApi: pSelected.useResponseApi,
+            requestHeaders: requestHeaders,
+            requestBodyStyle: requestBodyStyle,
+            requestIdentity: identity,
           ),
         );
       }

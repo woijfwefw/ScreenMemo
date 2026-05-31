@@ -6,6 +6,7 @@ import 'package:screen_memo/features/ai/application/ai_context_budgets.dart';
 import 'package:screen_memo/features/ai/application/ai_providers_service.dart';
 import 'package:screen_memo/features/ai/application/models_dev_catalog_service.dart';
 import 'package:screen_memo/features/ai/application/provider_key_batch_maintenance_service.dart';
+import 'package:screen_memo/features/ai/application/provider_request_headers.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
 import 'package:screen_memo/core/widgets/model_logo.dart';
 import 'package:screen_memo/core/widgets/ui_action_menu.dart';
@@ -60,6 +61,8 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
   );
   final _azureApiVerCtrl = TextEditingController(text: '2024-02-15');
   final _modelInputCtrl = TextEditingController();
+  List<_HeaderDraft> _headerDrafts = <_HeaderDraft>[];
+  String _requestBodyStyle = ProviderRequestBodyStyles.defaultStyle;
 
   String _type = AIProviderTypes.openai;
   bool _useResponseApi = false;
@@ -165,9 +168,13 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
           ),
         );
         _nameCtrl.text = p.name;
-        _type = p.type;
+        _type = p.type == AIProviderTypes.custom
+            ? AIProviderTypes.openai
+            : p.type;
         _baseUrlCtrl.text = p.baseUrl ?? '';
-        _chatPathCtrl.text = p.chatPath ?? '/v1/chat/completions';
+        _chatPathCtrl.text =
+            p.chatPath ??
+            defaultChatPathForType(_type, useResponsesApi: p.useResponseApi);
         final path = p.modelsPath.trim();
         if (path.isEmpty) {
           _modelsPathCtrl.text = defaultModelsPathForType(_type);
@@ -181,6 +188,13 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
           final v = (p.extra['azure_api_version'] as String?) ?? '2024-02-15';
           _azureApiVerCtrl.text = v;
         }
+        _headerDrafts = ProviderRequestHeaders.entriesFromExtra(
+          p.extra,
+        ).map(_HeaderDraft.fromEntry).toList(growable: false);
+        _requestBodyStyle = ProviderRequestHeaders.bodyStyleFromExtra(
+          p.extra,
+          providerType: p.type,
+        );
         if (p.type == AIProviderTypes.gemini) {
           _showGeminiRegionNotice();
         }
@@ -209,6 +223,9 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
     _modelsPathCtrl.dispose();
     _azureApiVerCtrl.dispose();
     _modelInputCtrl.dispose();
+    for (final _HeaderDraft draft in _headerDrafts) {
+      draft.dispose();
+    }
     super.dispose();
   }
 
@@ -295,5 +312,28 @@ class _ProviderEditPageState extends State<ProviderEditPage> {
               ),
             ),
     );
+  }
+}
+
+class _HeaderDraft {
+  _HeaderDraft({String name = '', String value = ''})
+    : nameController = TextEditingController(text: name),
+      valueController = TextEditingController(text: value);
+
+  factory _HeaderDraft.fromEntry(ProviderHeaderEntry entry) {
+    return _HeaderDraft(name: entry.name, value: entry.value);
+  }
+
+  final TextEditingController nameController;
+  final TextEditingController valueController;
+
+  ProviderHeaderEntry toEntry() => ProviderHeaderEntry(
+    name: nameController.text,
+    value: valueController.text,
+  );
+
+  void dispose() {
+    nameController.dispose();
+    valueController.dispose();
   }
 }

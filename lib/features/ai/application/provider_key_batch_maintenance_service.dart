@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:screen_memo/features/ai/application/ai_providers_service.dart';
 import 'package:screen_memo/features/ai/application/ai_request_gateway.dart';
 import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
+import 'package:screen_memo/features/ai/application/provider_request_headers.dart';
 import 'package:screen_memo/core/logging/flutter_logger.dart';
 import 'package:screen_memo/data/database/screenshot_database.dart';
 
@@ -389,6 +390,8 @@ class ProviderKeyBatchMaintenanceService {
       final String token = _randomProbeToken();
       onAttemptStart?.call(attempt + 1, safeAttempts, model);
       try {
+        final ProviderRequestIdentity identity =
+            ProviderRequestIdentity.create();
         final AIEndpoint endpoint = AIEndpoint(
           groupId: -1 * (provider.id ?? 0).abs(),
           providerId: provider.id,
@@ -402,6 +405,16 @@ class ProviderKeyBatchMaintenanceService {
           model: model,
           chatPath: _resolveChatPath(provider),
           useResponseApi: provider.useResponseApi,
+          requestHeaders: ProviderRequestHeaders.headersFromExtra(
+            provider.extra,
+            apiKey: key.apiKey,
+            identity: identity,
+          ),
+          requestBodyStyle: ProviderRequestHeaders.bodyStyleFromExtra(
+            provider.extra,
+            providerType: provider.type,
+          ),
+          requestIdentity: identity,
         );
         final List<AIMessage> messages = <AIMessage>[
           AIMessage(
@@ -542,7 +555,12 @@ class ProviderKeyBatchMaintenanceService {
 
   String _resolveChatPath(AIProvider provider) {
     final String path = (provider.chatPath ?? '').trim();
-    return path.isEmpty ? '/v1/chat/completions' : path;
+    return path.isEmpty
+        ? defaultChatPathForType(
+            provider.type,
+            useResponsesApi: provider.useResponseApi,
+          )
+        : path;
   }
 
   bool _probeResponseHasContent(String response) {

@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
 import 'package:screen_memo/features/ai/application/ai_providers_service.dart';
+import 'package:screen_memo/features/ai/application/provider_request_headers.dart';
 import 'package:screen_memo/core/logging/flutter_logger.dart';
 import 'package:screen_memo/features/ai/application/openai_responses_extract.dart';
 import 'package:screen_memo/features/app_health/application/app_health_service.dart';
@@ -809,17 +810,35 @@ class AIRequestGateway {
     if (apiKey == null || apiKey.isEmpty) {
       throw Exception('API key is empty');
     }
+    final String requestBodyStyle = ProviderRequestBodyStyles.normalize(
+      endpoint.requestBodyStyle,
+    );
+    final bool useClaudeCodeMessages =
+        requestBodyStyle == ProviderRequestBodyStyles.claudeCodeMessages;
+    final bool useAnthropicMessages =
+        requestBodyStyle == ProviderRequestBodyStyles.anthropicMessages ||
+        useClaudeCodeMessages;
+    final bool useCodexResponses =
+        requestBodyStyle == ProviderRequestBodyStyles.codexResponses;
+    final ProviderRequestIdentity requestIdentity =
+        endpoint.requestIdentity ?? ProviderRequestIdentity.create();
 
-    if (isGoogle) {
+    if (isGoogle && !useAnthropicMessages && !useCodexResponses) {
       final String method = stream
           ? 'streamGenerateContent'
           : 'generateContent';
-      Uri uri = baseUri.resolve(
-        '/v1beta/models/${Uri.encodeComponent(endpoint.model)}:$method',
+      Uri uri = _buildGoogleGenerateContentUriFromBase(
+        baseUri,
+        endpoint.chatPath,
+        endpoint.model,
+        method,
       );
       if (stream) {
         uri = uri.replace(
-          queryParameters: const <String, String>{'alt': 'sse'},
+          queryParameters: <String, String>{
+            ...uri.queryParameters,
+            'alt': 'sse',
+          },
         );
       }
       final Map<String, dynamic> payload = _buildGooglePayload(
@@ -832,68 +851,142 @@ class AIRequestGateway {
         'x-goog-api-key': apiKey,
         if (stream) 'Accept': 'text/event-stream',
       };
+      final Map<String, String> mergedHeaders =
+          ProviderRequestHeaders.mergeHeaders(headers, endpoint.requestHeaders);
       return _PreparedRequest(
         uri: uri,
-        headers: headers,
+        headers: mergedHeaders,
         body: jsonEncode(payload),
         isGoogle: true,
         hasTools: false,
         useResponsesApi: false,
+        requestBodyStyle: ProviderRequestBodyStyles.defaultStyle,
         promptCacheKey: null,
       );
     }
 
     final bool useResponsesApi =
-        useResponsesApiOverride ??
-        _shouldUseResponsesApi(
-          endpoint: endpoint,
-          baseUri: baseUri,
-          tools: tools,
-        );
-    final Uri uri = useResponsesApi
-        ? _buildResponsesUriFromBase(baseUri, endpoint.chatPath)
-        : _buildEndpointUriFromBase(baseUri, endpoint.chatPath);
-    final List<Map<String, dynamic>> effectiveTools = useResponsesApi
+        useCodexResponses ||
+        (useResponsesApiOverride ??
+            _shouldUseResponsesApi(
+              endpoint: endpoint,
+              baseUri: baseUri,
+              tools: tools,
+            ));
+    final Uri uri = useAnthropicMessages
+        ? _buildClaudeMessagesUriFromBase(
+            baseUri,
+            endpoint.chatPath,
+            betaQuery: useClaudeCodeMessages,
+          )
+        : (useResponsesApi
+              ? _buildResponsesUriFromBase(baseUri, endpoint.chatPath)
+              : _buildEndpointUriFromBase(baseUri, endpoint.chatPath));
+    final List<Map<String, dynamic>> effectiveTools =
+        useResponsesApi && !useCodexResponses && !useAnthropicMessages
         ? _withAutoResponsesWebSearchTool(endpoint, tools)
         : tools;
-    final Map<String, dynamic> payload = useResponsesApi
-        ? _buildResponsesPayload(
+    final Map<String, dynamic> payload = useClaudeCodeMessages
+        ? _buildClaudeCodeMessagesPayload(
             endpoint: endpoint,
             messages: messages,
             stream: stream,
-            tools: effectiveTools,
-            toolChoice: toolChoice,
+            tools: tools,
             reasoningLevel: reasoningLevel,
+            identity: requestIdentity,
           )
-        : _buildChatCompletionsPayload(
-            endpoint: endpoint,
-            messages: messages,
-            stream: stream,
-            tools: effectiveTools,
-            toolChoice: toolChoice,
-            reasoningLevel: reasoningLevel,
-          );
+        : (useAnthropicMessages
+              ? _buildAnthropicMessagesPayload(
+                  endpoint: endpoint,
+                  messages: messages,
+                  stream: stream,
+                  tools: tools,
+                  reasoningLevel: reasoningLevel,
+                  identity: requestIdentity,
+                )
+              : (useResponsesApi
+                    ? _buildResponsesPayload(
+                        endpoint: endpoint,
+                        messages: messages,
+                        stream: stream,
+                        tools: effectiveTools,
+                        toolChoice: toolChoice,
+                        reasoningLevel: reasoningLevel,
+                        codexStyle: useCodexResponses,
+                        identity: requestIdentity,
+                      )
+                    : _buildChatCompletionsPayload(
+                        endpoint: endpoint,
+                        messages: messages,
+                        stream: stream,
+                        tools: effectiveTools,
+                        toolChoice: toolChoice,
+                        reasoningLevel: reasoningLevel,
+                      )));
     final String? effectivePromptCacheKey = _effectivePromptCacheKey(
       endpoint: endpoint,
       baseUri: baseUri,
       promptCacheKey: promptCacheKey,
     );
-    if (effectivePromptCacheKey != null) {
+    if (effectivePromptCacheKey != null && !useCodexResponses) {
       payload['prompt_cache_key'] = effectivePromptCacheKey;
     }
     final Map<String, String> headers = <String, String>{
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer $apiKey',
       if (stream) 'Accept': 'text/event-stream',
     };
+    if (useClaudeCodeMessages) {
+      headers.addAll(<String, String>{
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $apiKey',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta':
+            'prompt-caching-scope-2026-01-05,claude-code-20250219',
+        'anthropic-dangerous-direct-browser-access': 'true',
+        'x-app': 'cli',
+        'User-Agent': 'claude-cli/2.1.121 (external, sdk-cli)',
+        'X-Claude-Code-Session-Id': requestIdentity.sessionId,
+        'x-stainless-arch': 'x64',
+        'x-stainless-lang': 'js',
+        'x-stainless-os': 'Windows',
+        'x-stainless-package-version': '0.81.0',
+        'x-stainless-retry-count': '0',
+        'x-stainless-runtime': 'node',
+        'x-stainless-runtime-version': 'v24.3.0',
+        'x-stainless-timeout': '600',
+      });
+    } else if (useAnthropicMessages) {
+      headers.addAll(<String, String>{
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      });
+    } else {
+      headers['Authorization'] = 'Bearer $apiKey';
+    }
+    if (useCodexResponses) {
+      headers.addAll(<String, String>{
+        'originator': 'codex_cli_rs',
+        'User-Agent': ProviderRequestHeaders.codexUserAgent,
+        'session-id': requestIdentity.sessionId,
+        'thread-id': requestIdentity.threadId,
+        'x-client-request-id': requestIdentity.threadId,
+        'x-codex-window-id': requestIdentity.windowId,
+      });
+    }
+    final Map<String, String> mergedHeaders =
+        ProviderRequestHeaders.mergeHeaders(headers, endpoint.requestHeaders);
     return _PreparedRequest(
       uri: uri,
-      headers: headers,
+      headers: mergedHeaders,
       body: jsonEncode(payload),
       isGoogle: false,
       hasTools: effectiveTools.isNotEmpty,
-      useResponsesApi: useResponsesApi,
-      promptCacheKey: effectivePromptCacheKey,
+      useResponsesApi: useResponsesApi && !useAnthropicMessages,
+      requestBodyStyle: requestBodyStyle,
+      promptCacheKey: useCodexResponses
+          ? requestIdentity.threadId
+          : effectivePromptCacheKey,
     );
   }
 
@@ -943,6 +1036,9 @@ class AIRequestGateway {
       model: endpoint.model,
       chatPath: '/v1/chat/completions',
       useResponseApi: endpoint.useResponseApi,
+      requestHeaders: endpoint.requestHeaders,
+      requestBodyStyle: ProviderRequestBodyStyles.defaultStyle,
+      requestIdentity: endpoint.requestIdentity,
     );
   }
 
@@ -968,9 +1064,7 @@ class AIRequestGateway {
       if (api is List) {
         for (final dynamic raw in api) {
           if (raw is! Map) continue;
-          final Map<String, dynamic> map = Map<String, dynamic>.from(
-            raw as Map,
-          );
+          final Map<String, dynamic> map = Map<String, dynamic>.from(raw);
           final String type = (map['type'] as String? ?? '')
               .trim()
               .toLowerCase();
@@ -993,7 +1087,7 @@ class AIRequestGateway {
               url = imageObj;
             } else if (imageObj is Map) {
               final Map<String, dynamic> imageMap = Map<String, dynamic>.from(
-                imageObj as Map,
+                imageObj,
               );
               url =
                   (imageMap['url'] as String?) ??
@@ -1194,11 +1288,18 @@ class AIRequestGateway {
     required List<Map<String, dynamic>> tools,
     required Object? toolChoice,
     required AIReasoningLevel reasoningLevel,
+    bool codexStyle = false,
+    ProviderRequestIdentity? identity,
   }) {
     final Map<String, dynamic> payload = <String, dynamic>{
       'model': endpoint.model,
-      if (tools.isNotEmpty) 'tools': _normalizeResponsesTools(tools),
-      'input': _buildResponsesInputItems(messages),
+      if (codexStyle) 'instructions': _extractResponsesInstructions(messages),
+      if (codexStyle) 'tools': _normalizeResponsesTools(tools),
+      if (!codexStyle && tools.isNotEmpty)
+        'tools': _normalizeResponsesTools(tools),
+      'input': _buildResponsesInputItems(
+        codexStyle ? _withoutInstructionMessages(messages) : messages,
+      ),
       'stream': stream,
     };
     _applyResponsesReasoningPayload(
@@ -1214,7 +1315,42 @@ class AIRequestGateway {
         payload['tool_choice'] = _stableJsonValue(normalizedToolChoice);
       }
     }
+    if (codexStyle) {
+      final ProviderRequestIdentity resolved =
+          identity ?? ProviderRequestIdentity.create();
+      payload['tool_choice'] = payload['tool_choice'] ?? 'auto';
+      payload['parallel_tool_calls'] = tools.isNotEmpty;
+      payload['reasoning'] = payload.containsKey('reasoning')
+          ? payload['reasoning']
+          : null;
+      payload['store'] = false;
+      payload['include'] = payload['include'] ?? <String>[];
+      payload['prompt_cache_key'] = resolved.threadId;
+      payload['client_metadata'] = <String, String>{
+        'x-codex-installation-id': resolved.installationId,
+      };
+    }
     return payload;
+  }
+
+  String _extractResponsesInstructions(List<AIMessage> messages) {
+    final List<String> instructions = <String>[];
+    for (final AIMessage message in messages) {
+      final String role = message.role.trim().toLowerCase();
+      if (role != 'system' && role != 'developer') continue;
+      final String text = message.providerContent.trim();
+      if (text.isNotEmpty) instructions.add(text);
+    }
+    return instructions.join('\n\n');
+  }
+
+  List<AIMessage> _withoutInstructionMessages(List<AIMessage> messages) {
+    return messages
+        .where((AIMessage message) {
+          final String role = message.role.trim().toLowerCase();
+          return role != 'system' && role != 'developer';
+        })
+        .toList(growable: false);
   }
 
   List<Map<String, dynamic>> _buildResponsesInputItems(
@@ -1277,9 +1413,7 @@ class AIRequestGateway {
           Object? argumentsRaw;
           final dynamic fnRaw = map['function'];
           if (fnRaw is Map) {
-            final Map<String, dynamic> fn = Map<String, dynamic>.from(
-              fnRaw as Map,
-            );
+            final Map<String, dynamic> fn = Map<String, dynamic>.from(fnRaw);
             name = ((fn['name'] as String?) ?? '').trim();
             argumentsRaw = fn['arguments'];
           }
@@ -1316,6 +1450,282 @@ class AIRequestGateway {
     return items;
   }
 
+  Map<String, dynamic> _buildClaudeCodeMessagesPayload({
+    required AIEndpoint endpoint,
+    required List<AIMessage> messages,
+    required bool stream,
+    required List<Map<String, dynamic>> tools,
+    required AIReasoningLevel reasoningLevel,
+    required ProviderRequestIdentity identity,
+  }) {
+    final List<Map<String, dynamic>> wireMessages = _buildClaudeMessages(
+      messages,
+    );
+    final List<Map<String, dynamic>> system = _buildClaudeSystem(messages);
+    final List<Map<String, dynamic>> normalizedTools = _normalizeClaudeTools(
+      tools,
+    );
+    final Map<String, dynamic> payload = <String, dynamic>{
+      'model': endpoint.model,
+      'messages': wireMessages,
+      'system': system.isEmpty ? <String, dynamic>{} : system.first,
+      'tools': normalizedTools,
+      'metadata': <String, dynamic>{
+        'user_id': jsonEncode(<String, String>{
+          'device_id': identity.installationId,
+          'account_uuid': identity.uuid,
+          'session_id': identity.sessionId,
+        }),
+      },
+      'max_tokens': 8192,
+      'stream': stream,
+    };
+    _applyClaudeThinkingPayload(payload, reasoningLevel);
+    return payload;
+  }
+
+  Map<String, dynamic> _buildAnthropicMessagesPayload({
+    required AIEndpoint endpoint,
+    required List<AIMessage> messages,
+    required bool stream,
+    required List<Map<String, dynamic>> tools,
+    required AIReasoningLevel reasoningLevel,
+    required ProviderRequestIdentity identity,
+  }) {
+    final List<Map<String, dynamic>> wireMessages = _buildClaudeMessages(
+      messages,
+    );
+    final String system = _buildClaudeSystemText(messages);
+    final List<Map<String, dynamic>> normalizedTools = _normalizeClaudeTools(
+      tools,
+    );
+    final Map<String, dynamic> payload = <String, dynamic>{
+      'model': endpoint.model,
+      'messages': wireMessages,
+      if (system.isNotEmpty) 'system': system,
+      if (normalizedTools.isNotEmpty) 'tools': normalizedTools,
+      'max_tokens': 8192,
+      'stream': stream,
+      'metadata': <String, String>{'user_id': identity.installationId},
+    };
+    _applyClaudeThinkingPayload(payload, reasoningLevel);
+    return payload;
+  }
+
+  String _buildClaudeSystemText(List<AIMessage> messages) {
+    final List<String> out = <String>[];
+    for (final AIMessage message in messages) {
+      final String role = message.role.trim().toLowerCase();
+      if (role != 'system' && role != 'developer') continue;
+      final String text = message.providerContent.trim();
+      if (text.isNotEmpty) out.add(text);
+    }
+    return out.join('\n\n');
+  }
+
+  List<Map<String, dynamic>> _buildClaudeSystem(List<AIMessage> messages) {
+    final List<Map<String, dynamic>> out = <Map<String, dynamic>>[];
+    for (final AIMessage message in messages) {
+      final String role = message.role.trim().toLowerCase();
+      if (role != 'system' && role != 'developer') continue;
+      final String text = message.providerContent.trim();
+      if (text.isEmpty) continue;
+      out.add(<String, dynamic>{'type': 'text', 'text': text});
+    }
+    return out;
+  }
+
+  List<Map<String, dynamic>> _buildClaudeMessages(List<AIMessage> messages) {
+    final List<Map<String, dynamic>> out = <Map<String, dynamic>>[];
+    for (final AIMessage message in messages) {
+      final String role = message.role.trim().toLowerCase();
+      if (role == 'system' || role == 'developer') continue;
+      if (role == 'tool') {
+        final String toolUseId = (message.toolCallId ?? '').trim();
+        if (toolUseId.isEmpty) continue;
+        out.add(<String, dynamic>{
+          'role': 'user',
+          'content': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'type': 'tool_result',
+              'tool_use_id': toolUseId,
+              'content': message.providerContent,
+            },
+          ],
+        });
+        continue;
+      }
+
+      final String normalizedRole = role == 'assistant' ? 'assistant' : 'user';
+      final List<Map<String, dynamic>> parts = _buildClaudeContentParts(
+        role: normalizedRole,
+        content: message.providerContent,
+        apiContent: message.apiContent,
+      );
+      if (role == 'assistant' &&
+          message.toolCalls != null &&
+          message.toolCalls!.isNotEmpty) {
+        for (final Map<String, dynamic> call in message.toolCalls!) {
+          final Map<String, dynamic>? toolUse = _claudeToolUseFromCall(call);
+          if (toolUse != null) parts.add(toolUse);
+        }
+      }
+      if (parts.isEmpty) continue;
+      out.add(<String, dynamic>{'role': normalizedRole, 'content': parts});
+    }
+    return out;
+  }
+
+  List<Map<String, dynamic>> _buildClaudeContentParts({
+    required String role,
+    required String content,
+    required Object? apiContent,
+  }) {
+    final List<Map<String, dynamic>> parts = <Map<String, dynamic>>[];
+    if (apiContent is List) {
+      for (final dynamic raw in apiContent) {
+        if (raw is! Map) continue;
+        final Map<String, dynamic> map = Map<String, dynamic>.from(raw);
+        final String type = (map['type'] as String? ?? '').trim().toLowerCase();
+        if (type == 'text' || type == 'input_text' || type == 'output_text') {
+          final String text = AIMessage.sanitizeEvidenceRefsForProvider(
+            (map['text'] as String?) ?? '',
+          );
+          if (text.trim().isNotEmpty) {
+            parts.add(<String, dynamic>{'type': 'text', 'text': text});
+          }
+          continue;
+        }
+        if (role == 'user' && (type == 'image_url' || type == 'input_image')) {
+          final Map<String, dynamic>? image = _claudeImagePartFromOpenAI(map);
+          if (image != null) parts.add(image);
+        }
+      }
+    }
+    if (parts.isEmpty && content.trim().isNotEmpty) {
+      parts.add(<String, dynamic>{'type': 'text', 'text': content});
+    }
+    return parts;
+  }
+
+  Map<String, dynamic>? _claudeImagePartFromOpenAI(Map<String, dynamic> map) {
+    String url = '';
+    final dynamic imageObj = map['image_url'] ?? map['imageUrl'];
+    if (imageObj is String) {
+      url = imageObj;
+    } else if (imageObj is Map) {
+      final Map<String, dynamic> imageMap = Map<String, dynamic>.from(imageObj);
+      url =
+          (imageMap['url'] as String?) ??
+          (imageMap['image_url'] as String?) ??
+          (imageMap['imageUrl'] as String?) ??
+          '';
+    } else {
+      url = (map['url'] as String?) ?? '';
+    }
+    url = url.trim();
+    if (!url.startsWith('data:')) return null;
+    final int semi = url.indexOf(';');
+    final int comma = url.indexOf(',');
+    if (semi <= 5 || comma <= semi) return null;
+    final String mime = url.substring(5, semi).trim();
+    final String meta = url.substring(semi + 1, comma).trim().toLowerCase();
+    final String data = url.substring(comma + 1).trim();
+    if (!meta.contains('base64') || data.isEmpty) return null;
+    return <String, dynamic>{
+      'type': 'image',
+      'source': <String, dynamic>{
+        'type': 'base64',
+        'media_type': mime.isEmpty ? 'application/octet-stream' : mime,
+        'data': data,
+      },
+    };
+  }
+
+  Map<String, dynamic>? _claudeToolUseFromCall(Map<String, dynamic> call) {
+    String id = (call['id'] as String? ?? '').trim();
+    String name = (call['name'] as String? ?? '').trim();
+    Object? input = call['arguments'];
+    final dynamic fnRaw = call['function'];
+    if (fnRaw is Map) {
+      final Map<String, dynamic> fn = Map<String, dynamic>.from(fnRaw);
+      if (name.isEmpty) name = (fn['name'] as String? ?? '').trim();
+      input ??= fn['arguments'];
+    }
+    if (name.isEmpty) return null;
+    if (id.isEmpty) id = _newFallbackToolCallId();
+    return <String, dynamic>{
+      'type': 'tool_use',
+      'id': id,
+      'name': name,
+      'input': _parseJsonObjectOrEmpty(input),
+    };
+  }
+
+  Map<String, dynamic> _parseJsonObjectOrEmpty(Object? raw) {
+    if (raw is Map) return Map<String, dynamic>.from(_stableJsonObject(raw));
+    if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        final dynamic decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          return Map<String, dynamic>.from(_stableJsonObject(decoded));
+        }
+      } catch (_) {}
+    }
+    return <String, dynamic>{};
+  }
+
+  List<Map<String, dynamic>> _normalizeClaudeTools(
+    List<Map<String, dynamic>> tools,
+  ) {
+    final List<Map<String, dynamic>> out = <Map<String, dynamic>>[];
+    for (final Map<String, dynamic> raw in tools) {
+      final Map<String, dynamic> map = Map<String, dynamic>.from(raw);
+      if ((map['type'] as String? ?? '').trim().toLowerCase() != 'function') {
+        continue;
+      }
+      final dynamic fnRaw = map['function'];
+      String name = '';
+      String description = '';
+      Object? schema;
+      if (fnRaw is Map) {
+        final Map<String, dynamic> fn = Map<String, dynamic>.from(fnRaw);
+        name = (fn['name'] as String? ?? '').trim();
+        description = (fn['description'] as String? ?? '').trim();
+        schema = fn['parameters'];
+      } else {
+        name = (map['name'] as String? ?? '').trim();
+        description = (map['description'] as String? ?? '').trim();
+        schema = map['parameters'] ?? map['input_schema'];
+      }
+      if (name.isEmpty) continue;
+      out.add(<String, dynamic>{
+        'name': name,
+        if (description.isNotEmpty) 'description': description,
+        'input_schema': schema == null
+            ? <String, dynamic>{
+                'type': 'object',
+                'properties': <String, dynamic>{},
+              }
+            : _stableJsonValue(schema),
+      });
+    }
+    out.sort((a, b) => (a['name'] as String).compareTo(b['name'] as String));
+    return out;
+  }
+
+  void _applyClaudeThinkingPayload(
+    Map<String, dynamic> payload,
+    AIReasoningLevel level,
+  ) {
+    if (level == AIReasoningLevel.auto) return;
+    if (!level.isEnabled) return;
+    payload['thinking'] = <String, dynamic>{
+      'type': 'enabled',
+      'budget_tokens': level.budgetTokens.clamp(1024, 16000).toInt(),
+    };
+  }
+
   List<Map<String, dynamic>> _buildResponsesContentParts({
     required String role,
     required String content,
@@ -1327,7 +1737,7 @@ class AIRequestGateway {
     if (apiContent is List) {
       for (final dynamic raw in apiContent) {
         if (raw is! Map) continue;
-        final Map<String, dynamic> map = Map<String, dynamic>.from(raw as Map);
+        final Map<String, dynamic> map = Map<String, dynamic>.from(raw);
         final String type = (map['type'] as String? ?? '').trim().toLowerCase();
 
         if (type == 'text') {
@@ -1370,7 +1780,7 @@ class AIRequestGateway {
             url = imageObj;
           } else if (imageObj is Map) {
             final Map<String, dynamic> imageMap = Map<String, dynamic>.from(
-              imageObj as Map,
+              imageObj,
             );
             url =
                 (imageMap['url'] as String?) ??
@@ -1413,7 +1823,7 @@ class AIRequestGateway {
 
       final dynamic fnRaw = map['function'];
       if (fnRaw is Map) {
-        final Map<String, dynamic> fn = Map<String, dynamic>.from(fnRaw as Map);
+        final Map<String, dynamic> fn = Map<String, dynamic>.from(fnRaw);
         final String name = (fn['name'] as String? ?? '').trim();
         if (name.isEmpty) continue;
         out.add(<String, dynamic>{
@@ -1507,7 +1917,7 @@ class AIRequestGateway {
       Object? parameters;
       Object? strict;
       if (fnRaw is Map) {
-        final Map<String, dynamic> fn = Map<String, dynamic>.from(fnRaw as Map);
+        final Map<String, dynamic> fn = Map<String, dynamic>.from(fnRaw);
         name = (fn['name'] as String? ?? '').trim();
         description = (fn['description'] as String? ?? '').trim();
         parameters = fn['parameters'];
@@ -1773,9 +2183,7 @@ class AIRequestGateway {
     if (toolChoice == null) return null;
     if (toolChoice is! Map) return toolChoice;
 
-    final Map<String, dynamic> map = Map<String, dynamic>.from(
-      toolChoice as Map,
-    );
+    final Map<String, dynamic> map = Map<String, dynamic>.from(toolChoice);
     final String type = (map['type'] as String? ?? '').trim().toLowerCase();
     if (type != 'function') {
       return map;
@@ -1784,7 +2192,7 @@ class AIRequestGateway {
     String name = (map['name'] as String? ?? '').trim();
     final dynamic fnRaw = map['function'];
     if (name.isEmpty && fnRaw is Map) {
-      final Map<String, dynamic> fn = Map<String, dynamic>.from(fnRaw as Map);
+      final Map<String, dynamic> fn = Map<String, dynamic>.from(fnRaw);
       name = (fn['name'] as String? ?? '').trim();
     }
     if (name.isEmpty) return map;
@@ -1836,20 +2244,7 @@ class AIRequestGateway {
     }
 
     Map<String, String> maskHeaders(Map<String, String> headers) {
-      final Map<String, String> out = <String, String>{};
-      headers.forEach((String k, String v) {
-        final String key = k.toLowerCase();
-        if (key == 'authorization') {
-          out[k] = v.startsWith('Bearer ') ? 'Bearer ***' : '***';
-          return;
-        }
-        if (key == 'x-goog-api-key' || key == 'api-key' || key == 'x-api-key') {
-          out[k] = '***';
-          return;
-        }
-        out[k] = v;
-      });
-      return out;
+      return ProviderRequestHeaders.redactForLog(headers);
     }
 
     String redactDataUrls(String s) {
@@ -1893,11 +2288,7 @@ class AIRequestGateway {
     final String traceId = _newTraceId();
     final Stopwatch sw = Stopwatch()..start();
 
-    final String apiType = prepared.isGoogle
-        ? 'google.generateContent'
-        : (prepared.useResponsesApi
-              ? 'openai.responses'
-              : 'openai.chat.completions');
+    final String apiType = prepared.apiTypeLabelForStream(false);
     final String providerName = (endpoint.providerName ?? '').trim();
     final String providerType = (endpoint.providerType ?? '').trim();
     final String providerIdText = endpoint.providerId == null
@@ -2050,14 +2441,16 @@ class AIRequestGateway {
       );
     }
 
-    final _OpenAIResponse parsed = _parseOpenAIResponse(response.body);
+    final _OpenAIResponse parsed = prepared.isClaudeMessages
+        ? _parseClaudeMessagesResponse(response.body)
+        : _parseOpenAIResponse(response.body);
     final bool hasToolCalls = parsed.toolCalls.isNotEmpty;
     final String sanitized = hasToolCalls
         ? _trimLeadingIgnorable(parsed.content)
         : _stripResponseStart(responseStartMarker, parsed.content);
     final String usage = usageFields(parsed.usage);
     emitUiLog(
-      'PARSED openai contentLen=${sanitized.length} toolCalls=${parsed.toolCalls.length} reasoningLen=${(parsed.reasoning ?? '').length}${usage.isEmpty ? '' : ' $usage'}',
+      'PARSED ${prepared.isClaudeMessages ? 'anthropic' : 'openai'} contentLen=${sanitized.length} toolCalls=${parsed.toolCalls.length} reasoningLen=${(parsed.reasoning ?? '').length}${usage.isEmpty ? '' : ' $usage'}',
     );
     if (usage.isEmpty) {
       try {
@@ -2354,20 +2747,7 @@ class AIRequestGateway {
     }
 
     Map<String, String> maskHeaders(Map<String, String> headers) {
-      final Map<String, String> out = <String, String>{};
-      headers.forEach((String k, String v) {
-        final String key = k.toLowerCase();
-        if (key == 'authorization') {
-          out[k] = v.startsWith('Bearer ') ? 'Bearer ***' : '***';
-          return;
-        }
-        if (key == 'x-goog-api-key' || key == 'api-key' || key == 'x-api-key') {
-          out[k] = '***';
-          return;
-        }
-        out[k] = v;
-      });
-      return out;
+      return ProviderRequestHeaders.redactForLog(headers);
     }
 
     String redactDataUrls(String s) {
@@ -2412,11 +2792,7 @@ class AIRequestGateway {
 
     final String traceId = _newTraceId();
 
-    final String apiType = prepared.isGoogle
-        ? 'google.streamGenerateContent'
-        : (prepared.useResponsesApi
-              ? 'openai.responses'
-              : 'openai.chat.completions');
+    final String apiType = prepared.apiTypeLabelForStream(true);
     final String providerName = (endpoint.providerName ?? '').trim();
     final String providerType = (endpoint.providerType ?? '').trim();
     final String providerIdText = endpoint.providerId == null
@@ -2600,7 +2976,7 @@ class AIRequestGateway {
               pendingDataLines = 0;
               continue;
             }
-            json = Map<String, dynamic>.from(decoded as Map);
+            json = Map<String, dynamic>.from(decoded);
           } catch (_) {
             continue;
           }
@@ -2825,7 +3201,7 @@ class AIRequestGateway {
               final dynamic itemRaw = json['item'];
               if (itemRaw is Map) {
                 final Map<String, dynamic> item = Map<String, dynamic>.from(
-                  itemRaw as Map,
+                  itemRaw,
                 );
                 final String itemType = (item['type'] as String?) ?? '';
 
@@ -3019,9 +3395,7 @@ class AIRequestGateway {
               // Some relays may only emit content parts. Treat output_text parts as content.
               final dynamic part = json['part'];
               if (part is Map) {
-                final Map<String, dynamic> p = Map<String, dynamic>.from(
-                  part as Map,
-                );
+                final Map<String, dynamic> p = Map<String, dynamic>.from(part);
                 final String partType = (p['type'] as String?) ?? '';
                 final String txt = (p['text'] as String?) ?? '';
                 rememberAndEmitCitationsFromAnnotations(p['annotations']);
@@ -3051,6 +3425,48 @@ class AIRequestGateway {
                 }
               }
               continue;
+            }
+            if (prepared.isClaudeMessages) {
+              if (type == 'message_stop') {
+                done = true;
+                continue;
+              }
+              if (type == 'message_delta') {
+                final _UsageSnapshot? deltaUsage = _extractUsageSnapshotFromAny(
+                  json,
+                );
+                if (deltaUsage != null && !deltaUsage.isEmpty) {
+                  usageSnapshot = deltaUsage;
+                  logUsageSnapshot('STREAM_USAGE_PARSED', usageSnapshot);
+                }
+                continue;
+              }
+              if (type == 'content_block_delta') {
+                final dynamic deltaRaw = json['delta'];
+                if (deltaRaw is Map) {
+                  final Map<String, dynamic> delta = Map<String, dynamic>.from(
+                    deltaRaw,
+                  );
+                  final String deltaType = (delta['type'] as String? ?? '')
+                      .trim();
+                  final String text =
+                      (delta['text'] as String?) ??
+                      (delta['thinking'] as String?) ??
+                      '';
+                  if (text.isNotEmpty) {
+                    if (deltaType == 'thinking_delta' ||
+                        delta.containsKey('thinking')) {
+                      emitReasoningDelta(text);
+                    } else {
+                      emitContentDelta(text);
+                    }
+                  }
+                }
+                continue;
+              }
+              if (type == 'content_block_stop') {
+                continue;
+              }
             }
           }
 
@@ -3381,6 +3797,45 @@ class AIRequestGateway {
     );
   }
 
+  _OpenAIResponse _parseClaudeMessagesResponse(String body) {
+    final Map<String, dynamic> data = jsonDecode(body) as Map<String, dynamic>;
+    final StringBuffer content = StringBuffer();
+    final StringBuffer reasoning = StringBuffer();
+    final List<AIToolCall> toolCalls = <AIToolCall>[];
+    final dynamic parts = data['content'];
+    if (parts is List) {
+      for (final dynamic raw in parts) {
+        if (raw is! Map) continue;
+        final Map<String, dynamic> part = Map<String, dynamic>.from(raw);
+        final String type = (part['type'] as String? ?? '').trim();
+        if (type == 'text') {
+          final String text = (part['text'] as String? ?? '');
+          if (text.isNotEmpty) content.write(text);
+        } else if (type == 'thinking') {
+          final String text = (part['thinking'] as String? ?? '');
+          if (text.isNotEmpty) reasoning.write(text);
+        } else if (type == 'tool_use') {
+          final String name = (part['name'] as String? ?? '').trim();
+          if (name.isEmpty) continue;
+          final String id = ((part['id'] as String?) ?? '').trim();
+          toolCalls.add(
+            AIToolCall(
+              id: id.isEmpty ? _newFallbackToolCallId() : id,
+              name: name,
+              argumentsJson: jsonEncode(part['input'] ?? <String, dynamic>{}),
+            ),
+          );
+        }
+      }
+    }
+    return _OpenAIResponse(
+      content: content.toString(),
+      toolCalls: toolCalls,
+      reasoning: reasoning.isEmpty ? null : reasoning.toString(),
+      usage: _extractUsageSnapshotFromAny(data),
+    );
+  }
+
   AIWebSearchCall? _parseWebSearchCall(Map<String, dynamic> item) {
     if (item['type'] != 'web_search_call') return null;
     String? readString(Object? value) {
@@ -3586,6 +4041,96 @@ class AIRequestGateway {
     return baseUri.resolve('$versionPrefix/responses');
   }
 
+  Uri _buildClaudeMessagesUriFromBase(
+    Uri baseUri,
+    String path, {
+    bool betaQuery = false,
+  }) {
+    String trimmedPath = path.trim();
+    if (trimmedPath.isEmpty) {
+      return baseUri.resolve(
+        betaQuery ? '/v1/messages?beta=true' : '/v1/messages',
+      );
+    }
+    if (trimmedPath.toLowerCase().contains('/messages') ||
+        trimmedPath.toLowerCase() == 'messages') {
+      final String effectivePath = trimmedPath.startsWith('/')
+          ? trimmedPath
+          : '/$trimmedPath';
+      final Uri uri = baseUri.resolve(effectivePath);
+      return betaQuery ? _withBetaQuery(uri) : uri;
+    }
+    final String normalized = trimmedPath.startsWith('/')
+        ? trimmedPath
+        : '/$trimmedPath';
+    final RegExp chatCompletions = RegExp(
+      r'/chat/completions(?:$|\?)',
+      caseSensitive: false,
+    );
+    if (chatCompletions.hasMatch(normalized)) {
+      final String replaced = normalized.replaceFirst(
+        chatCompletions,
+        betaQuery ? '/messages?beta=true' : '/messages',
+      );
+      return baseUri.resolve(replaced);
+    }
+    final int lastSlash = normalized.lastIndexOf('/');
+    final String prefix = lastSlash >= 0
+        ? normalized.substring(0, lastSlash)
+        : '';
+    final String versionPrefix = prefix.toLowerCase().endsWith('/v1')
+        ? prefix
+        : '/v1';
+    return baseUri.resolve(
+      betaQuery
+          ? '$versionPrefix/messages?beta=true'
+          : '$versionPrefix/messages',
+    );
+  }
+
+  Uri _withBetaQuery(Uri uri) {
+    if (uri.queryParameters['beta'] == 'true') return uri;
+    final Map<String, String> query = <String, String>{
+      ...uri.queryParameters,
+      'beta': 'true',
+    };
+    return uri.replace(queryParameters: query);
+  }
+
+  Uri _buildGoogleGenerateContentUriFromBase(
+    Uri baseUri,
+    String path,
+    String model,
+    String method,
+  ) {
+    final String modelId = model.trim().startsWith('models/')
+        ? model.trim().substring('models/'.length)
+        : model.trim();
+    final String encodedModel = Uri.encodeComponent(modelId);
+    final String defaultPath = '/v1beta/models/$encodedModel:$method';
+    final String trimmedPath = path.trim();
+    if (trimmedPath.isEmpty) return baseUri.resolve(defaultPath);
+
+    final String normalizedPath = trimmedPath.startsWith('/')
+        ? trimmedPath
+        : '/$trimmedPath';
+    final String lowerPath = normalizedPath.toLowerCase();
+    if (!normalizedPath.contains('{model}') &&
+        !lowerPath.contains('/models/')) {
+      return baseUri.resolve(defaultPath);
+    }
+    final String modelResource = 'models/$encodedModel';
+    final String resolvedPath = normalizedPath
+        .replaceAll('{model=models/*}', modelResource)
+        .replaceAll('{model}', encodedModel)
+        .replaceAll(':generateContent', ':$method')
+        .replaceAll(':streamGenerateContent', ':$method');
+    if (resolvedPath.contains('{model')) {
+      return baseUri.resolve(defaultPath);
+    }
+    return baseUri.resolve(resolvedPath);
+  }
+
   Uri _buildEndpointUriFromBase(Uri baseUri, String path) {
     final String trimmedPath = path.trim();
     final String effectivePath = trimmedPath.isEmpty
@@ -3732,6 +4277,7 @@ class _PreparedRequest {
     required this.isGoogle,
     required this.hasTools,
     required this.useResponsesApi,
+    required this.requestBodyStyle,
     required this.promptCacheKey,
   });
 
@@ -3741,7 +4287,23 @@ class _PreparedRequest {
   final bool isGoogle;
   final bool hasTools;
   final bool useResponsesApi;
+  final String requestBodyStyle;
   final String? promptCacheKey;
+
+  bool get isClaudeMessages =>
+      requestBodyStyle == ProviderRequestBodyStyles.anthropicMessages ||
+      requestBodyStyle == ProviderRequestBodyStyles.claudeCodeMessages;
+
+  String get apiTypeLabel {
+    if (isGoogle) return 'google.generateContent';
+    if (isClaudeMessages) return 'anthropic.messages';
+    return useResponsesApi ? 'openai.responses' : 'openai.chat.completions';
+  }
+
+  String apiTypeLabelForStream(bool stream) {
+    if (!isGoogle) return apiTypeLabel;
+    return stream ? 'google.streamGenerateContent' : 'google.generateContent';
+  }
 }
 
 class _GoogleStreamParts {
@@ -4040,9 +4602,7 @@ class _ToolCallAccumulator {
       for (int i = 0; i < toolCalls.length; i += 1) {
         final dynamic raw = toolCalls[i];
         if (raw is! Map) continue;
-        final Map<String, dynamic> chunk = Map<String, dynamic>.from(
-          raw as Map,
-        );
+        final Map<String, dynamic> chunk = Map<String, dynamic>.from(raw);
         final dynamic idxRaw = chunk['index'];
         final int idx = idxRaw is int ? idxRaw : i;
         final _ToolCallDraft draft = _drafts.putIfAbsent(
@@ -4057,7 +4617,7 @@ class _ToolCallAccumulator {
         delta['function_call'] ?? delta['functionCall'];
     if (functionCall is Map) {
       final Map<String, dynamic> chunk = Map<String, dynamic>.from(
-        functionCall as Map,
+        functionCall,
       );
       final _ToolCallDraft draft = _drafts.putIfAbsent(
         0,
@@ -4087,7 +4647,7 @@ String _extractOpenAIChatText(dynamic node) {
   if (node == null) return '';
   if (node is String) return node;
   if (node is Map) {
-    final Map<String, dynamic> map = Map<String, dynamic>.from(node as Map);
+    final Map<String, dynamic> map = Map<String, dynamic>.from(node);
     final String type = (map['type'] as String?) ?? '';
     final String text = (map['text'] as String?) ?? '';
     if (text.isNotEmpty) {

@@ -1375,6 +1375,43 @@
   "baseUrlHintCustom": "OpenAI 호환 Base URL을 입력하세요",
   "createProviderTitle": "새 프로바이더",
   "editProviderTitle": "프로바이더 편집",
+  "providerRequestHeadersTitle": "요청 헤더",
+  "providerRequestHeadersDesc": "선택적 사용자 지정 헤더는 채팅, 모델 새로고침, Key 테스트, 이미지 생성에 함께 전송됩니다. {apiKeyPlaceholder}, {uuidPlaceholder}, {sessionIdPlaceholder}, {threadIdPlaceholder}, {installationIdPlaceholder}, {windowIdPlaceholder}, {timestampMsPlaceholder} 자리표시자를 지원합니다.",
+  "@providerRequestHeadersDesc": {
+    "placeholders": {
+      "apiKeyPlaceholder": {},
+      "uuidPlaceholder": {},
+      "sessionIdPlaceholder": {},
+      "threadIdPlaceholder": {},
+      "installationIdPlaceholder": {},
+      "windowIdPlaceholder": {},
+      "timestampMsPlaceholder": {}
+    }
+  },
+  "providerRequestHeadersEmpty": "사용자 지정 요청 헤더가 없습니다. 기본 인증 헤더를 사용합니다.",
+  "providerRequestHeaderApplyTemplate": "템플릿 적용",
+  "providerRequestHeaderAdd": "헤더 추가",
+  "providerRequestHeaderRemove": "헤더 삭제",
+  "providerRequestHeaderNameLabel": "헤더 이름",
+  "providerRequestHeaderValueLabel": "헤더 값",
+  "providerRequestHeaderNameHint": "Authorization",
+  "providerRequestHeaderValueHint": "Bearer {apiKeyPlaceholder} / {uuidPlaceholder}",
+  "@providerRequestHeaderValueHint": {
+    "placeholders": {
+      "apiKeyPlaceholder": {},
+      "uuidPlaceholder": {}
+    }
+  },
+  "providerRequestHeaderInvalid": "Invalid request header: {name}",
+  "@providerRequestHeaderInvalid": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "providerRequestHeaderTemplateOpenAI": "OpenAI",
+  "providerRequestHeaderTemplateAnthropic": "Anthropic / Claude API",
+  "providerRequestHeaderTemplateCodex": "Codex 호환",
+  "providerRequestHeaderTemplateClaudeCode": "Claude Code API key",
   "deletedToast": "삭제했습니다",
   "providerNotFound": "프로바이더를 찾을 수 없습니다",
   "conversationsSectionTitle": "대화",

@@ -1377,6 +1377,43 @@
   "baseUrlHintCustom": "请输入兼容 OpenAI 的 Base URL",
   "createProviderTitle": "新建提供商",
   "editProviderTitle": "编辑提供商",
+  "providerRequestHeadersTitle": "请求头",
+  "providerRequestHeadersDesc": "可选自定义请求头会随聊天、模型刷新、Key 测试和图片生成一起发送。支持 {apiKeyPlaceholder}、{uuidPlaceholder}、{sessionIdPlaceholder}、{threadIdPlaceholder}、{installationIdPlaceholder}、{windowIdPlaceholder}、{timestampMsPlaceholder} 占位符。",
+  "@providerRequestHeadersDesc": {
+    "placeholders": {
+      "apiKeyPlaceholder": {},
+      "uuidPlaceholder": {},
+      "sessionIdPlaceholder": {},
+      "threadIdPlaceholder": {},
+      "installationIdPlaceholder": {},
+      "windowIdPlaceholder": {},
+      "timestampMsPlaceholder": {}
+    }
+  },
+  "providerRequestHeadersEmpty": "暂无自定义请求头，将使用内置鉴权请求头。",
+  "providerRequestHeaderApplyTemplate": "应用模板",
+  "providerRequestHeaderAdd": "新增请求头",
+  "providerRequestHeaderRemove": "删除请求头",
+  "providerRequestHeaderNameLabel": "请求头名称",
+  "providerRequestHeaderValueLabel": "请求头值",
+  "providerRequestHeaderNameHint": "Authorization",
+  "providerRequestHeaderValueHint": "Bearer {apiKeyPlaceholder} / {uuidPlaceholder}",
+  "@providerRequestHeaderValueHint": {
+    "placeholders": {
+      "apiKeyPlaceholder": {},
+      "uuidPlaceholder": {}
+    }
+  },
+  "providerRequestHeaderInvalid": "Invalid request header: {name}",
+  "@providerRequestHeaderInvalid": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "providerRequestHeaderTemplateOpenAI": "OpenAI",
+  "providerRequestHeaderTemplateAnthropic": "Anthropic / Claude API",
+  "providerRequestHeaderTemplateCodex": "Codex 兼容",
+  "providerRequestHeaderTemplateClaudeCode": "Claude Code API key",
   "deletedToast": "已删除",
   "providerNotFound": "提供商不存在",
   "conversationsSectionTitle": "对话",

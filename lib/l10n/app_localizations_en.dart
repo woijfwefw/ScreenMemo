@@ -2683,6 +2683,69 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editProviderTitle => 'Edit provider';
 
   @override
+  String get providerRequestHeadersTitle => 'Request headers';
+
+  @override
+  String providerRequestHeadersDesc(
+    Object apiKeyPlaceholder,
+    Object uuidPlaceholder,
+    Object sessionIdPlaceholder,
+    Object threadIdPlaceholder,
+    Object installationIdPlaceholder,
+    Object windowIdPlaceholder,
+    Object timestampMsPlaceholder,
+  ) {
+    return 'Optional custom headers are sent with chat, model refresh, key tests, and image generation. Supports $apiKeyPlaceholder, $uuidPlaceholder, $sessionIdPlaceholder, $threadIdPlaceholder, $installationIdPlaceholder, $windowIdPlaceholder, and $timestampMsPlaceholder placeholders.';
+  }
+
+  @override
+  String get providerRequestHeadersEmpty =>
+      'No custom request headers. Built-in authentication headers will be used.';
+
+  @override
+  String get providerRequestHeaderApplyTemplate => 'Apply template';
+
+  @override
+  String get providerRequestHeaderAdd => 'Add header';
+
+  @override
+  String get providerRequestHeaderRemove => 'Remove header';
+
+  @override
+  String get providerRequestHeaderNameLabel => 'Header name';
+
+  @override
+  String get providerRequestHeaderValueLabel => 'Header value';
+
+  @override
+  String get providerRequestHeaderNameHint => 'Authorization';
+
+  @override
+  String providerRequestHeaderValueHint(
+    Object apiKeyPlaceholder,
+    Object uuidPlaceholder,
+  ) {
+    return 'Bearer $apiKeyPlaceholder / $uuidPlaceholder';
+  }
+
+  @override
+  String providerRequestHeaderInvalid(Object name) {
+    return 'Invalid request header: $name';
+  }
+
+  @override
+  String get providerRequestHeaderTemplateOpenAI => 'OpenAI';
+
+  @override
+  String get providerRequestHeaderTemplateAnthropic => 'Anthropic / Claude API';
+
+  @override
+  String get providerRequestHeaderTemplateCodex => 'Codex compatible';
+
+  @override
+  String get providerRequestHeaderTemplateClaudeCode => 'Claude Code API key';
+
+  @override
   String get deletedToast => 'Deleted';
 
   @override

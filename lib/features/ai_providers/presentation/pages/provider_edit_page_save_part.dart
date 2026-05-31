@@ -42,6 +42,17 @@ extension _ProviderEditSavePart on _ProviderEditPageState {
     if (_type == AIProviderTypes.openai && base.isEmpty) {
       base = 'https://api.openai.com';
     }
+    final List<ProviderHeaderEntry> invalidHeaders =
+        ProviderRequestHeaders.invalidEntries(_headerEntriesFromDrafts());
+    if (invalidHeaders.isNotEmpty) {
+      final ProviderHeaderEntry first = invalidHeaders.first;
+      final String name = first.name.trim().isEmpty ? '(empty)' : first.name;
+      UINotifier.error(
+        context,
+        AppLocalizations.of(context).providerRequestHeaderInvalid(name),
+      );
+      return;
+    }
 
     _providerEditSetState(() => _saving = true);
     try {
