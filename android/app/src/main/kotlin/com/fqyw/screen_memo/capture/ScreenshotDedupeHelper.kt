@@ -11,6 +11,7 @@ import kotlin.math.abs
  */
 object ScreenshotDedupeHelper {
     private const val SIGNATURE_VERSION = "v2"
+    private const val DEFAULT_SAMPLE_MAX_SIDE = 96
     private const val THUMB_SIZE = 32
     private const val DHASH_WIDTH = 9
     private const val DHASH_HEIGHT = 8
@@ -69,6 +70,33 @@ object ScreenshotDedupeHelper {
         val changedRows: Int = THUMB_SIZE,
         val changedCols: Int = THUMB_SIZE
     )
+
+    data class SampleSize(
+        val width: Int,
+        val height: Int
+    )
+
+    fun sampleSizeForMode(
+        width: Int,
+        height: Int,
+        mode: Mode,
+        targetMaxSide: Int = DEFAULT_SAMPLE_MAX_SIDE
+    ): SampleSize {
+        require(width > 0) { "width must be positive" }
+        require(height > 0) { "height must be positive" }
+        require(targetMaxSide > 0) { "targetMaxSide must be positive" }
+
+        val maxSide = maxOf(width, height)
+        if (mode == Mode.EXACT || maxSide <= targetMaxSide) {
+            return SampleSize(width, height)
+        }
+
+        val scale = targetMaxSide.toFloat() / maxSide.toFloat()
+        return SampleSize(
+            width = (width * scale).toInt().coerceAtLeast(1),
+            height = (height * scale).toInt().coerceAtLeast(1)
+        )
+    }
 
     fun buildFeatures(
         width: Int,

@@ -139,6 +139,30 @@ class ScreenshotDedupeHelperTest {
         assertFalse(result.duplicate)
     }
 
+    @Test
+    fun sampleSizeForMode_exactKeepsFullResolution() {
+        val size = ScreenshotDedupeHelper.sampleSizeForMode(
+            width = 1440,
+            height = 3120,
+            mode = ScreenshotDedupeHelper.Mode.EXACT,
+        )
+
+        assertTrue(size.width == 1440)
+        assertTrue(size.height == 3120)
+    }
+
+    @Test
+    fun sampleSizeForMode_balancedDownsamplesLargeFrames() {
+        val size = ScreenshotDedupeHelper.sampleSizeForMode(
+            width = 1440,
+            height = 3120,
+            mode = ScreenshotDedupeHelper.Mode.BALANCED,
+        )
+
+        assertTrue(size.width == 44)
+        assertTrue(size.height == 96)
+    }
+
     private fun baseFrame(): IntArray {
         return IntArray(width * height) { 0xffeeeeee.toInt() }
     }

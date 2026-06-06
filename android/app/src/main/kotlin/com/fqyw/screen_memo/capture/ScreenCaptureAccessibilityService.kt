@@ -58,6 +58,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.concurrent.timer
@@ -97,12 +98,12 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
         return seconds.toString()
     }
 
-    private fun perf(message: String) {
+    internal fun perf(message: String) {
         // 使用独立 tag，避免“截图分类日志”关闭时看不到关键链路耗时。
         FileLogger.i(PERF_TAG, message)
     }
 
-    private fun nextCaptureTraceId(): Long = captureTraceCounter.incrementAndGet()
+    internal fun nextCaptureTraceId(): Long = captureTraceCounter.incrementAndGet()
 
     private fun persistTimedScreenshotRunningState() {
         try {
@@ -240,15 +241,21 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
     private var screenshotInterval: Int = 5 // 默认5秒
     private var isTimedScreenshotRunning = false
     @Volatile private var pausedByScreenOff: Boolean = false
+    private val screenshotCallbackExecutor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "ScreenMemoScreenshotCallback").apply { isDaemon = true }
+    }
     private val screenshotSaveExecutor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "ScreenMemoScreenshotSave").apply { isDaemon = true }
     }
-    private val screenshotCompressionExecutor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+    internal val screenshotCompressionExecutor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "ScreenMemoScreenshotCompress").apply { isDaemon = true }
+    }
+    internal val ocrExecutor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "ScreenMemoScreenshotOcr").apply { isDaemon = true }
     }
     private val pendingScreenshotSaves = AtomicInteger(0)
     private val maxPendingScreenshotSaves = 20
-    private val pendingDeferredCompressions = AtomicInteger(0)
+    internal val pendingDeferredCompressions = AtomicInteger(0)
     private val captureTraceCounter = AtomicLong(0)
 
     // 段落推进心跳（无新截图时也能结束 collecting）
@@ -407,7 +414,7 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
     }
 
     // 复用 OCR 识别器，避免频繁创建带来的CPU/内存抖动
-    @Volatile private var sharedTextRecognizer: com.google.mlkit.vision.text.TextRecognizer? = null
+    @Volatile internal var sharedTextRecognizer: com.google.mlkit.vision.text.TextRecognizer? = null
 
 
     // 启用输入法(IME)集合与正则兜底，用于排除键盘被误判为前台应用
@@ -807,10 +814,17 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
 
         // 关闭截图保存队列，避免服务销毁后继续编码/写文件
         try {
+            screenshotCallbackExecutor.shutdownNow()
+        } catch (_: Exception) {}
+        try {
             screenshotSaveExecutor.shutdownNow()
         } catch (_: Exception) {}
         try {
             screenshotCompressionExecutor.shutdownNow()
+        } catch (_: Exception) {}
+        try {
+            ocrExecutor.shutdownNow()
+            ocrExecutor.awaitTermination(1500, TimeUnit.MILLISECONDS)
         } catch (_: Exception) {}
         pendingScreenshotSaves.set(0)
         pendingDeferredCompressions.set(0)
@@ -1113,6 +1127,7 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
         targetPackage: String?,
         traceId: Long = nextCaptureTraceId(),
         tickStartMs: Long = SystemClock.elapsedRealtime(),
+        captureTimeMillis: Long = System.currentTimeMillis(),
         callback: (Boolean, String?) -> Unit
     ) {
         val apiStartMs = SystemClock.elapsedRealtime()
@@ -1144,7 +1159,7 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
                 acquireWakeLock()
                 takeScreenshot(
                     android.view.Display.DEFAULT_DISPLAY,
-                    { runnable -> runnable.run() },
+                    screenshotCallbackExecutor,
                     object : AccessibilityService.TakeScreenshotCallback {
                         override fun onSuccess(screenshotResult: AccessibilityService.ScreenshotResult) {
                             var shouldReleaseWakeLock = true
@@ -1153,10 +1168,15 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
                                 val callbackAtMs = SystemClock.elapsedRealtime()
                                 val wrapStartMs = SystemClock.elapsedRealtime()
                                 FileLogger.d(TAG, "截屏成功，开始包装 Bitmap")
-                                val bitmap = Bitmap.wrapHardwareBuffer(
-                                    screenshotResult.hardwareBuffer,
-                                    screenshotResult.colorSpace
-                                )
+                                val hardwareBuffer = screenshotResult.hardwareBuffer
+                                val bitmap = try {
+                                    Bitmap.wrapHardwareBuffer(
+                                        hardwareBuffer,
+                                        screenshotResult.colorSpace
+                                    )
+                                } finally {
+                                    try { hardwareBuffer.close() } catch (_: Exception) {}
+                                }
                                 val wrapMs = SystemClock.elapsedRealtime() - wrapStartMs
 
                                 if (bitmap == null) {
@@ -1262,7 +1282,7 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
                                         val workerStartMs = SystemClock.elapsedRealtime()
                                         val duplicateStartMs = SystemClock.elapsedRealtime()
                                         try {
-                                            if (isDuplicateScreenshot(bitmap, lockedTarget)) {
+                                            if (isDuplicateScreenshot(bitmap, lockedTarget, traceId)) {
                                                 val duplicateMs = SystemClock.elapsedRealtime() - duplicateStartMs
                                                 perf(
                                                     "trace=$traceId stage=duplicate_check result=duplicate target=$lockedTarget " +
@@ -1276,7 +1296,7 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
                                                         this@ScreenCaptureAccessibilityService,
                                                         foregroundPackage = lockedTarget,
                                                         intervalSeconds = if (screenshotInterval > 0) screenshotInterval else null,
-                                                        lastScreenshotAt = System.currentTimeMillis(),
+                                                        lastScreenshotAt = captureTimeMillis,
                                                         captureEnabled = true
                                                     )
                                                 } catch (_: Exception) {}
@@ -1294,13 +1314,19 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
                                         }
                                         val duplicateMs = SystemClock.elapsedRealtime() - duplicateStartMs
 
-                                        val savedPath = saveScreenshotBitmap(bitmap, lockedTarget, traceId, tickStartMs)
+                                        val savedPath = saveScreenshotBitmap(
+                                            bitmap,
+                                            lockedTarget,
+                                            traceId,
+                                            tickStartMs,
+                                            captureTimeMillis
+                                        )
                                         try {
                                             ScreenCaptureService.updateNotificationState(
                                                 this@ScreenCaptureAccessibilityService,
                                                 foregroundPackage = lockedTarget,
                                                 intervalSeconds = if (screenshotInterval > 0) screenshotInterval else null,
-                                                lastScreenshotAt = System.currentTimeMillis(),
+                                                lastScreenshotAt = captureTimeMillis,
                                                 captureEnabled = true
                                             )
                                         } catch (_: Exception) {}
@@ -1447,18 +1473,64 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
         return ScreenshotDedupeHelper.Mode.fromRaw(raw)
     }
 
-    private fun bitmapPixels(bitmap: Bitmap): IntArray {
+    private data class DedupePixelSample(
+        val width: Int,
+        val height: Int,
+        val pixels: IntArray,
+        val sampledBitmap: Bitmap?
+    )
+
+    private fun sampleBitmapPixelsForDedupe(
+        bitmap: Bitmap,
+        mode: ScreenshotDedupeHelper.Mode
+    ): DedupePixelSample {
         val width = bitmap.width
         val height = bitmap.height
-        val pixels = IntArray(width * height)
-        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-        return pixels
+        val sampleSize = ScreenshotDedupeHelper.sampleSizeForMode(width, height, mode)
+        val sampled = if (sampleSize.width != width || sampleSize.height != height) {
+            try {
+                Bitmap.createScaledBitmap(bitmap, sampleSize.width, sampleSize.height, true)
+            } catch (e: Exception) {
+                FileLogger.w(TAG, "截图去重采样缩放失败，使用原图采样: ${e.message}")
+                bitmap
+            }
+        } else {
+            bitmap
+        }
+        val sampleWidth = sampled.width
+        val sampleHeight = sampled.height
+        val pixels = IntArray(sampleWidth * sampleHeight)
+        sampled.getPixels(pixels, 0, sampleWidth, 0, 0, sampleWidth, sampleHeight)
+        return DedupePixelSample(
+            width = sampleWidth,
+            height = sampleHeight,
+            pixels = pixels,
+            sampledBitmap = if (sampled !== bitmap) sampled else null
+        )
+    }
+
+    private fun recycleDedupeBitmaps(
+        sample: DedupePixelSample?,
+        roi: Bitmap,
+        normalized: Bitmap,
+        originalBitmap: Bitmap
+    ) {
+        val sampled = sample?.sampledBitmap
+        try { sampled?.recycle() } catch (_: Exception) {}
+        if (roi !== originalBitmap && roi !== sampled) {
+            try { roi.recycle() } catch (_: Exception) {}
+        }
+        if (normalized !== originalBitmap && normalized !== roi && normalized !== sampled) {
+            try { normalized.recycle() } catch (_: Exception) {}
+        }
     }
 
     /**
      * 基于“自动裁剪系统栏”的近似去重：先比精确签名，再按感知哈希与缩略图差异判断。
      */
-    private fun isDuplicateScreenshot(originalBitmap: Bitmap, packageName: String): Boolean {
+    private fun isDuplicateScreenshot(originalBitmap: Bitmap, packageName: String, traceId: Long): Boolean {
+        val dedupeStartMs = SystemClock.elapsedRealtime()
+        var sample: DedupePixelSample? = null
         // 1) 归一化方向，并确保为可读写（非硬件）位图
         val normalized = try { normalizeBitmapOrientationForHash(originalBitmap) } catch (_: Exception) { originalBitmap }
 
@@ -1483,15 +1555,23 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
 
         val roi = try { Bitmap.createBitmap(normalized, 0, roiY, w, roiH) } catch (_: Exception) { normalized }
 
-        // 3) 读取模式并构建当前签名特征
+        // 3) 读取模式并构建当前签名特征。非精确模式先采样，避免保存队列被全图哈希拖慢。
         val mode = readScreenshotDedupeMode()
         val currentFeatures = try {
-            ScreenshotDedupeHelper.buildFeatures(roi.width, roi.height, bitmapPixels(roi))
+            val sampleStartMs = SystemClock.elapsedRealtime()
+            sample = sampleBitmapPixelsForDedupe(roi, mode)
+            val sampleMs = SystemClock.elapsedRealtime() - sampleStartMs
+            val s = sample ?: return false
+            val featureStartMs = SystemClock.elapsedRealtime()
+            val features = ScreenshotDedupeHelper.buildFeatures(s.width, s.height, s.pixels)
+            perf(
+                "trace=$traceId stage=dedupe_features result=ok source=${roi.width}x${roi.height} " +
+                    "sample=${s.width}x${s.height} sampleMs=$sampleMs featureMs=${SystemClock.elapsedRealtime() - featureStartMs}"
+            )
+            features
         } catch (e: Exception) {
             FileLogger.w(TAG, "构建截图去重特征失败，降级为不重复: ${e.message}")
-            if (roi !== normalized && roi !== originalBitmap) {
-                try { roi.recycle() } catch (_: Exception) {}
-            }
+            recycleDedupeBitmaps(sample, roi, normalized, originalBitmap)
             return false
         }
 
@@ -1506,9 +1586,11 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
                     "hashDistance=${compareResult.hashDistance} changedPixelRatio=${compareResult.changedPixelRatio} " +
                     "changedBlocks=${compareResult.changedBlocks} changedRows=${compareResult.changedRows} changedCols=${compareResult.changedCols}"
             )
-            if (roi !== normalized && roi !== originalBitmap) {
-                try { roi.recycle() } catch (_: Exception) {}
-            }
+            perf(
+                "trace=$traceId stage=dedupe result=duplicate target=$packageName mode=${mode.rawValue} " +
+                    "reason=${compareResult.reason} totalMs=${SystemClock.elapsedRealtime() - dedupeStartMs}"
+            )
+            recycleDedupeBitmaps(sample, roi, normalized, originalBitmap)
             return true
         }
 
@@ -1516,9 +1598,11 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
         val currentSignature = currentFeatures.toSignature()
         lastSignatureByApp[packageName] = currentSignature
         ScreenshotDatabaseHelper.setLastSignature(this, packageName, null, currentSignature)
-        if (roi !== normalized && roi !== originalBitmap) {
-            try { roi.recycle() } catch (_: Exception) {}
-        }
+        perf(
+            "trace=$traceId stage=dedupe result=changed target=$packageName mode=${mode.rawValue} " +
+                "reason=${compareResult.reason} totalMs=${SystemClock.elapsedRealtime() - dedupeStartMs}"
+        )
+        recycleDedupeBitmaps(sample, roi, normalized, originalBitmap)
         return false
     }
 
@@ -1561,20 +1645,24 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
         }
         m.postRotate(degrees)
         return try {
-            Bitmap.createBitmap(swBitmap, 0, 0, w, h, m, true)
+            val rotated = Bitmap.createBitmap(swBitmap, 0, 0, w, h, m, true)
+            if (rotated !== swBitmap && swBitmap !== bitmap) {
+                try { swBitmap.recycle() } catch (_: Exception) {}
+            }
+            rotated
         } catch (_: Exception) {
             swBitmap
         }
     }
 
-    private fun getStatusBarHeight(): Int {
+    internal fun getStatusBarHeight(): Int {
         return try {
             val resId = resources.getIdentifier("status_bar_height", "dimen", "android")
             if (resId > 0) resources.getDimensionPixelSize(resId) else 0
         } catch (_: Exception) { 0 }
     }
 
-    private fun getNavigationBarHeight(): Int {
+    internal fun getNavigationBarHeight(): Int {
         return try {
             val orientation = resources.configuration.orientation
             val name = if (orientation == Configuration.ORIENTATION_LANDSCAPE) "navigation_bar_height_landscape" else "navigation_bar_height"
@@ -2190,7 +2278,8 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
         bitmap: Bitmap,
         packageName: String,
         traceId: Long = nextCaptureTraceId(),
-        captureStartMs: Long = SystemClock.elapsedRealtime()
+        captureStartMs: Long = SystemClock.elapsedRealtime(),
+        captureTimeMillis: Long = System.currentTimeMillis()
     ): String? {
         val saveTotalStartMs = SystemClock.elapsedRealtime()
         var rotateMs = 0L
@@ -2205,13 +2294,15 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
         var mkdirMs = 0L
         var encodedBytes = 0
         var outputBytes = 0L
+        var saveBitmapForCleanup: Bitmap? = null
+        var saveBitmapHandedToOcr = false
         return try {
             val appNameStartMs = SystemClock.elapsedRealtime()
             val appName = getAppName(packageName) ?: packageName
             appNameMs = SystemClock.elapsedRealtime() - appNameStartMs
 
             // 新的目录结构：应用+时间 (output/screen/包名/年月/日期/)
-            val now = Date()
+            val now = Date(captureTimeMillis)
             val yearMonth = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(now)
             val day = SimpleDateFormat("dd", Locale.getDefault()).format(now)
             val relativeDir = "output/screen/$packageName/$yearMonth/$day"
@@ -2288,8 +2379,12 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
 
             // 应用压缩设置（不改变分辨率，仅通过编码质量/格式控制大小；可选灰度）
             val encodeStartMs = SystemClock.elapsedRealtime()
+            val bitmapForSave = rotatedOrOriginal ?: bitmap
+            if (bitmapForSave !== bitmap) {
+                saveBitmapForCleanup = bitmapForSave
+            }
             val encodeResult = encodeToBytesAccordingToSettings(
-                rotatedOrOriginal ?: bitmap,
+                bitmapForSave,
                 packageName,
                 traceId,
             )
@@ -2348,7 +2443,7 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
                     packageName,
                     appName,
                     file.absolutePath,
-                    System.currentTimeMillis(),
+                    captureTimeMillis,
                     pageUrl
                 )
                 nativeDbMs = SystemClock.elapsedRealtime() - nativeDbStartMs
@@ -2375,10 +2470,8 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
                     packageName,
                     appName,
                     file.absolutePath,
-                    System.currentTimeMillis()
+                    captureTimeMillis
                 )
-                // 在每次截图后，后台补齐未完成的段落直到最新可完整时段
-                try { SegmentSummaryManager.backfillToLatest(this@ScreenCaptureAccessibilityService) } catch (_: Exception) {}
                 segmentMs = SystemClock.elapsedRealtime() - segmentStartMs
             } catch (e: Exception) {
                 FileLogger.w(TAG, "SegmentSummaryManager 调用失败: ${e.message}")
@@ -2389,7 +2482,7 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
             // 如果 OCR 需要沿用该对象，必须先复制一份，避免异步线程读到已释放位图。
             try {
                 val ocrLaunchStartMs = SystemClock.elapsedRealtime()
-                val ocrSource = rotatedOrOriginal ?: bitmap
+                val ocrSource = bitmapForSave
                 val needsOcrCopy = ocrSource === bitmap
                 val forOcr = if (needsOcrCopy) {
                     try {
@@ -2402,10 +2495,14 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
                     ocrSource
                 }
                 if (forOcr != null) {
+                    val recycleOcrSourceWhenDone = forOcr !== bitmap
+                    if (forOcr === saveBitmapForCleanup) {
+                        saveBitmapHandedToOcr = true
+                    }
                     runOcrAsyncAndPersist(
                         forOcr,
                         file.absolutePath,
-                        recycleSourceWhenDone = needsOcrCopy,
+                        recycleSourceWhenDone = recycleOcrSourceWhenDone,
                         traceId = traceId
                     )
                 }
@@ -2417,7 +2514,14 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
             // 通知Flutter端更新数据库（作为第二路径，方便UI即刻刷新）
             try {
                 val flutterNotifyStartMs = SystemClock.elapsedRealtime()
-                notifyScreenshotSaved(packageName, appName, relativePath, pageUrl, traceId)
+                notifyScreenshotSaved(
+                    packageName,
+                    appName,
+                    relativePath,
+                    pageUrl,
+                    traceId,
+                    captureTimeMillis
+                )
                 flutterNotifyMs = SystemClock.elapsedRealtime() - flutterNotifyStartMs
             } catch (e: Exception) {
                 FileLogger.w(TAG, "通知Flutter更新数据库失败: ${e.message}")
@@ -2445,6 +2549,10 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
             )
             FileLogger.e(TAG, "保存截图失败", e)
             null
+        } finally {
+            if (!saveBitmapHandedToOcr) {
+                try { saveBitmapForCleanup?.recycle() } catch (_: Exception) {}
+            }
         }
     }
 
@@ -2452,593 +2560,6 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
      * 使用 ML Kit 中文文本识别在原始位图上执行 OCR，并将结果写入对应记录（按文件路径更新）。
      * 离线：模型将随依赖一起打包入 APK；无网络也可识别。
      */
-    private fun runOcrAsyncAndPersist(
-        srcBitmap: Bitmap,
-        absolutePath: String,
-        recycleSourceWhenDone: Boolean = false,
-        traceId: Long = nextCaptureTraceId()
-    ) {
-        try {
-            val setupStartMs = SystemClock.elapsedRealtime()
-            val recognizer = ensureTextRecognizer()
-            val setupMs = SystemClock.elapsedRealtime() - setupStartMs
-            Thread {
-                val ocrStartMs = SystemClock.elapsedRealtime()
-                var preprocessMs = 0L
-                var recognizeMs = 0L
-                var dbMs = 0L
-                var portrait = true
-                try {
-                    portrait = try { srcBitmap.height >= srcBitmap.width } catch (_: Exception) { true }
-                    val preprocessStartMs = SystemClock.elapsedRealtime()
-                    val base = if (portrait) {
-                        val topCropped = cropTopStatusBarPortrait(srcBitmap)
-                        val bothCropped = cropBottomNavBarPortrait(topCropped)
-                        preprocessForOcrPortrait(bothCropped)
-                    } else srcBitmap
-                    preprocessMs = SystemClock.elapsedRealtime() - preprocessStartMs
-                    val recognizeStartMs = SystemClock.elapsedRealtime()
-                    val text = if (portrait) {
-                        recognizePortraitBySlices(recognizer, base)
-                    } else {
-                        // 横屏暂用整图识别
-                        val img = InputImage.fromBitmap(base, 0)
-                        try { Tasks.await(recognizer.process(img)).text ?: "" } catch (e: Exception) { "" }
-                    }
-                    recognizeMs = SystemClock.elapsedRealtime() - recognizeStartMs
-                    val finalText = text.trim().ifEmpty { null }
-                    val dbStartMs = SystemClock.elapsedRealtime()
-                    ScreenshotDatabaseHelper.updateOcrTextByFilePath(
-                        this@ScreenCaptureAccessibilityService,
-                        absolutePath,
-                        finalText
-                    )
-                    dbMs = SystemClock.elapsedRealtime() - dbStartMs
-                    perf(
-                        "trace=$traceId stage=ocr_complete result=ok portrait=$portrait " +
-                            "setupMs=$setupMs preprocessMs=$preprocessMs recognizeMs=$recognizeMs dbMs=$dbMs " +
-                            "ocrTotalMs=${SystemClock.elapsedRealtime() - ocrStartMs} textLength=${finalText?.length ?: 0} " +
-                            "path=$absolutePath"
-                    )
-                    FileLogger.i(TAG, "OCR完成(切片=${portrait}), 长度=${finalText?.length ?: 0}")
-                } catch (e: Exception) {
-                    perf(
-                        "trace=$traceId stage=ocr_complete result=exception portrait=$portrait " +
-                            "setupMs=$setupMs preprocessMs=$preprocessMs recognizeMs=$recognizeMs dbMs=$dbMs " +
-                            "ocrTotalMs=${SystemClock.elapsedRealtime() - ocrStartMs} message=${e.message ?: "-"} path=$absolutePath"
-                    )
-                    FileLogger.w(TAG, "OCR线程异常: ${e.message}")
-                } finally {
-                    if (recycleSourceWhenDone) {
-                        try { srcBitmap.recycle() } catch (_: Exception) {}
-                    }
-                }
-            }.start()
-        } catch (e: Exception) {
-            perf(
-                "trace=$traceId stage=ocr_launch result=exception " +
-                    "message=${e.message ?: "-"} path=$absolutePath"
-            )
-            FileLogger.w(TAG, "启动OCR异常: ${e.message}")
-            if (recycleSourceWhenDone) {
-                try { srcBitmap.recycle() } catch (_: Exception) {}
-            }
-        }
-    }
-
-    private fun ensureTextRecognizer(): com.google.mlkit.vision.text.TextRecognizer {
-        val existing = sharedTextRecognizer
-        if (existing != null) return existing
-        val created = TextRecognition.getClient(ChineseTextRecognizerOptions.Builder().build())
-        sharedTextRecognizer = created
-        return created
-    }
-
-    /**
-     * 裁剪竖屏截图顶部状态栏区域，避免无关内容参与识别。
-     */
-    private fun cropTopStatusBarPortrait(src: Bitmap): Bitmap {
-        return try {
-            val w = src.width
-            val h = src.height
-            val status = getStatusBarHeight().coerceAtLeast(0)
-            val cropTop = status.coerceAtMost(h / 6)
-            if (cropTop <= 0 || cropTop >= h - 16) return src
-            Bitmap.createBitmap(src, 0, cropTop, w, h - cropTop)
-        } catch (_: Exception) { src }
-    }
-
-    /**
-     * 竖屏：对比度增强 + 轻锐化（不旋转、不改分辨率）。
-     */
-    private fun preprocessForOcrPortrait(src: Bitmap): Bitmap {
-        return try {
-            val w = src.width
-            val h = src.height
-            val safe = if (src.config != Bitmap.Config.ARGB_8888) src.copy(Bitmap.Config.ARGB_8888, true) else src.copy(Bitmap.Config.ARGB_8888, true)
-            val pixels = IntArray(w * h)
-            safe.getPixels(pixels, 0, w, 0, 0, w, h)
-            // 简单对比度增强（可配置：flutter.ocr_contrast_1e2，默认118 => 1.18）
-            val sp = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-            val cVal = spGetIntCompat(sp, "flutter.ocr_contrast_1e2", 118).coerceIn(100, 140)
-            val contrast = cVal / 100f
-            val brightness = 0f
-            for (i in pixels.indices) {
-                val c = pixels[i]
-                val a = c ushr 24 and 0xFF
-                var r = c ushr 16 and 0xFF
-                var g = c ushr 8 and 0xFF
-                var b = c and 0xFF
-                r = clamp255(((r - 128) * contrast + 128 + brightness).toInt())
-                g = clamp255(((g - 128) * contrast + 128 + brightness).toInt())
-                b = clamp255(((b - 128) * contrast + 128 + brightness).toInt())
-                pixels[i] = (a shl 24) or (r shl 16) or (g shl 8) or b
-            }
-            safe.setPixels(pixels, 0, w, 0, 0, w, h)
-            safe
-        } catch (_: Exception) { src }
-    }
-
-    private fun clamp255(v: Int): Int = if (v < 0) 0 else if (v > 255) 255 else v
-
-    /**
-     * 竖屏切片 + 小字放大：纵向步进切片，重叠15%，宽度不足则放大至1080。
-     */
-    private fun recognizePortraitBySlices(recognizer: com.google.mlkit.vision.text.TextRecognizer, bmp: Bitmap): String {
-        val w = bmp.width
-        val h = bmp.height
-        val sp = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        val sliceTarget = spGetIntCompat(sp, "flutter.ocr_slice_height", 1900).coerceIn(900, 2600)
-        val overlapPct = spGetIntCompat(sp, "flutter.ocr_slice_overlap_percent", 22).coerceIn(8, 35)
-        val overlapRatio = overlapPct / 100f
-        val step = (sliceTarget * (1 - overlapRatio)).toInt().coerceAtLeast(500)
-        val slices = mutableListOf<Bitmap>()
-        var y = 0
-        while (y < h) {
-            val sh = if (y + sliceTarget <= h) sliceTarget else (h - y)
-            if (sh <= 0) break
-            try {
-                val sub = Bitmap.createBitmap(bmp, 0, y, w, sh)
-                val scaled = upscaleIfNeeded(sub)
-                if (scaled !== sub) sub.recycle()
-                slices.add(scaled)
-            } catch (_: Exception) {}
-            y += step
-        }
-        if (slices.isEmpty()) {
-            val img = InputImage.fromBitmap(bmp, 0)
-            return try { Tasks.await(recognizer.process(img)).text ?: "" } catch (e: Exception) { "" }
-        }
-        val seen = LinkedHashSet<String>()
-        for (s in slices) {
-            try {
-                val text = Tasks.await(recognizer.process(InputImage.fromBitmap(s, 0)))
-                for (block in text.textBlocks) {
-                    for (line in block.lines) {
-                        val t = line.text?.trim() ?: ""
-                        if (t.isNotEmpty() && !seen.contains(t)) {
-                            seen.add(t)
-                        }
-                    }
-                }
-            } catch (_: Exception) {
-            } finally {
-                try { s.recycle() } catch (_: Exception) {}
-            }
-        }
-        if (seen.isEmpty()) {
-            // 回退：整图一次
-            val img = InputImage.fromBitmap(bmp, 0)
-            return try { Tasks.await(recognizer.process(img)).text ?: "" } catch (e: Exception) { "" }
-        }
-        val sb = StringBuilder()
-        for (l in seen) {
-            if (sb.isNotEmpty()) sb.append('\n')
-            sb.append(l)
-        }
-        return sb.toString()
-    }
-
-    private fun upscaleIfNeeded(bm: Bitmap): Bitmap {
-        return try {
-            val sp = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-            val minWidth = spGetIntCompat(sp, "flutter.ocr_upscale_min_width", 1440).coerceIn(900, 2000)
-            if (bm.width >= minWidth) bm else {
-                val scale = minWidth.toFloat() / bm.width.toFloat()
-                val tw = (bm.width * scale).toInt()
-                val th = (bm.height * scale).toInt()
-                Bitmap.createScaledBitmap(bm, tw, th, true)
-            }
-        } catch (_: Exception) { bm }
-    }
-
-    /**
-     * 裁剪竖屏截图底部导航栏区域，减少无关误检。
-     */
-    private fun cropBottomNavBarPortrait(src: Bitmap): Bitmap {
-        return try {
-            val w = src.width
-            val h = src.height
-            val nav = getNavigationBarHeight().coerceAtLeast(0)
-            val cropBottom = nav.coerceAtMost(h / 6)
-            if (cropBottom <= 0 || cropBottom >= h - 16) return src
-            Bitmap.createBitmap(src, 0, 0, w, h - cropBottom)
-        } catch (_: Exception) { src }
-    }
-
-    /**
-     * 根据用户设置进行编码（格式/质量/目标大小/灰度），不改变分辨率。
-     * FlutterSharedPreferences 键：
-     *  - flutter.image_format: jpeg | png | webp_lossy | webp_lossless (默认 webp_lossy)
-     *  - flutter.image_quality: Int 1..100（默认 90，仅对 lossy 生效）
-     *  - flutter.use_target_size: Bool（默认 false，仅对 lossy 生效）
-     *  - flutter.target_size_kb: Int（默认 50，仅对 lossy 生效）
-     *  - flutter.grayscale: Bool（默认 false）
-     */
-    private data class EncodedScreenshot(
-        val bytes: ByteArray?,
-        val ext: String,
-        val deferredTarget: DeferredTargetCompressionSpec? = null
-    )
-
-    private data class DeferredTargetCompressionSpec(
-        val formatName: String,
-        val compressFormat: Bitmap.CompressFormat,
-        val targetBytes: Int,
-        val fallbackQuality: Int,
-        val targetKb: Int
-    )
-
-    // 返回编码结果；目标大小模式会先快速编码，精确压缩延后到独立队列。
-    private fun encodeToBytesAccordingToSettings(
-        src: Bitmap,
-        packageName: String?,
-        traceId: Long = nextCaptureTraceId()
-    ): EncodedScreenshot {
-            val totalStartMs = SystemClock.elapsedRealtime()
-            var settingsReadMs = 0L
-            var perAppReadMs = 0L
-            val sp = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-            val settingsStartMs = SystemClock.elapsedRealtime()
-            var format = (sp.getString("flutter.image_format", null)
-            ?: (sp.all["flutter.image_format"] as? String)
-            ?: "webp_lossy")
-            var quality = spGetIntCompat(sp, "flutter.image_quality", 90).coerceIn(1, 100)
-            var useTarget = spGetBoolCompat(sp, "flutter.use_target_size", false)
-            var targetKb = spGetIntCompat(sp, "flutter.target_size_kb", 50).coerceAtLeast(50)
-            settingsReadMs = SystemClock.elapsedRealtime() - settingsStartMs
-
-            // 覆盖为每应用设置：从每应用 SQLite settings 读取（若 use_custom=true）
-            try {
-                val perAppStartMs = SystemClock.elapsedRealtime()
-                val per = PerAppSettingsBridge.readQualitySettingsIfCustom(this, packageName)
-                perAppReadMs = SystemClock.elapsedRealtime() - perAppStartMs
-                if (per != null) {
-                    format = per.format ?: format
-                    quality = per.quality ?: quality
-                    useTarget = per.useTargetSize ?: useTarget
-                    targetKb = per.targetSizeKb ?: targetKb
-                }
-            } catch (_: Exception) {}
-
-        // 可选灰度转换（不改变尺寸）
-        val bitmap = src // 灰度已移除
-
-        // 选择编码器
-        val (cf, isLossy, isLossless, ext) = when (format) {
-            "jpeg" -> Quad(Bitmap.CompressFormat.JPEG, true, false, "jpg")
-            "png" -> Quad(Bitmap.CompressFormat.PNG, false, true, "png")
-            "webp_lossless" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                Quad(Bitmap.CompressFormat.WEBP_LOSSLESS, false, true, "webp")
-            } else {
-                // 退化到 PNG 以确保无损
-                Quad(Bitmap.CompressFormat.PNG, false, true, "png")
-            }
-            else -> { // webp_lossy
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    Quad(Bitmap.CompressFormat.WEBP_LOSSY, true, false, "webp")
-                } else {
-                    Quad(Bitmap.CompressFormat.WEBP, true, false, "webp")
-                }
-            }
-        }
-
-        FileLogger.i(TAG, "编码设置 -> format=${format}, lossy=${isLossy}, lossless=${isLossless}, quality=${quality}, useTarget=${useTarget}, targetKb=${targetKb}")
-
-        // 目标大小仅在有损编码时生效
-        if (isLossy && useTarget) {
-            return try {
-                val compressStartMs = SystemClock.elapsedRealtime()
-                val quickQuality = 100
-                val data = compressOnce(bitmap, cf, quickQuality)
-                val compressMs = SystemClock.elapsedRealtime() - compressStartMs
-                val spec = DeferredTargetCompressionSpec(
-                    formatName = format,
-                    compressFormat = cf,
-                    targetBytes = targetKb * 1024,
-                    fallbackQuality = 1,
-                    targetKb = targetKb
-                )
-                FileLogger.i(TAG, "目标大小快速编码完成，精确压缩延后 -> 当前字节=${data.size}, 目标字节=${spec.targetBytes}")
-                perf(
-                    "trace=$traceId stage=encode result=ok mode=target_deferred format=$format ext=$ext " +
-                        "quality=$quickQuality targetKb=$targetKb settingsReadMs=$settingsReadMs perAppReadMs=$perAppReadMs " +
-                        "compressMs=$compressMs encodeTotalMs=${SystemClock.elapsedRealtime() - totalStartMs} bytes=${data.size}"
-                )
-                EncodedScreenshot(data, ext, spec)
-            } catch (e: Exception) {
-                perf(
-                    "trace=$traceId stage=encode result=exception mode=target_deferred format=$format ext=$ext " +
-                        "settingsReadMs=$settingsReadMs perAppReadMs=$perAppReadMs " +
-                        "encodeTotalMs=${SystemClock.elapsedRealtime() - totalStartMs} message=${e.message ?: "-"}"
-                )
-                EncodedScreenshot(null, ext)
-            }
-        }
-
-        // 否则按质量单次压缩；无损忽略质量
-        return try {
-            val appliedQ = if (isLossless) 100 else quality
-            val compressStartMs = SystemClock.elapsedRealtime()
-            val data = compressOnce(bitmap, cf, appliedQ)
-            val compressMs = SystemClock.elapsedRealtime() - compressStartMs
-            FileLogger.i(TAG, "单次编码完成 -> 实际字节=${data.size}, 格式=${format}, 质量=${appliedQ}")
-            perf(
-                "trace=$traceId stage=encode result=ok mode=single format=$format ext=$ext " +
-                    "quality=$appliedQ settingsReadMs=$settingsReadMs perAppReadMs=$perAppReadMs " +
-                    "compressMs=$compressMs encodeTotalMs=${SystemClock.elapsedRealtime() - totalStartMs} bytes=${data.size}"
-            )
-            EncodedScreenshot(data, ext)
-        } catch (e: Exception) {
-            perf(
-                "trace=$traceId stage=encode result=exception format=$format ext=$ext " +
-                    "settingsReadMs=$settingsReadMs perAppReadMs=$perAppReadMs " +
-                    "encodeTotalMs=${SystemClock.elapsedRealtime() - totalStartMs} message=${e.message ?: "-"}"
-            )
-            EncodedScreenshot(null, ext)
-        }
-    }
-
-    private data class Quad<A,B,C,D>(val a: A, val b: B, val c: C, val d: D)
-
-    private fun compressOnce(bm: Bitmap, cf: Bitmap.CompressFormat, q: Int): ByteArray {
-        val baos = java.io.ByteArrayOutputStream()
-        bm.compress(cf, q.coerceIn(1,100), baos)
-            return baos.toByteArray()
-    }
-
-    private fun enqueueDeferredTargetCompression(
-        file: File,
-        relativePath: String,
-        packageName: String,
-        spec: DeferredTargetCompressionSpec,
-        traceId: Long,
-        initialBytes: Long
-    ) {
-        val pendingAfterEnqueue = pendingDeferredCompressions.incrementAndGet()
-        try {
-            perf(
-                "trace=$traceId stage=deferred_compress_enqueue result=ok app=$packageName " +
-                    "pending=$pendingAfterEnqueue initialBytes=$initialBytes targetBytes=${spec.targetBytes} path=$relativePath"
-            )
-            screenshotCompressionExecutor.execute {
-                try {
-                    runDeferredTargetCompression(file, relativePath, packageName, spec, traceId, initialBytes)
-                } finally {
-                    pendingDeferredCompressions.decrementAndGet()
-                }
-            }
-        } catch (e: Exception) {
-            pendingDeferredCompressions.decrementAndGet()
-            perf(
-                "trace=$traceId stage=deferred_compress_enqueue result=exception app=$packageName " +
-                    "message=${e.message ?: "-"} path=$relativePath"
-            )
-            FileLogger.w(TAG, "提交延后精确压缩任务失败: ${e.message}")
-        }
-    }
-
-    private fun runDeferredTargetCompression(
-        file: File,
-        relativePath: String,
-        packageName: String,
-        spec: DeferredTargetCompressionSpec,
-        traceId: Long,
-        initialBytes: Long
-    ) {
-        val totalStartMs = SystemClock.elapsedRealtime()
-        var decodeMs = 0L
-        var compressMs = 0L
-        var writeMs = 0L
-        var replaceMs = 0L
-        var dbMs = 0L
-        var notifyMs = 0L
-        var decoded: Bitmap? = null
-        val tmpFile = File(file.parentFile, "${file.name}.target.tmp")
-        try {
-            if (!file.exists()) {
-                perf(
-                    "trace=$traceId stage=deferred_compress result=skip reason=file_missing " +
-                        "app=$packageName path=$relativePath"
-                )
-                return
-            }
-
-            val decodeStartMs = SystemClock.elapsedRealtime()
-            decoded = BitmapFactory.decodeFile(file.absolutePath)
-            decodeMs = SystemClock.elapsedRealtime() - decodeStartMs
-            val bitmap = decoded
-            if (bitmap == null) {
-                perf(
-                    "trace=$traceId stage=deferred_compress result=skip reason=decode_failed " +
-                        "app=$packageName decodeMs=$decodeMs path=$relativePath"
-                )
-                return
-            }
-
-            val compressStartMs = SystemClock.elapsedRealtime()
-            val targetBytes = compressToTargetSize(
-                bitmap,
-                spec.compressFormat,
-                spec.targetBytes,
-                minQ = 1,
-                maxQ = 100
-            ) ?: compressOnce(bitmap, spec.compressFormat, spec.fallbackQuality)
-            compressMs = SystemClock.elapsedRealtime() - compressStartMs
-
-            val writeStartMs = SystemClock.elapsedRealtime()
-            FileOutputStream(tmpFile).use { out ->
-                out.write(targetBytes)
-                try {
-                    out.fd.sync()
-                } catch (_: Exception) {}
-            }
-            writeMs = SystemClock.elapsedRealtime() - writeStartMs
-
-            val replaceStartMs = SystemClock.elapsedRealtime()
-            try {
-                Os.rename(tmpFile.absolutePath, file.absolutePath)
-            } catch (_: Exception) {
-                try {
-                    FileOutputStream(file, false).use { out ->
-                        out.write(targetBytes)
-                        try {
-                            out.fd.sync()
-                        } catch (_: Exception) {}
-                    }
-                    tmpFile.delete()
-                } catch (e: Exception) {
-                    FileLogger.w(TAG, "延后精确压缩替换文件失败: ${e.message}")
-                    throw e
-                }
-            }
-            replaceMs = SystemClock.elapsedRealtime() - replaceStartMs
-
-            val newSize = try { file.length() } catch (_: Exception) { targetBytes.size.toLong() }
-            var nativeDbUpdated = false
-            try {
-                val dbStartMs = SystemClock.elapsedRealtime()
-                nativeDbUpdated = ScreenshotDatabaseHelper.updateFileSizeByFilePath(
-                    this@ScreenCaptureAccessibilityService,
-                    file.absolutePath,
-                    newSize
-                )
-                dbMs = SystemClock.elapsedRealtime() - dbStartMs
-            } catch (e: Exception) {
-                FileLogger.w(TAG, "延后精确压缩后更新原生文件大小失败: ${e.message}")
-            }
-
-            try {
-                val notifyStartMs = SystemClock.elapsedRealtime()
-                notifyScreenshotFileRecompressed(
-                    packageName,
-                    relativePath,
-                    file.absolutePath,
-                    newSize,
-                    nativeDbUpdated,
-                    traceId
-                )
-                notifyMs = SystemClock.elapsedRealtime() - notifyStartMs
-            } catch (e: Exception) {
-                FileLogger.w(TAG, "通知Flutter延后压缩完成失败: ${e.message}")
-            }
-
-            perf(
-                "trace=$traceId stage=deferred_compress result=ok app=$packageName " +
-                    "format=${spec.formatName} targetKb=${spec.targetKb} initialBytes=$initialBytes newBytes=$newSize " +
-                    "decodeMs=$decodeMs compressMs=$compressMs writeMs=$writeMs replaceMs=$replaceMs dbMs=$dbMs notifyMs=$notifyMs " +
-                    "totalMs=${SystemClock.elapsedRealtime() - totalStartMs} path=$relativePath"
-            )
-        } catch (e: Exception) {
-            perf(
-                "trace=$traceId stage=deferred_compress result=exception app=$packageName " +
-                    "message=${e.message ?: "-"} decodeMs=$decodeMs compressMs=$compressMs writeMs=$writeMs " +
-                    "replaceMs=$replaceMs totalMs=${SystemClock.elapsedRealtime() - totalStartMs} path=$relativePath"
-            )
-        } finally {
-            try { decoded?.recycle() } catch (_: Exception) {}
-            try { if (tmpFile.exists()) tmpFile.delete() } catch (_: Exception) {}
-        }
-    }
-
-    /**
-     * 二分质量以尽量接近目标大小（仅 lossy）。
-     */
-    private fun compressToTargetSize(bm: Bitmap, cf: Bitmap.CompressFormat, targetBytes: Int, minQ: Int, maxQ: Int): ByteArray? {
-        var lo = minQ.coerceIn(1, 100)
-        var hi = maxQ.coerceIn(lo, 100)
-        var bestUnder: ByteArray? = null
-        var bestOver: ByteArray? = null
-        var iterations = 0
-        while (lo <= hi && iterations < 12) {
-            iterations++
-            val mid = (lo + hi) / 2
-            val data = compressOnce(bm, cf, mid)
-            FileLogger.d(TAG, "压缩二分 -> 第${iterations}次, q=${mid}, size=${data.size}, target=${targetBytes}")
-            if (data.size <= targetBytes) {
-                // 记录当前最接近目标的“不过线”方案，继续提高质量以更接近目标
-                if (bestUnder == null || data.size > bestUnder.size) bestUnder = data
-                lo = mid + 1
-            } else {
-                // 记录当前最小的“超过目标”方案，降低质量
-                if (bestOver == null || data.size < bestOver.size) bestOver = data
-                hi = mid - 1
-            }
-        }
-        val result = bestUnder ?: bestOver
-        if (result != null) {
-            FileLogger.i(TAG, "压缩二分完成 -> 最终size=${result.size}, 目标=${targetBytes}")
-        } else {
-            FileLogger.w(TAG, "压缩二分未找到合适质量")
-        }
-        return result
-    }
-
-    private fun spGetIntCompat(sp: android.content.SharedPreferences, key: String, def: Int): Int {
-        return try {
-            val any = sp.all[key]
-            when (any) {
-                is Int -> any
-                is Long -> {
-                    if (any > Int.MAX_VALUE) Int.MAX_VALUE else if (any < Int.MIN_VALUE) Int.MIN_VALUE else any.toInt()
-                }
-                is Float -> any.toInt()
-                is Double -> {
-                    if (any > Int.MAX_VALUE) Int.MAX_VALUE else if (any < Int.MIN_VALUE) Int.MIN_VALUE else any.toInt()
-                }
-                is String -> any.toDoubleOrNull()?.toInt() ?: def
-                else -> try { sp.getInt(key, def) } catch (_: Exception) { def }
-            }
-        } catch (_: Exception) { def }
-    }
-
-    private fun spGetBoolCompat(sp: android.content.SharedPreferences, key: String, def: Boolean): Boolean {
-        return try {
-            val any = sp.all[key]
-            when (any) {
-                is Boolean -> any
-                is String -> any.equals("true", ignoreCase = true)
-                is Int -> any != 0
-                is Long -> any != 0L
-                else -> sp.getBoolean(key, def)
-            }
-        } catch (_: Exception) { def }
-    }
-
-    private fun toGrayscale(src: Bitmap): Bitmap {
-        return try {
-            val w = src.width
-            val h = src.height
-            val gray = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-            val c = Canvas(gray)
-            val paint = Paint()
-            val cm = ColorMatrix()
-            cm.setSaturation(0f)
-            paint.colorFilter = ColorMatrixColorFilter(cm)
-            c.drawBitmap(src, 0f, 0f, paint)
-            gray
-        } catch (_: Exception) { src }
-    }
 
     /**
      * 判断当前目标应用是否处于“全屏”
@@ -3091,7 +2612,8 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
         appName: String,
         filePath: String,
         pageUrl: String?,
-        traceId: Long = nextCaptureTraceId()
+        traceId: Long = nextCaptureTraceId(),
+        captureTimeMillis: Long = System.currentTimeMillis()
     ) {
         try {
             val startMs = SystemClock.elapsedRealtime()
@@ -3101,7 +2623,7 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
                 putExtra("packageName", packageName)
                 putExtra("appName", appName)
                 putExtra("filePath", filePath)
-                putExtra("captureTime", System.currentTimeMillis())
+                putExtra("captureTime", captureTimeMillis)
                 if (!pageUrl.isNullOrBlank()) putExtra("pageUrl", pageUrl)
             }
             sendBroadcast(intent)
@@ -3119,7 +2641,7 @@ class ScreenCaptureAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun notifyScreenshotFileRecompressed(
+    internal fun notifyScreenshotFileRecompressed(
         packageName: String,
         relativePath: String,
         absolutePath: String,
