@@ -1049,6 +1049,11 @@ class AISettingsService {
 
   Future<bool> deleteConversation(String cid) async {
     final db = ScreenshotDatabase.instance;
+    String activeBeforeDelete = '';
+    try {
+      activeBeforeDelete = ((await db.getAiSetting('chat_active_cid')) ?? '')
+          .trim();
+    } catch (_) {}
     final sw = Stopwatch()..start();
     final ok = await db.deleteAiConversation(cid);
     sw.stop();
@@ -1062,9 +1067,12 @@ class AISettingsService {
       // 若删除的是当前激活，则选择最新一条或 default
       bool deletedWasActive = false;
       try {
-        final active = await getActiveConversationCid();
-        if (active == cid) {
+        if (activeBeforeDelete == cid) {
           deletedWasActive = true;
+          // 先清空 active，避免 listAiConversations 的索引修复把刚删除的 cid 补回列表。
+          try {
+            await db.setAiSetting('chat_active_cid', '');
+          } catch (_) {}
           final rows = await db.listAiConversations(limit: 1, offset: 0);
           if (rows.isNotEmpty) {
             final nextCid = (rows.first['cid'] as String?) ?? 'default';
