@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:screen_memo/l10n/app_localizations.dart';
 import 'package:screen_memo/core/theme/theme_service.dart';
 import 'package:screen_memo/features/ai_providers/presentation/pages/provider_list_page.dart';
 import 'package:screen_memo/features/ai_chat/presentation/pages/prompt_manager_page.dart';
+import 'package:screen_memo/features/ai_chat/presentation/pages/ai_settings_page.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
 import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
 import 'package:screen_memo/core/widgets/model_logo.dart';
@@ -12,10 +15,58 @@ import 'package:screen_memo/core/logging/flutter_logger.dart';
 import 'package:screen_memo/app/navigation/navigation_service.dart';
 
 /// 侧边栏：简洁清爽，复用设置页面样式
-class AppSideDrawer extends StatelessWidget {
+class AppSideDrawer extends StatefulWidget {
   final ThemeService? themeService;
 
   const AppSideDrawer({super.key, this.themeService});
+
+  @override
+  State<AppSideDrawer> createState() => _AppSideDrawerState();
+}
+
+class _AppSideDrawerState extends State<AppSideDrawer> {
+  final Map<String, bool> _conversationExpansionByCid = <String, bool>{};
+  Future<List<Object>>? _conversationListFuture;
+  StreamSubscription<String>? _ctxChangedSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshConversationListFuture();
+    _ctxChangedSub = AISettingsService.instance.onContextChanged.listen((ctx) {
+      if (!mounted) return;
+      if (ctx == 'chat' ||
+          ctx == 'chat:deleted' ||
+          ctx == 'chat:cleared' ||
+          ctx == 'chat:history' ||
+          ctx.startsWith('chat:history:')) {
+        _refreshConversationList();
+      }
+    });
+  }
+
+  Future<List<Object>> _loadConversationListData() async {
+    final Future<List<Map<String, dynamic>>> rowsFuture = AISettingsService
+        .instance
+        .listAiConversations(includeSubagents: true);
+    final Future<String> activeFuture = AISettingsService.instance
+        .getActiveConversationCid();
+    return <Object>[await rowsFuture, await activeFuture];
+  }
+
+  void _refreshConversationListFuture() {
+    _conversationListFuture = _loadConversationListData();
+  }
+
+  void _refreshConversationList() {
+    setState(_refreshConversationListFuture);
+  }
+
+  @override
+  void dispose() {
+    _ctxChangedSub?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,12 +134,10 @@ class AppSideDrawer extends StatelessWidget {
               ),
             ),
             FutureBuilder<List<Object>>(
-              future: Future.wait([
-                AISettingsService.instance.listAiConversations(),
-                AISettingsService.instance.getActiveConversationCid(),
-              ]),
+              future: _conversationListFuture,
               builder: (ctx, snap) {
-                if (snap.connectionState != ConnectionState.done) {
+                if (snap.connectionState != ConnectionState.done &&
+                    !snap.hasData) {
                   return Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppTheme.spacing4,
@@ -128,8 +177,46 @@ class AppSideDrawer extends StatelessWidget {
                   );
                 }
 
+                String normalizedParent(Map<String, dynamic> row) {
+                  final String cid = ((row['cid'] as String?) ?? '').trim();
+                  final String parentRaw =
+                      ((row['parent_cid'] as String?) ?? '').trim();
+                  final String lower = parentRaw.toLowerCase();
+                  if (parentRaw.isEmpty ||
+                      lower == 'null' ||
+                      lower == 'undefined' ||
+                      parentRaw == cid) {
+                    return '';
+                  }
+                  return parentRaw;
+                }
+
+                final Set<String> allCids = list
+                    .map((row) => ((row['cid'] as String?) ?? '').trim())
+                    .where((cid) => cid.isNotEmpty)
+                    .toSet();
+
                 // 将当前激活会话置顶
-                final sortedList = List<Map<String, dynamic>>.from(list);
+                final rootList = list
+                    .where((row) {
+                      final String parent = normalizedParent(row);
+                      return parent.isEmpty || !allCids.contains(parent);
+                    })
+                    .toList(growable: false);
+                final Map<String, List<Map<String, dynamic>>> childrenByParent =
+                    <String, List<Map<String, dynamic>>>{};
+                for (final row in list) {
+                  final String parent = normalizedParent(row);
+                  if (parent.isEmpty || !allCids.contains(parent)) {
+                    continue;
+                  }
+                  childrenByParent
+                      .putIfAbsent(parent, () => <Map<String, dynamic>>[])
+                      .add(row);
+                }
+                final sortedList = List<Map<String, dynamic>>.from(
+                  rootList.isEmpty ? list : rootList,
+                );
                 sortedList.sort((a, b) {
                   final aCid = (a['cid'] as String?) ?? '';
                   final bCid = (b['cid'] as String?) ?? '';
@@ -140,6 +227,32 @@ class AppSideDrawer extends StatelessWidget {
                   final bTime = (b['updated_at'] as int?) ?? 0;
                   return bTime.compareTo(aTime);
                 });
+                try {
+                  final String sample = list.isEmpty
+                      ? '-'
+                      : [
+                          'cid=${((list.first['cid'] as String?) ?? '').trim()}',
+                          'parent=${((list.first['parent_cid'] as String?) ?? '').trim()}',
+                          'kind=${((list.first['conversation_kind'] as String?) ?? '').trim()}',
+                          'title=${((list.first['title'] as String?) ?? '').trim()}',
+                        ].join(' ');
+                  FlutterLogger.nativeInfo(
+                    'UI',
+                    'SideDrawer conversations total=${list.length} roots=${rootList.length} children=${childrenByParent.length} sorted=${sortedList.length} active=$active sample=$sample',
+                  );
+                } catch (_) {}
+                if (sortedList.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppTheme.spacing4,
+                      vertical: AppTheme.spacing1,
+                    ),
+                    child: Text(
+                      t.noConversations,
+                      style: Theme.of(ctx).textTheme.bodySmall,
+                    ),
+                  );
+                }
 
                 return Column(
                   children: sortedList.map((c) {
@@ -151,12 +264,69 @@ class AppSideDrawer extends StatelessWidget {
                     final model = (c['model'] as String?) ?? '';
                     final isActive = active == cid;
 
-                    return _buildConversationItem(
-                      context: context,
-                      cid: cid,
-                      title: title,
-                      model: model,
-                      isActive: isActive,
+                    final List<Map<String, dynamic>> children =
+                        List<Map<String, dynamic>>.from(
+                          childrenByParent[cid] ??
+                              const <Map<String, dynamic>>[],
+                        );
+                    children.sort((a, b) {
+                      final aTime = (a['updated_at'] as int?) ?? 0;
+                      final bTime = (b['updated_at'] as int?) ?? 0;
+                      return bTime.compareTo(aTime);
+                    });
+                    final bool hasChildren = children.isNotEmpty;
+                    final bool hasActiveChild = children.any((child) {
+                      final childCid = ((child['cid'] as String?) ?? '').trim();
+                      return childCid.isNotEmpty && childCid == active;
+                    });
+                    return StatefulBuilder(
+                      key: ValueKey<String>('conversation-tree-$cid'),
+                      builder: (context, rowSetState) {
+                        final bool defaultExpanded = isActive || hasActiveChild;
+                        final bool isExpanded =
+                            hasChildren &&
+                            (_conversationExpansionByCid[cid] ??
+                                defaultExpanded);
+                        return Column(
+                          children: [
+                            _buildConversationItem(
+                              context: context,
+                              cid: cid,
+                              title: title,
+                              model: model,
+                              isActive: isActive,
+                              hasChildren: hasChildren,
+                              isExpanded: isExpanded,
+                              onToggleChildren: hasChildren
+                                  ? () {
+                                      _conversationExpansionByCid[cid] =
+                                          !isExpanded;
+                                      rowSetState(() {});
+                                    }
+                                  : null,
+                            ),
+                            if (hasChildren)
+                              ClipRect(
+                                child: AnimatedSize(
+                                  duration: const Duration(milliseconds: 180),
+                                  curve: Curves.easeOutCubic,
+                                  alignment: Alignment.topCenter,
+                                  child: isExpanded
+                                      ? Column(
+                                          children: [
+                                            for (final child in children)
+                                              _buildSubagentConversationItem(
+                                                context: context,
+                                                row: child,
+                                              ),
+                                          ],
+                                        )
+                                      : const SizedBox.shrink(),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
                     );
                   }).toList(),
                 );
@@ -184,7 +354,7 @@ class AppSideDrawer extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
-            color: theme.colorScheme.outline.withOpacity(0.6),
+            color: theme.colorScheme.outline.withValues(alpha: 0.6),
             width: 1,
           ),
         ),
@@ -226,6 +396,9 @@ class AppSideDrawer extends StatelessWidget {
     required String title,
     required String model,
     required bool isActive,
+    bool hasChildren = false,
+    bool isExpanded = false,
+    VoidCallback? onToggleChildren,
   }) {
     final theme = Theme.of(context);
     final t = AppLocalizations.of(context);
@@ -233,11 +406,11 @@ class AppSideDrawer extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: isActive
-            ? theme.colorScheme.primaryContainer.withOpacity(0.15)
+            ? theme.colorScheme.primaryContainer.withValues(alpha: 0.15)
             : Colors.transparent,
         border: Border(
           bottom: BorderSide(
-            color: theme.colorScheme.outline.withOpacity(0.6),
+            color: theme.colorScheme.outline.withValues(alpha: 0.6),
             width: 1,
           ),
         ),
@@ -247,6 +420,7 @@ class AppSideDrawer extends StatelessWidget {
           try {
             await AISettingsService.instance.setActiveConversationCid(cid);
           } catch (_) {}
+          if (!context.mounted) return;
           Navigator.of(context).pop();
         },
         onLongPress: () async {
@@ -264,16 +438,16 @@ class AppSideDrawer extends StatelessWidget {
                   try {
                     final sw = Stopwatch()..start();
                     Navigator.of(ctx).pop();
-                    // 触发重建（数据源来自 FutureBuilder，不做本地列表回滚）
-                    (context as Element).markNeedsBuild();
                     final ok = await AISettingsService.instance
                         .deleteConversation(cid);
                     sw.stop();
+                    if (!context.mounted) return;
+                    if (!mounted) return;
+                    _refreshConversationList();
                     try {
                       await FlutterLogger.nativeInfo(
                         'UI',
-                        'SideDrawer 删除对话总耗时(毫秒)=' +
-                            sw.elapsedMilliseconds.toString(),
+                        'SideDrawer 删除对话总耗时(毫秒)=${sw.elapsedMilliseconds}',
                       );
                     } catch (_) {}
                     // 记录“完全清空”耗时：从删除返回到FutureBuilder下一次完成的时间
@@ -284,18 +458,18 @@ class AppSideDrawer extends StatelessWidget {
                       try {
                         await FlutterLogger.nativeInfo(
                           'UI',
-                          'SideDrawer 清空后首帧耗时(毫秒)=' +
-                              sw2.elapsedMilliseconds.toString(),
+                          'SideDrawer 清空后首帧耗时(毫秒)=${sw2.elapsedMilliseconds}',
                         );
                       } catch (_) {}
                     });
+                    if (!mounted) return;
                     if (!ok) {
-                      UINotifier.error(context, t.deleteFailed);
-                      (context as Element).markNeedsBuild();
+                      UINotifier.error(this.context, t.deleteFailed);
                     } else {
-                      UINotifier.success(context, t.deletedToast);
+                      UINotifier.success(this.context, t.deletedToast);
                     }
                   } catch (e) {
+                    if (!ctx.mounted) return;
                     UINotifier.error(
                       ctx,
                       t.deleteFailedWithError(e.toString()),
@@ -341,15 +515,148 @@ class AppSideDrawer extends StatelessWidget {
                 ),
               ),
               if (isActive)
-                Icon(
-                  Icons.chevron_right,
-                  color: theme.colorScheme.primary,
-                  size: 20,
+                hasChildren
+                    ? const SizedBox.shrink()
+                    : Icon(
+                        Icons.chevron_right,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
+              if (hasChildren)
+                InkWell(
+                  onTap: onToggleChildren,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                  child: SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: Icon(
+                      isExpanded
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      color: isActive
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurfaceVariant,
+                      size: 22,
+                    ),
+                  ),
                 ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildSubagentConversationItem({
+    required BuildContext context,
+    required Map<String, dynamic> row,
+  }) {
+    final theme = Theme.of(context);
+    final String cid = ((row['cid'] as String?) ?? '').trim();
+    final String titleRaw = ((row['title'] as String?) ?? '').trim();
+    final String title = titleRaw.isEmpty ? 'Subagent' : titleRaw;
+    final String model = ((row['model'] as String?) ?? '').trim();
+    final int tokens = (row['subagent_context_tokens'] as int?) ?? 0;
+    final int cap = (row['subagent_context_cap_tokens'] as int?) ?? 0;
+    final String contextPercentLabel = _formatSubagentContextPercent(
+      tokens: tokens,
+      cap: cap,
+    );
+    return Padding(
+      padding: const EdgeInsets.only(left: AppTheme.spacing5),
+      child: InkWell(
+        onTap: cid.isEmpty
+            ? null
+            : () {
+                Navigator.of(context).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        AISettingsPage(conversationCid: cid, readOnly: true),
+                  ),
+                );
+              },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTheme.spacing3,
+            vertical: AppTheme.spacing2,
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 14,
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                child: model.isEmpty
+                    ? Icon(
+                        Icons.smart_toy_outlined,
+                        size: 15,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.all(5),
+                        child: ModelLogo(modelId: model, size: 14),
+                      ),
+              ),
+              const SizedBox(width: AppTheme.spacing2),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (model.isNotEmpty)
+                      Text(
+                        model,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.78,
+                          ),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppTheme.spacing2),
+              Text(
+                contextPercentLabel,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 16,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatSubagentContextPercent({
+    required int tokens,
+    required int cap,
+  }) {
+    if (tokens <= 0 || cap <= 0) return '-';
+    final double percent = tokens * 100.0 / cap;
+    if (percent > 0 && percent < 0.1) return '<0.1%';
+    if (percent < 10) {
+      return '${percent.toStringAsFixed(1)}%';
+    }
+    return '${percent.round().clamp(0, 999)}%';
   }
 }

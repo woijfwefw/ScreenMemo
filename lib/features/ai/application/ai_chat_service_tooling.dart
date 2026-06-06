@@ -99,6 +99,20 @@ extension AIChatServiceToolingExt on AIChatService {
       if (error != null) return _loc('错误：$error', 'error=$error');
       return _loc('未生成图片', 'no images generated');
     }
+    if (tool == 'delegate_subagents') {
+      final int count = (obj['results'] is List)
+          ? (obj['results'] as List).length
+          : 0;
+      return count > 0
+          ? _loc('完成 $count 个子代理', 'completed $count subagent(s)')
+          : _loc('完成子代理委派', 'subagent delegation completed');
+    }
+    if (tool == 'update_todos') {
+      final int count = _toInt(obj['count']) ?? 0;
+      return count > 0
+          ? _loc('更新 $count 个 TODO', 'updated $count TODO item(s)')
+          : _loc('已更新 TODO', 'TODO updated');
+    }
     if (error != null) return _loc('错误：$error', 'error=$error');
     if (tool == 'get_images') {
       final Map<String, dynamic>? stats = (obj['stats'] is Map)
@@ -152,6 +166,8 @@ extension AIChatServiceToolingExt on AIChatService {
 
   static List<Map<String, dynamic>>
   defaultChatTools() => <Map<String, dynamic>>[
+    AIChatServiceAgentStatusExt.buildUpdateTodosToolSchema(),
+    AIChatServiceSubagentsExt.buildDelegateSubagentsToolSchema(),
     <String, dynamic>{
       'type': 'function',
       'function': <String, dynamic>{
@@ -577,6 +593,18 @@ extension AIChatServiceToolingExt on AIChatService {
     },
   ];
 
+  static List<Map<String, dynamic>> defaultSubagentTools() {
+    const Set<String> blocked = <String>{'update_todos', 'delegate_subagents'};
+    return defaultChatTools()
+        .where((Map<String, dynamic> tool) {
+          final Object? fn = tool['function'];
+          if (fn is! Map) return true;
+          final String name = (fn['name'] ?? '').toString().trim();
+          return !blocked.contains(name);
+        })
+        .toList(growable: false);
+  }
+
   String _detectImageMimeByExt(String path) {
     final String p = path.toLowerCase();
     if (p.endsWith('.png')) return 'image/png';
@@ -824,6 +852,18 @@ extension AIChatServiceToolingExt on AIChatService {
     int msToMin(int ms) => ms <= 0 ? 0 : (ms ~/ 60000);
 
     switch (call.name) {
+      case 'update_todos':
+        final dynamic raw = args['items'];
+        final int count = raw is List ? raw.length : 0;
+        return count > 0
+            ? _loc('更新 TODO：$count 项', 'Update TODO: $count items')
+            : _loc('更新 TODO', 'Update TODO');
+      case 'delegate_subagents':
+        final dynamic raw = args['tasks'] ?? args['agents'];
+        final int count = raw is List ? raw.length : 0;
+        return count > 0
+            ? _loc('委派子代理：$count 个', 'Delegate subagents: $count')
+            : _loc('委派子代理', 'Delegate subagents');
       case 'generate_image':
         sig['prompt'] = ((args['prompt'] as String?) ?? '').trim();
         sig['count'] = AIImageGenerationParams.normalizeCount(args['count']);

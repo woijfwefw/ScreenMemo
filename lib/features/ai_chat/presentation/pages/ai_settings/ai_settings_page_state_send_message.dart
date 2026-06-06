@@ -704,6 +704,7 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
     String? retryConversationCid,
     int? retryCutoffCreatedAtMs,
   }) async {
+    if (widget.readOnly) return;
     if (_sending) return;
     final String? override = overrideText?.trim();
     final rawText = (override != null && override.isNotEmpty)

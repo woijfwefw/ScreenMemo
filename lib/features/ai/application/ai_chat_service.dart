@@ -28,10 +28,17 @@ export 'package:screen_memo/features/ai/application/ai_request_gateway.dart'
     show InvalidResponseStartException, InvalidEndpointConfigurationException;
 
 part 'ai_chat_service_core.dart';
+part 'ai_chat_service_agent_status.dart';
+part 'ai_chat_service_message_result.dart';
 part 'ai_chat_service_prompt_budget.dart';
+part 'ai_chat_service_tool_loop_events.dart';
+part 'ai_chat_service_tool_loop_driver.dart';
+part 'ai_chat_service_tool_loop_retries.dart';
 part 'ai_chat_service_tool_loop_support.dart';
+part 'ai_chat_service_subagents.dart';
 part 'ai_chat_service_tooling.dart';
 part 'ai_chat_service_tool_exec.dart';
+part 'ai_chat_service_ui_thinking_persister.dart';
 part 'ai_chat_service_send.dart';
 part 'ai_chat_service_persistence.dart';
 
@@ -58,6 +65,9 @@ class AIChatService {
 
   static List<Map<String, dynamic>> defaultChatTools() =>
       AIChatServiceToolingExt.defaultChatTools();
+
+  static List<Map<String, dynamic>> defaultSubagentTools() =>
+      AIChatServiceToolingExt.defaultSubagentTools();
 
   // Keep chat history bounded by an approximate token budget (Codex-style).
   // This is in addition to the DB tail limit, and prevents a few very long

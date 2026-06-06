@@ -706,6 +706,8 @@ void main() {
           model: 'gpt-image-test',
         );
 
+        final int userCreatedAtMs = DateTime.now().millisecondsSinceEpoch;
+        final int assistantCreatedAtMs = userCreatedAtMs + 1;
         final ({AIMessage completed, List<AIStreamEvent> events}) outcome =
             await HttpOverrides.runZoned(
               () async {
@@ -719,9 +721,8 @@ void main() {
                       tools: AIChatService.defaultChatTools(),
                       toolChoice: 'auto',
                       conversationCid: 'cid-loop-test',
-                      uiUserCreatedAtMs: DateTime.now().millisecondsSinceEpoch,
-                      uiAssistantCreatedAtMs:
-                          DateTime.now().millisecondsSinceEpoch + 1,
+                      uiUserCreatedAtMs: userCreatedAtMs,
+                      uiAssistantCreatedAtMs: assistantCreatedAtMs,
                     );
                 final List<AIStreamEvent> events = await session.stream
                     .toList();
@@ -759,6 +760,52 @@ void main() {
           (Map<String, dynamic> payload) => payload['type'] == 'tool_call_end',
         );
         expect(endPayload['generated_image_markers'], isNotEmpty);
+        expect(
+          uiPayloads.where(
+            (Map<String, dynamic> payload) => payload['type'] == 'plan_update',
+          ),
+          isEmpty,
+        );
+        expect(
+          uiPayloads.where(
+            (Map<String, dynamic> payload) => payload['type'] == 'todo_update',
+          ),
+          isEmpty,
+        );
+        expect(
+          uiPayloads.where(
+            (Map<String, dynamic> payload) =>
+                payload['type'] == 'subagent_update',
+          ),
+          isEmpty,
+        );
+        final String uiThinkingJson = (completed.uiThinkingJson ?? '').trim();
+        expect(uiThinkingJson, isNotEmpty);
+        final Map<String, dynamic> uiThinking =
+            jsonDecode(uiThinkingJson) as Map<String, dynamic>;
+        final List<dynamic> persistedEvents = <dynamic>[
+          for (final dynamic block in (uiThinking['blocks'] as List<dynamic>))
+            if (block is Map && block['events'] is List)
+              ...(block['events'] as List<dynamic>),
+        ];
+        expect(
+          persistedEvents.where(
+            (dynamic event) =>
+                event is Map &&
+                ((event['type'] ?? '').toString().trim() == 'plan' ||
+                    (event['type'] ?? '').toString().trim() == 'todo'),
+          ),
+          isEmpty,
+        );
+        expect(
+          persistedEvents.where(
+            (dynamic event) =>
+                event is Map &&
+                event['type'] == 'subagents' &&
+                jsonEncode(event).contains('call_image_1'),
+          ),
+          isEmpty,
+        );
         expect(
           events.where(
             (AIStreamEvent event) =>

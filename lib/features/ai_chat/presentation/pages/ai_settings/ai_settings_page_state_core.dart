@@ -174,7 +174,10 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
       final Future<int?> fActiveId = _settings.getActiveGroupId();
       // Capture the active conversation CID once so chat history stays consistent
       // even if the user switches conversations while other settings are loading.
-      final Future<String> fChatCid = _settings.getActiveConversationCid();
+      final String fixedWidgetCid = (widget.conversationCid ?? '').trim();
+      final Future<String> fChatCid = fixedWidgetCid.isNotEmpty
+          ? Future<String>.value(fixedWidgetCid)
+          : _settings.getActiveConversationCid();
       final Future<List<AIMessage>> fTailHistory = fChatCid.then(
         (cid) => _settings.getChatHistoryByCid(cid),
       );
@@ -1833,13 +1836,85 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
       _mergeUrlCitationForAssistant(assistantIdx, payload['citation']);
       return;
     }
-    if (type == 'tool_batch_begin' || type == 'tool_call_end') {
+    if (type == 'tool_batch_begin' ||
+        type == 'tool_call_end' ||
+        type == 'plan_update' ||
+        type == 'todo_update' ||
+        type == 'subagent_update') {
       unawaited(
         FlutterLogger.nativeInfo(
           'AI_IMAGE',
           'ui.handle_event type=$type idx=$assistantIdx contentLen=${(assistantIdx >= 0 && assistantIdx < _messages.length) ? _messages[assistantIdx].content.length : -1}',
         ),
       );
+    }
+
+    if (type == 'plan_update' || type == 'todo_update') {
+      final List<_AgentStatusItem> items = _parseAgentStatusItems(
+        payload['steps'] ?? payload['items'],
+        fallbackPrefix: type == 'plan_update' ? 'plan' : 'todo',
+      );
+      if (items.isEmpty) return;
+      final _ThinkingBlock block = _ensureThinkingBlock(assistantIdx);
+      _clearTransientThinkingSteps(assistantIdx);
+      final _ThinkingEventType eventType = type == 'plan_update'
+          ? _ThinkingEventType.plan
+          : _ThinkingEventType.todo;
+      final String fallbackTitle = type == 'plan_update' ? 'Plan' : 'TODO';
+      final String title = ((payload['title'] as String?) ?? '').trim().isEmpty
+          ? fallbackTitle
+          : ((payload['title'] as String?) ?? '').trim();
+      _ThinkingEvent? event;
+      for (final e in block.events) {
+        if (e.type == eventType) {
+          event = e;
+          break;
+        }
+      }
+      event ??= _ThinkingEvent(
+        type: eventType,
+        title: title,
+        icon: eventType == _ThinkingEventType.todo
+            ? Icons.checklist_rounded
+            : Icons.format_list_numbered_rounded,
+        items: <_AgentStatusItem>[],
+      );
+      if (!block.events.contains(event)) block.events.add(event);
+      event.title = title;
+      _upsertAgentStatusItems(event.items, items);
+      event.active = items.any((item) => item.status == 'in_progress');
+      return;
+    }
+
+    if (type == 'subagent_update') {
+      final List<_SubagentStatusItem> items = _parseSubagentStatusItems(
+        payload['agents'],
+      );
+      if (items.isEmpty) return;
+      final _ThinkingBlock block = _ensureThinkingBlock(assistantIdx);
+      _clearTransientThinkingSteps(assistantIdx);
+      final String title = ((payload['title'] as String?) ?? '').trim().isEmpty
+          ? 'Subagents'
+          : ((payload['title'] as String?) ?? '').trim();
+      _ThinkingEvent? event;
+      for (final e in block.events) {
+        if (e.type == _ThinkingEventType.subagents) {
+          event = e;
+          break;
+        }
+      }
+      event ??= _ThinkingEvent(
+        type: _ThinkingEventType.subagents,
+        title: title,
+        icon: Icons.smart_toy_outlined,
+        subagents: <_SubagentStatusItem>[],
+      );
+      if (!block.events.contains(event)) block.events.add(event);
+      event.title = title;
+      _upsertSubagentStatusItems(event.subagents, items);
+      event.active = items.any((item) => item.status == 'working');
+      _subagentListVersion.value = _subagentListVersion.value + 1;
+      return;
     }
 
     if (type == 'tool_batch_begin') {
@@ -1869,6 +1944,7 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
         final Map<String, dynamic> m = Map<String, dynamic>.from(t);
         final String callId = (m['call_id'] as String?)?.trim() ?? '';
         final String toolName = (m['tool_name'] as String?)?.trim() ?? '';
+        if (_isStatusOnlyToolName(toolName)) continue;
         final String label = (m['label'] as String?)?.trim() ?? toolName.trim();
         final String detailRef = (m['detail_ref'] as String?)?.trim() ?? '';
         final int generatedImageLoadingCount =
@@ -1951,6 +2027,9 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
     if (type == 'tool_call_end') {
       final String callId = (payload['call_id'] as String?)?.trim() ?? '';
       if (callId.isEmpty) return;
+      final String endedToolName =
+          (payload['tool_name'] as String?)?.trim() ?? '';
+      if (_isStatusOnlyToolName(endedToolName)) return;
       final String resultSummary =
           (payload['result_summary'] as String?)?.trim() ?? '';
       final int durationMs = (payload['duration_ms'] is num)
@@ -1994,6 +2073,142 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
         callId,
       );
       return;
+    }
+  }
+
+  bool _isStatusOnlyToolName(String toolName) {
+    final String name = toolName.trim();
+    return name == 'update_todos' || name == 'delegate_subagents';
+  }
+
+  List<_AgentStatusItem> _parseAgentStatusItems(
+    Object? raw, {
+    required String fallbackPrefix,
+  }) {
+    if (raw is! List) return const <_AgentStatusItem>[];
+    final List<_AgentStatusItem> out = <_AgentStatusItem>[];
+    for (final item0 in raw) {
+      if (item0 is! Map) continue;
+      final Map<String, dynamic> item = Map<String, dynamic>.from(item0);
+      final String text =
+          (item['text'] ??
+                  item['step'] ??
+                  item['task'] ??
+                  item['description'] ??
+                  '')
+              .toString()
+              .trim();
+      if (text.isEmpty) continue;
+      final String id = ((item['id'] ?? '').toString().trim().isEmpty)
+          ? '${fallbackPrefix}_${out.length + 1}'
+          : (item['id'] ?? '').toString().trim();
+      final String status = ((item['status'] ?? '').toString().trim().isEmpty)
+          ? 'pending'
+          : (item['status'] ?? '').toString().trim();
+      out.add(_AgentStatusItem(id: id, text: text, status: status));
+    }
+    return out;
+  }
+
+  void _upsertAgentStatusItems(
+    List<_AgentStatusItem> target,
+    List<_AgentStatusItem> updates,
+  ) {
+    for (final item in updates) {
+      int idx = target.indexWhere((e) => e.id == item.id);
+      if (idx < 0) {
+        idx = target.indexWhere((e) => e.text == item.text);
+      }
+      if (idx < 0) {
+        target.add(item);
+        continue;
+      }
+      target[idx].text = item.text;
+      target[idx].status = item.status;
+    }
+  }
+
+  List<_SubagentStatusItem> _parseSubagentStatusItems(Object? raw) {
+    if (raw is! List) return const <_SubagentStatusItem>[];
+    final List<_SubagentStatusItem> out = <_SubagentStatusItem>[];
+    int asInt(Object? v) {
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      return int.tryParse((v ?? '').toString()) ?? 0;
+    }
+
+    for (final item0 in raw) {
+      if (item0 is! Map) continue;
+      final Map<String, dynamic> item = Map<String, dynamic>.from(item0);
+      final String name = (item['name'] ?? item['title'] ?? item['task'] ?? '')
+          .toString()
+          .trim();
+      final String summary =
+          (item['summary'] ?? item['task'] ?? item['description'] ?? '')
+              .toString()
+              .trim();
+      if (name.isEmpty && summary.isEmpty) continue;
+      final String id = ((item['id'] ?? '').toString().trim().isEmpty)
+          ? 'subagent_${out.length + 1}'
+          : (item['id'] ?? '').toString().trim();
+      final int contextTokens = asInt(item['context_tokens_estimate']);
+      final int contextCap = asInt(item['context_cap_tokens']);
+      final int contextPercent = asInt(item['context_percent']);
+      final int durationMs = asInt(item['duration_ms']);
+      final String model = ((item['model'] ?? '').toString()).trim();
+      out.add(
+        _SubagentStatusItem(
+          id: id,
+          name: name.isEmpty ? 'Subagent ${out.length + 1}' : name,
+          status: ((item['status'] ?? '').toString().trim().isEmpty)
+              ? 'working'
+              : (item['status'] ?? '').toString().trim(),
+          role: ((item['role'] ?? '').toString().trim().isEmpty)
+              ? null
+              : (item['role'] ?? '').toString().trim(),
+          summary: summary.isEmpty ? null : summary,
+          model: model.isEmpty ? null : model,
+          conversationCid:
+              ((item['conversation_cid'] ?? '').toString().trim().isEmpty)
+              ? null
+              : (item['conversation_cid'] ?? '').toString().trim(),
+          contextTokensEstimate: contextTokens > 0 ? contextTokens : null,
+          contextCapTokens: contextCap > 0 ? contextCap : null,
+          contextPercent: contextPercent > 0 ? contextPercent : null,
+          durationMs: durationMs > 0 ? durationMs : null,
+        ),
+      );
+    }
+    return out;
+  }
+
+  void _upsertSubagentStatusItems(
+    List<_SubagentStatusItem> target,
+    List<_SubagentStatusItem> updates,
+  ) {
+    for (final item in updates) {
+      int idx = target.indexWhere((e) => e.id == item.id);
+      if (idx < 0) {
+        idx = target.indexWhere((e) => e.name == item.name);
+      }
+      if (idx < 0) {
+        target.add(item);
+        continue;
+      }
+      final _SubagentStatusItem existing = target[idx];
+      existing.name = item.name;
+      existing.status = item.status;
+      existing.role = item.role ?? existing.role;
+      existing.summary = item.summary ?? existing.summary;
+      existing.model = item.model ?? existing.model;
+      existing.conversationCid =
+          item.conversationCid ?? existing.conversationCid;
+      existing.contextTokensEstimate =
+          item.contextTokensEstimate ?? existing.contextTokensEstimate;
+      existing.contextCapTokens =
+          item.contextCapTokens ?? existing.contextCapTokens;
+      existing.contextPercent = item.contextPercent ?? existing.contextPercent;
+      existing.durationMs = item.durationMs ?? existing.durationMs;
     }
   }
 

@@ -143,12 +143,108 @@ Map<String, dynamic> _ensureToolsEvent(
   return found;
 }
 
+Map<String, dynamic> _ensureStatusEvent(
+  Map<String, dynamic> block, {
+  required String type,
+  required String title,
+  required String icon,
+}) {
+  final List<dynamic> events = (block['events'] is List)
+      ? List<dynamic>.from(block['events'] as List)
+      : <dynamic>[];
+
+  Map<String, dynamic>? found;
+  for (int i = events.length - 1; i >= 0; i--) {
+    final Object? raw = events[i];
+    if (raw is! Map) continue;
+    final Map<String, dynamic> event = Map<String, dynamic>.from(raw);
+    if ((event['type'] ?? '').toString().trim() != type) continue;
+    found = event;
+    events[i] = event;
+    break;
+  }
+
+  if (found == null) {
+    found = <String, dynamic>{
+      'type': type,
+      'title': title,
+      'icon': icon,
+      'items': <Map<String, dynamic>>[],
+    };
+    events.add(found);
+  } else {
+    if (((found['title'] ?? '').toString().trim()).isEmpty) {
+      found['title'] = title;
+    }
+    if (((found['icon'] ?? '').toString().trim()).isEmpty) {
+      found['icon'] = icon;
+    }
+  }
+
+  final Object? items0 = found['items'];
+  if (items0 is List) {
+    found['items'] = List<dynamic>.from(items0);
+  } else {
+    found['items'] = <dynamic>[];
+  }
+
+  block['events'] = events;
+  return found;
+}
+
+void _upsertStatusItems(
+  Map<String, dynamic> event,
+  List<dynamic> rawItems, {
+  required List<String> identityKeys,
+  required String defaultStatus,
+}) {
+  final List<dynamic> items = (event['items'] is List)
+      ? List<dynamic>.from(event['items'] as List)
+      : <dynamic>[];
+
+  String buildKey(Map<String, dynamic> item) {
+    for (final String key in identityKeys) {
+      final String value = (item[key] ?? '').toString().trim();
+      if (value.isNotEmpty) return '$key:$value';
+    }
+    return '';
+  }
+
+  for (final dynamic raw in rawItems) {
+    if (raw is! Map) continue;
+    final Map<String, dynamic> next = Map<String, dynamic>.from(raw);
+    final String id = buildKey(next);
+    if (id.isEmpty) continue;
+    next['status'] = (next['status'] ?? defaultStatus).toString().trim();
+    int existingIndex = -1;
+    for (int i = 0; i < items.length; i++) {
+      final Object? rawExisting = items[i];
+      if (rawExisting is! Map) continue;
+      final Map<String, dynamic> existing = Map<String, dynamic>.from(
+        rawExisting,
+      );
+      if (buildKey(existing) != id) continue;
+      existingIndex = i;
+      items[i] = <String, dynamic>{...existing, ...next};
+      break;
+    }
+    if (existingIndex < 0) {
+      items.add(next);
+    }
+  }
+
+  event['items'] = items;
+}
+
 /// Patch/extend v2 `ui_thinking_json` with tool UI events emitted by the service.
 ///
 /// Supported payload types:
 /// - `reasoning_delta`: appends/extends a lightweight reasoning span event.
 /// - `tool_batch_begin`: upserts tool chips and marks them active.
 /// - `tool_call_end`: marks the matching chip inactive and attaches `result_summary`.
+/// - `plan_update`: upserts plan steps and their statuses.
+/// - `todo_update`: upserts todo items and their statuses.
+/// - `subagent_update`: upserts child-agent status cards.
 ///
 /// If `uiThinkingJson` is empty, we create a minimal v2 structure so the chat
 /// bubble can still render the tool timeline even if the UI detached.
@@ -161,7 +257,10 @@ String? patchUiThinkingJsonWithToolUiEvent(
   final String type = (payload['type'] ?? '').toString().trim();
   if (type != 'tool_batch_begin' &&
       type != 'tool_call_end' &&
-      type != 'reasoning_delta') {
+      type != 'reasoning_delta' &&
+      type != 'plan_update' &&
+      type != 'todo_update' &&
+      type != 'subagent_update') {
     return uiThinkingJson;
   }
 
@@ -227,6 +326,66 @@ String? patchUiThinkingJsonWithToolUiEvent(
     } catch (_) {
       return uiThinkingJson;
     }
+  }
+
+  if (type == 'plan_update') {
+    final Object? steps0 = payload['steps'];
+    if (steps0 is! List) return jsonEncode(obj);
+    final Map<String, dynamic> event = _ensureStatusEvent(
+      block,
+      type: 'plan',
+      title: ((payload['title'] ?? '').toString().trim().isEmpty)
+          ? 'Plan'
+          : (payload['title'] as String).trim(),
+      icon: 'format_list_numbered',
+    );
+    _upsertStatusItems(
+      event,
+      steps0,
+      identityKeys: const <String>['id', 'step'],
+      defaultStatus: 'pending',
+    );
+    return jsonEncode(obj);
+  }
+
+  if (type == 'todo_update') {
+    final Object? items0 = payload['items'];
+    if (items0 is! List) return jsonEncode(obj);
+    final Map<String, dynamic> event = _ensureStatusEvent(
+      block,
+      type: 'todo',
+      title: ((payload['title'] ?? '').toString().trim().isEmpty)
+          ? 'TODO'
+          : (payload['title'] as String).trim(),
+      icon: 'checklist',
+    );
+    _upsertStatusItems(
+      event,
+      items0,
+      identityKeys: const <String>['id', 'text'],
+      defaultStatus: 'pending',
+    );
+    return jsonEncode(obj);
+  }
+
+  if (type == 'subagent_update') {
+    final Object? agents0 = payload['agents'];
+    if (agents0 is! List) return jsonEncode(obj);
+    final Map<String, dynamic> event = _ensureStatusEvent(
+      block,
+      type: 'subagents',
+      title: ((payload['title'] ?? '').toString().trim().isEmpty)
+          ? 'Subagents'
+          : (payload['title'] as String).trim(),
+      icon: 'groups_2',
+    );
+    _upsertStatusItems(
+      event,
+      agents0,
+      identityKeys: const <String>['id', 'name'],
+      defaultStatus: 'working',
+    );
+    return jsonEncode(obj);
   }
 
   final Map<String, dynamic> toolsEvent = _ensureToolsEvent(

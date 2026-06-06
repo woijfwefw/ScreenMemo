@@ -418,4 +418,109 @@ extension AIChatServicePromptBudgetExt on AIChatService {
     );
     return working;
   }
+
+  String _usageCallPhase({
+    required bool isToolLoop,
+    required AIGatewayResult result,
+  }) {
+    if (!isToolLoop) return 'final_answer';
+    return result.toolCalls.isEmpty ? 'final_answer' : 'tool_loop';
+  }
+
+  bool _looksLikeToolUsageInstruction(String text) {
+    final String t = text.trim();
+    if (t.isEmpty) return false;
+    final String lower = t.toLowerCase();
+    // Heuristic: detect the common tool-instruction preface (zh/en).
+    return lower.contains('tool calling is enabled') ||
+        lower.contains('available tools:') ||
+        t.contains('已启用工具调用') ||
+        t.contains('可用工具：');
+  }
+
+  String _buildPromptBreakdownJsonFromMessages({
+    required String model,
+    required List<AIMessage> messages,
+    required List<Map<String, dynamic>> tools,
+  }) {
+    int msgTokens(AIMessage m) => PromptBudget.approxTokensForMessageJson(m);
+
+    final Map<String, int> parts = <String, int>{};
+
+    final int toolsSchemaTokens = _approxToolSchemaTokens(tools);
+    if (toolsSchemaTokens > 0) parts['tool_schema'] = toolsSchemaTokens;
+
+    bool firstSystem = true;
+    int lastUserIdx = -1;
+    for (int i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role == 'user') {
+        lastUserIdx = i;
+        break;
+      }
+    }
+
+    for (int i = 0; i < messages.length; i++) {
+      final AIMessage m = messages[i];
+      final String role = m.role;
+      final int t = msgTokens(m);
+      if (t <= 0) continue;
+
+      if (role == 'system') {
+        if (firstSystem) {
+          parts['system_prompt'] = (parts['system_prompt'] ?? 0) + t;
+          firstSystem = false;
+          continue;
+        }
+        final String content = m.content;
+        final String trimmed = content.trim();
+        if (trimmed.contains('<conversation_context>')) {
+          parts['conversation_context'] =
+              (parts['conversation_context'] ?? 0) + t;
+        } else if (trimmed.contains('<user_memory>')) {
+          parts['user_memory'] = (parts['user_memory'] ?? 0) + t;
+        } else if (trimmed.contains('<atomic_memory>')) {
+          parts['atomic_memory'] = (parts['atomic_memory'] ?? 0) + t;
+        } else if (_looksLikeToolUsageInstruction(trimmed)) {
+          parts['tool_instruction'] = (parts['tool_instruction'] ?? 0) + t;
+        } else {
+          parts['extra_system'] = (parts['extra_system'] ?? 0) + t;
+        }
+        continue;
+      }
+
+      if (role == 'user') {
+        final String k = (i == lastUserIdx) ? 'user_message' : 'history_user';
+        parts[k] = (parts[k] ?? 0) + t;
+        continue;
+      }
+
+      if (role == 'assistant') {
+        parts['history_assistant'] = (parts['history_assistant'] ?? 0) + t;
+        continue;
+      }
+
+      if (role == 'tool') {
+        parts['history_tool'] = (parts['history_tool'] ?? 0) + t;
+        continue;
+      }
+
+      // Unknown role: keep it under "extra_system" so we don't drop tokens.
+      parts['extra_system'] = (parts['extra_system'] ?? 0) + t;
+    }
+
+    final int total = parts.values.fold(0, (a, b) => a + b);
+
+    try {
+      return jsonEncode(<String, dynamic>{
+        'v': 1,
+        'model': model,
+        'total_tokens': total,
+        'parts': parts,
+        'tools_count': tools.length,
+        'include_history': true,
+      });
+    } catch (_) {
+      return '';
+    }
+  }
 }

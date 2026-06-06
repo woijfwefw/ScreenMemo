@@ -18,7 +18,9 @@ import 'package:screen_memo/data/platform/path_service.dart';
 import 'package:screen_memo/features/backup/data/backup_inventory_service.dart';
 
 part 'screenshot_database_ai.dart';
+part 'screenshot_database_ai_segments.dart';
 part 'screenshot_database_meta.dart';
+part 'screenshot_database_meta_management.dart';
 part 'screenshot_database_import_diagnostics.dart';
 part 'screenshot_database_search.dart';
 part 'screenshot_database_merge.dart';
@@ -114,7 +116,7 @@ class ScreenshotDatabase {
 
   // 分库缓存（key: "<package>|<year>")
   static final Map<String, Database> _shardDbCache = {};
-  static const int _dbVersion = 54;
+  static const int _dbVersion = 55;
   static const int _screenshotPathLookupCacheMaxEntries = 4096;
   static final Map<String, String?> _screenshotPathLookupCache =
       <String, String?>{};
@@ -1413,6 +1415,55 @@ class ScreenshotDatabase {
       } catch (_) {}
     }
 
+    // v55: Parent-child AI conversations for visible subagent sessions.
+    if (oldVersion < 55) {
+      try {
+        await db.execute(
+          "ALTER TABLE ai_conversations ADD COLUMN conversation_kind TEXT NOT NULL DEFAULT 'chat'",
+        );
+      } catch (_) {}
+      try {
+        await db.execute(
+          'ALTER TABLE ai_conversations ADD COLUMN parent_cid TEXT',
+        );
+      } catch (_) {}
+      try {
+        await db.execute(
+          'ALTER TABLE ai_conversations ADD COLUMN parent_assistant_created_at INTEGER',
+        );
+      } catch (_) {}
+      try {
+        await db.execute(
+          'ALTER TABLE ai_conversations ADD COLUMN parent_tool_call_id TEXT',
+        );
+      } catch (_) {}
+      try {
+        await db.execute(
+          'ALTER TABLE ai_conversations ADD COLUMN subagent_id TEXT',
+        );
+      } catch (_) {}
+      try {
+        await db.execute(
+          'ALTER TABLE ai_conversations ADD COLUMN subagent_role TEXT',
+        );
+      } catch (_) {}
+      try {
+        await db.execute(
+          'ALTER TABLE ai_conversations ADD COLUMN subagent_context_tokens INTEGER',
+        );
+      } catch (_) {}
+      try {
+        await db.execute(
+          'ALTER TABLE ai_conversations ADD COLUMN subagent_context_cap_tokens INTEGER',
+        );
+      } catch (_) {}
+      try {
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_ai_conversations_parent ON ai_conversations(parent_cid, updated_at DESC, id DESC)',
+        );
+      } catch (_) {}
+    }
+
     // v29: raw transcript + per-request prompt usage events.
     if (oldVersion < 29) {
       try {
@@ -2614,9 +2665,7 @@ class ScreenshotDatabase {
     try {
       await _createDayStatsTables(db);
       // 这里复用已有全局日期扫描；该方法较重，只在首次迁移或用户强制刷新时执行。
-      final List<Map<String, dynamic>> days = await ScreenshotDatabaseMeta(
-        this,
-      ).listAvailableDaysGlobal();
+      final List<Map<String, dynamic>> days = await listAvailableDaysGlobal();
       final int now = DateTime.now().millisecondsSinceEpoch;
       await db.transaction((txn) async {
         await _createDayStatsTables(txn);

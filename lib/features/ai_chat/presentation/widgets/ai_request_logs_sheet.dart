@@ -130,7 +130,7 @@ class AIRequestLogsSheet extends StatelessWidget {
                       SliverPadding(
                         padding: contentPadding,
                         sliver: SliverFillRemaining(
-                          hasScrollBody: false,
+                          hasScrollBody: true,
                           child: body,
                         ),
                       ),

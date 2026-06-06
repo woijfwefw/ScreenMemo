@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
-import 'package:screen_memo/features/settings/presentation/pages/settings_page.dart';
 import 'package:screen_memo/features/ai_chat/presentation/pages/ai_settings_page.dart';
 import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
 import 'package:screen_memo/core/widgets/ui_components.dart';
@@ -207,7 +206,7 @@ class _EventHomePageState extends State<EventHomePage> {
   Future<void> _loadConversations() async {
     _beginEntryPerfLoad('event.conversations');
     try {
-      final listFuture = _settings.listAiConversations();
+      final listFuture = _settings.listAiConversations(includeSubagents: true);
       final activeFuture = _settings.getActiveConversationCid();
       final list = await listFuture;
       final active = await activeFuture;
@@ -750,10 +749,63 @@ class _EventHomePageState extends State<EventHomePage> {
                               )
                             else
                               ...(() {
+                                String normalizedParent(
+                                  Map<String, dynamic> row,
+                                ) {
+                                  final String cid =
+                                      ((row['cid'] as String?) ?? '').trim();
+                                  final String parentRaw =
+                                      ((row['parent_cid'] as String?) ?? '')
+                                          .trim();
+                                  final String lower = parentRaw.toLowerCase();
+                                  if (parentRaw.isEmpty ||
+                                      lower == 'null' ||
+                                      lower == 'undefined' ||
+                                      parentRaw == cid) {
+                                    return '';
+                                  }
+                                  return parentRaw;
+                                }
+
+                                final Set<String> allCids = _conversations
+                                    .map(
+                                      (row) => ((row['cid'] as String?) ?? '')
+                                          .trim(),
+                                    )
+                                    .where((cid) => cid.isNotEmpty)
+                                    .toSet();
+
                                 // 将当前激活会话置顶
+                                final rootConvs = _conversations
+                                    .where((row) {
+                                      final String parent = normalizedParent(
+                                        row,
+                                      );
+                                      return parent.isEmpty ||
+                                          !allCids.contains(parent);
+                                    })
+                                    .toList(growable: false);
+                                final Map<String, List<Map<String, dynamic>>>
+                                childrenByParent =
+                                    <String, List<Map<String, dynamic>>>{};
+                                for (final row in _conversations) {
+                                  final String parent = normalizedParent(row);
+                                  if (parent.isEmpty ||
+                                      !allCids.contains(parent)) {
+                                    continue;
+                                  }
+                                  childrenByParent
+                                      .putIfAbsent(
+                                        parent,
+                                        () => <Map<String, dynamic>>[],
+                                      )
+                                      .add(row);
+                                }
                                 final sortedConvs =
                                     List<Map<String, dynamic>>.from(
-                                      _conversations,
+                                      rootConvs.isEmpty
+                                          ? _conversations
+                                          : rootConvs,
                                     );
                                 sortedConvs.sort((a, b) {
                                   final aCid = (a['cid'] as String?) ?? '';
@@ -767,7 +819,7 @@ class _EventHomePageState extends State<EventHomePage> {
                                   return bTime.compareTo(aTime);
                                 });
 
-                                return sortedConvs.map((c) {
+                                return sortedConvs.expand((c) {
                                   final cid = (c['cid'] as String?) ?? '';
                                   final title =
                                       ((c['title'] as String?) ?? '')
@@ -779,13 +831,33 @@ class _EventHomePageState extends State<EventHomePage> {
                                   final isActive =
                                       (_activeConversationCid ?? '') == cid;
 
-                                  return _buildConversationTile(
-                                    context: context,
-                                    cid: cid,
-                                    title: title,
-                                    model: model,
-                                    isActive: isActive,
-                                  );
+                                  final children =
+                                      List<Map<String, dynamic>>.from(
+                                        childrenByParent[cid] ??
+                                            const <Map<String, dynamic>>[],
+                                      );
+                                  children.sort((a, b) {
+                                    final aTime =
+                                        (a['updated_at'] as int?) ?? 0;
+                                    final bTime =
+                                        (b['updated_at'] as int?) ?? 0;
+                                    return bTime.compareTo(aTime);
+                                  });
+
+                                  return <Widget>[
+                                    _buildConversationTile(
+                                      context: context,
+                                      cid: cid,
+                                      title: title,
+                                      model: model,
+                                      isActive: isActive,
+                                    ),
+                                    for (final child in children)
+                                      _buildSubagentConversationTile(
+                                        context: context,
+                                        row: child,
+                                      ),
+                                  ];
                                 }).toList();
                               })(),
                             Padding(
@@ -1065,5 +1137,96 @@ class _EventHomePageState extends State<EventHomePage> {
         ),
       ),
     );
+  }
+
+  Widget _buildSubagentConversationTile({
+    required BuildContext context,
+    required Map<String, dynamic> row,
+  }) {
+    final theme = Theme.of(context);
+    final String cid = ((row['cid'] as String?) ?? '').trim();
+    final String titleRaw = ((row['title'] as String?) ?? '').trim();
+    final String title = titleRaw.isEmpty ? 'Subagent' : titleRaw;
+    final int tokens = (row['subagent_context_tokens'] as int?) ?? 0;
+    final int cap = (row['subagent_context_cap_tokens'] as int?) ?? 0;
+    final String contextPercentLabel = _formatSubagentContextPercent(
+      tokens: tokens,
+      cap: cap,
+    );
+    return Padding(
+      padding: const EdgeInsets.only(left: AppTheme.spacing4),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: cid.isEmpty
+              ? null
+              : () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          AISettingsPage(conversationCid: cid, readOnly: true),
+                    ),
+                  );
+                },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTheme.spacing3,
+              vertical: AppTheme.spacing2,
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 14,
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                  child: Icon(
+                    Icons.smart_toy_outlined,
+                    size: 15,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: AppTheme.spacing2),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Text(
+                  contextPercentLabel == '-'
+                      ? 'ctx -'
+                      : 'ctx $contextPercentLabel',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 16,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatSubagentContextPercent({
+    required int tokens,
+    required int cap,
+  }) {
+    if (tokens <= 0 || cap <= 0) return '-';
+    final double percent = tokens * 100.0 / cap;
+    if (percent > 0 && percent < 0.1) return '<0.1%';
+    if (percent < 10) return '${percent.toStringAsFixed(1)}%';
+    return '${percent.round().clamp(0, 999)}%';
   }
 }

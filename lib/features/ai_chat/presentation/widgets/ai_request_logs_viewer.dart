@@ -181,12 +181,13 @@ class AIRequestLogsViewer extends StatefulWidget {
 }
 
 class _AIRequestLogsViewerState extends State<AIRequestLogsViewer>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   int _selectedTraceIndex = 0;
   int _selectedPanelIndex = 0;
   int _panelSwitchDirection = 1;
   double _panelSwipeDx = 0;
   double _panelSwipeWidth = 0;
+  double _viewportPanelDragDx = 0;
   late TabController _panelTabController;
   late final AnimationController _panelSwipeAnimController;
   Animation<double>? _panelSwipeAnim;
@@ -247,6 +248,7 @@ class _AIRequestLogsViewerState extends State<AIRequestLogsViewer>
   }
 
   bool _shouldPrepareResponseData() {
+    if (_usesViewportPanels) return true;
     if (_panelNeedsResponseData(_selectedPanelIndex)) return true;
     final int? target = _panelSwipeTargetIndex();
     return target != null && _panelNeedsResponseData(target);
@@ -315,7 +317,7 @@ class _AIRequestLogsViewerState extends State<AIRequestLogsViewer>
     super.initState();
     _recreatePanelTabController();
     if (widget.traces.isNotEmpty) {
-      _selectedTraceIndex = widget.traces.length - 1;
+      _selectedTraceIndex = 0;
     }
 
     _panelSwipeAnimController = AnimationController(vsync: this);
@@ -369,7 +371,7 @@ class _AIRequestLogsViewerState extends State<AIRequestLogsViewer>
       }
     }
     if (_selectedTraceIndex >= widget.traces.length) {
-      _selectedTraceIndex = widget.traces.length - 1;
+      _selectedTraceIndex = 0;
       _selectedPanelIndex = _panelOverview;
       _panelSwitchDirection = -1;
       _panelTabController.index = _panelOverview;
@@ -554,6 +556,27 @@ class _AIRequestLogsViewerState extends State<AIRequestLogsViewer>
           _toNonEmptyString(value['value']) ??
           _toNonEmptyString(value['content']);
       return text;
+    }
+    return null;
+  }
+
+  String? _toContentString(dynamic value) {
+    if (value == null) return null;
+    if (value is String) return value.isEmpty ? null : value;
+    if (value is num || value is bool) return value.toString();
+    if (value is List) {
+      final List<String> parts = <String>[];
+      for (final dynamic item in value) {
+        final String? p = _toContentString(item);
+        if (p != null && p.isNotEmpty) parts.add(p);
+      }
+      if (parts.isEmpty) return null;
+      return parts.join();
+    }
+    if (value is Map) {
+      return _toContentString(value['text']) ??
+          _toContentString(value['value']) ??
+          _toContentString(value['content']);
     }
     return null;
   }
@@ -1013,9 +1036,9 @@ class _AIRequestLogsViewerState extends State<AIRequestLogsViewer>
     final List<String> out = <String>[];
 
     final String type = (obj['type'] ?? '').toString().trim().toLowerCase();
-    final String? typeDelta = _toNonEmptyString(obj['delta']);
+    final String? typeDelta = _toContentString(obj['delta']);
     if (type.contains('output_text') && typeDelta != null) out.add(typeDelta);
-    final String? doneText = _toNonEmptyString(obj['text']);
+    final String? doneText = _toContentString(obj['text']);
     if (type.contains('output_text.done') && doneText != null) {
       out.add(doneText);
     }
@@ -1026,20 +1049,20 @@ class _AIRequestLogsViewerState extends State<AIRequestLogsViewer>
       if (choice0 is Map) {
         final dynamic delta = choice0['delta'];
         if (delta is Map) {
-          final String? c = _toNonEmptyString(delta['content']);
+          final String? c = _toContentString(delta['content']);
           if (c != null) out.add(c);
         }
         final dynamic message = choice0['message'];
         if (message is Map) {
-          final String? c = _toNonEmptyString(message['content']);
+          final String? c = _toContentString(message['content']);
           if (c != null) out.add(c);
         }
-        final String? text = _toNonEmptyString(choice0['text']);
+        final String? text = _toContentString(choice0['text']);
         if (text != null) out.add(text);
       }
     }
 
-    final String? outputText = _toNonEmptyString(obj['output_text']);
+    final String? outputText = _toContentString(obj['output_text']);
     if (outputText != null) out.add(outputText);
 
     final dynamic output = obj['output'];
@@ -1049,11 +1072,11 @@ class _AIRequestLogsViewerState extends State<AIRequestLogsViewer>
         final dynamic content = item['content'];
         if (content is List) {
           for (final dynamic part in content) {
-            final String? text = _toNonEmptyString(part);
+            final String? text = _toContentString(part);
             if (text != null) out.add(text);
           }
         }
-        final String? itemText = _toNonEmptyString(item['text']);
+        final String? itemText = _toContentString(item['text']);
         if (itemText != null) out.add(itemText);
       }
     }
@@ -1068,7 +1091,7 @@ class _AIRequestLogsViewerState extends State<AIRequestLogsViewer>
           if (parts is List) {
             for (final dynamic p in parts) {
               if (p is! Map) continue;
-              final String? text = _toNonEmptyString(p['text']);
+              final String? text = _toContentString(p['text']);
               if (text != null) out.add(text);
             }
           }
@@ -1246,33 +1269,38 @@ class _AIRequestLogsViewerState extends State<AIRequestLogsViewer>
       final String b = badge.trim();
       final bool showBadge = b.isNotEmpty && b != '-' && b != '—';
       return Tab(
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(title),
-              if (showBadge) ...[
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                    color: cs.surfaceContainerHighest,
-                  ),
-                  child: Text(
-                    b,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: cs.onSurfaceVariant,
+        child: SizedBox(
+          width: double.infinity,
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(title),
+                  if (showBadge) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                        color: cs.surfaceContainerHighest,
+                      ),
+                      child: Text(
+                        b,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ],
-            ],
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
       );
@@ -1286,7 +1314,9 @@ class _AIRequestLogsViewerState extends State<AIRequestLogsViewer>
         buildTab(zh ? '原始响应' : 'Raw Response', ''),
     ];
 
-    final Widget panelBody = _buildSwipeablePanels(context, tr, req, rsp);
+    final Widget panelBody = fillBody
+        ? _buildViewportTabPanels(context, tr, req, rsp)
+        : _buildSwipeablePanels(context, tr, req, rsp);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1464,8 +1494,35 @@ class _AIRequestLogsViewerState extends State<AIRequestLogsViewer>
     _settlePanelSwipe(width, details.primaryVelocity ?? 0);
   }
 
+  void _handleViewportPanelDragStart(DragStartDetails _) {
+    _viewportPanelDragDx = 0;
+  }
+
+  void _handleViewportPanelDragUpdate(DragUpdateDetails details) {
+    _viewportPanelDragDx += details.delta.dx;
+  }
+
+  void _handleViewportPanelDragEnd(DragEndDetails details) {
+    final double dx = _viewportPanelDragDx;
+    _viewportPanelDragDx = 0;
+    final double velocity = details.primaryVelocity ?? 0;
+    final bool goNext = dx <= -48 || velocity <= -600;
+    final bool goPrev = dx >= 48 || velocity >= 600;
+    if (!goNext && !goPrev) return;
+
+    final int current = _selectedPanelIndex;
+    final int target = _clampPanelIndex(current + (goNext ? 1 : -1));
+    if (target == current) return;
+    setState(() {
+      _panelSwitchDirection = target > current ? 1 : -1;
+      _selectedPanelIndex = target;
+    });
+    _panelTabController.animateTo(target, duration: Duration.zero);
+  }
+
   Widget _buildHorizontalSwipeScope(Widget child) {
     if (widget.traces.isEmpty) return child;
+    if (_usesViewportPanels) return child;
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onHorizontalDragStart: _handlePanelHorizontalDragStart,
@@ -1491,6 +1548,50 @@ class _AIRequestLogsViewerState extends State<AIRequestLogsViewer>
         return _panelSwipeDx.abs() > 0.01
             ? _buildSwipingStack(context, width, tr, req, rsp)
             : _buildAnimatedPanelSwitcher(context, tr, req, rsp);
+      },
+    );
+  }
+
+  Widget _buildViewportTabPanels(
+    BuildContext context,
+    AIRequestTrace tr,
+    _RequestViewData req,
+    _ResponseViewData? rsp,
+  ) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double width = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.of(context).size.width;
+        _panelSwipeWidth = width;
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: IndexedStack(
+                index: _clampPanelIndex(_selectedPanelIndex),
+                children: List<Widget>.generate(
+                  _panelCount,
+                  (int index) =>
+                      _buildPanelByIndex(context, index, tr, req, rsp),
+                  growable: false,
+                ),
+              ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 56,
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onHorizontalDragStart: _handleViewportPanelDragStart,
+                onHorizontalDragUpdate: _handleViewportPanelDragUpdate,
+                onHorizontalDragEnd: _handleViewportPanelDragEnd,
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ],
+        );
       },
     );
   }

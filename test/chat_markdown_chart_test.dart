@@ -91,6 +91,22 @@ Before
     expect(processed, isNot(contains('([abc.net.au]')));
   });
 
+  test('preprocess converts evidence filename lists to evidence markers', () {
+    const String markdown = '''
+- **证据 filename**
+  - `141021_176.webp`
+  - `141221_242.webp`
+
+Plain `not_evidence.webp` should stay as code.
+''';
+
+    final String processed = preprocessForChatMarkdown(markdown);
+
+    expect(processed, contains('[evidence: 141021_176.webp]'));
+    expect(processed, contains('[evidence: 141221_242.webp]'));
+    expect(processed, contains('`not_evidence.webp`'));
+  });
+
   testWidgets('Markdown renders text and chart block together', (
     WidgetTester tester,
   ) async {

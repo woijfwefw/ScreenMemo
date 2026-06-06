@@ -1816,6 +1816,24 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
       );
     }
 
+    if (e.type == _ThinkingEventType.subagents && e.subagents.isNotEmpty) {
+      if (children.isNotEmpty) children.add(const SizedBox(height: 8));
+      children.add(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (int i = 0; i < e.subagents.length; i++)
+              Padding(
+                padding: EdgeInsets.only(
+                  bottom: i == e.subagents.length - 1 ? 0 : 6,
+                ),
+                child: _buildSubagentMiniRow(context, e.subagents[i]),
+              ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
       child: Column(
@@ -1823,6 +1841,101 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
         children: children,
       ),
     );
+  }
+
+  Widget _buildStatusItemRow(BuildContext context, _AgentStatusItem item) {
+    final theme = Theme.of(context);
+    final Color fg = _thinkingTextColor;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 1),
+          child: Icon(_statusIcon(item.status), size: 14, color: fg),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            item.text,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: fg,
+              fontWeight: FontWeight.w500,
+              height: 1.25,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSubagentMiniRow(BuildContext context, _SubagentStatusItem item) {
+    final theme = Theme.of(context);
+    final Color fg = _thinkingTextColor;
+    final String summary = (item.summary ?? '').trim();
+    final String percentLabel = _subagentContextPercentLabel(item);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 1),
+          child: Icon(Icons.smart_toy_outlined, size: 14, color: fg),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            summary.isEmpty ? item.name : '${item.name}: $summary',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: fg,
+              fontWeight: FontWeight.w500,
+              height: 1.25,
+            ),
+          ),
+        ),
+        if (percentLabel != '-') ...[
+          const SizedBox(width: 8),
+          Text(
+            percentLabel,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: fg,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  IconData _statusIcon(String status) {
+    switch (status.trim()) {
+      case 'completed':
+      case 'done':
+        return Icons.check_circle_rounded;
+      case 'in_progress':
+      case 'working':
+      case 'running':
+        return Icons.radio_button_checked_rounded;
+      case 'blocked':
+      case 'failed':
+        return Icons.error_rounded;
+      default:
+        return Icons.radio_button_unchecked_rounded;
+    }
+  }
+
+  String _subagentContextPercentLabel(_SubagentStatusItem item) {
+    final int tokens = item.contextTokensEstimate ?? 0;
+    final int cap = item.contextCapTokens ?? 0;
+    if (tokens > 0 && cap > 0) {
+      final double percent = tokens * 100.0 / cap;
+      if (percent > 0 && percent < 0.1) return '<0.1%';
+      if (percent < 10) return '${percent.toStringAsFixed(1)}%';
+      return '${percent.round().clamp(0, 999)}%';
+    }
+    final int explicit = item.contextPercent ?? 0;
+    if (explicit > 0) return '${explicit.clamp(0, 999)}%';
+    return '-';
   }
 
   String _reasoningSlice(_ThinkingEvent e) {

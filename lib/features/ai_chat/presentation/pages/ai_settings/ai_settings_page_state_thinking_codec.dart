@@ -49,6 +49,42 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
           if (iconKey.isNotEmpty) 'icon': iconKey,
           if (isLoading && e.active) 'active': true,
           if (tools.isNotEmpty) 'tools': tools,
+          if ((e.type == _ThinkingEventType.plan ||
+                  e.type == _ThinkingEventType.todo) &&
+              e.items.isNotEmpty)
+            'items': e.items
+                .map(
+                  (_AgentStatusItem item) => <String, dynamic>{
+                    'id': item.id,
+                    'text': item.text,
+                    'status': item.status,
+                  },
+                )
+                .toList(growable: false),
+          if (e.type == _ThinkingEventType.subagents && e.subagents.isNotEmpty)
+            'items': e.subagents
+                .map(
+                  (_SubagentStatusItem item) => <String, dynamic>{
+                    'id': item.id,
+                    'name': item.name,
+                    'status': item.status,
+                    if ((item.role ?? '').trim().isNotEmpty) 'role': item.role,
+                    if ((item.summary ?? '').trim().isNotEmpty)
+                      'summary': item.summary,
+                    if ((item.model ?? '').trim().isNotEmpty)
+                      'model': item.model,
+                    if ((item.conversationCid ?? '').trim().isNotEmpty)
+                      'conversation_cid': item.conversationCid,
+                    if (item.contextTokensEstimate != null)
+                      'context_tokens_estimate': item.contextTokensEstimate,
+                    if (item.contextCapTokens != null)
+                      'context_cap_tokens': item.contextCapTokens,
+                    if (item.contextPercent != null)
+                      'context_percent': item.contextPercent,
+                    if (item.durationMs != null) 'duration_ms': item.durationMs,
+                  },
+                )
+                .toList(growable: false),
           if (e.type == _ThinkingEventType.reasoning &&
               (e.reasoningStart ?? -1) >= 0 &&
               (e.reasoningLength ?? 0) > 0)
@@ -93,6 +129,76 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
       return false;
     }
 
+    String asString(dynamic v) => (v ?? '').toString().trim();
+
+    List<_AgentStatusItem> parseStatusItems(dynamic raw) {
+      if (raw is! List) return const <_AgentStatusItem>[];
+      final List<_AgentStatusItem> out = <_AgentStatusItem>[];
+      for (final item0 in raw) {
+        if (item0 is! Map) continue;
+        final Map<String, dynamic> item = Map<String, dynamic>.from(item0);
+        final String text = asString(
+          item['text'] ?? item['step'] ?? item['task'] ?? item['description'],
+        );
+        if (text.isEmpty) continue;
+        final String idRaw = asString(item['id']);
+        out.add(
+          _AgentStatusItem(
+            id: idRaw.isEmpty ? 'item_${out.length + 1}' : idRaw,
+            text: text,
+            status: asString(item['status']).isEmpty
+                ? 'pending'
+                : asString(item['status']),
+          ),
+        );
+      }
+      return out;
+    }
+
+    List<_SubagentStatusItem> parseSubagentItems(dynamic raw) {
+      if (raw is! List) return const <_SubagentStatusItem>[];
+      final List<_SubagentStatusItem> out = <_SubagentStatusItem>[];
+      for (final item0 in raw) {
+        if (item0 is! Map) continue;
+        final Map<String, dynamic> item = Map<String, dynamic>.from(item0);
+        final String name = asString(
+          item['name'] ?? item['title'] ?? item['task'],
+        );
+        final String summary = asString(
+          item['summary'] ?? item['task'] ?? item['description'],
+        );
+        if (name.isEmpty && summary.isEmpty) continue;
+        final String idRaw = asString(item['id']);
+        final int contextTokens = asInt(item['context_tokens_estimate']);
+        final int contextCap = asInt(item['context_cap_tokens']);
+        final int contextPercent = asInt(item['context_percent']);
+        final int durationMs = asInt(item['duration_ms']);
+        final String model = asString(item['model']);
+        out.add(
+          _SubagentStatusItem(
+            id: idRaw.isEmpty ? 'subagent_${out.length + 1}' : idRaw,
+            name: name.isEmpty ? 'Subagent ${out.length + 1}' : name,
+            status: asString(item['status']).isEmpty
+                ? 'working'
+                : asString(item['status']),
+            role: asString(item['role']).isEmpty
+                ? null
+                : asString(item['role']),
+            summary: summary.isEmpty ? null : summary,
+            model: model.isEmpty ? null : model,
+            conversationCid: asString(item['conversation_cid']).isEmpty
+                ? null
+                : asString(item['conversation_cid']),
+            contextTokensEstimate: contextTokens > 0 ? contextTokens : null,
+            contextCapTokens: contextCap > 0 ? contextCap : null,
+            contextPercent: contextPercent > 0 ? contextPercent : null,
+            durationMs: durationMs > 0 ? durationMs : null,
+          ),
+        );
+      }
+      return out;
+    }
+
     dynamic decoded;
     try {
       decoded = jsonDecode(t);
@@ -132,6 +238,9 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
           'intent' => _ThinkingEventType.intent,
           'reasoning' => _ThinkingEventType.reasoning,
           'tools' => _ThinkingEventType.tools,
+          'plan' => _ThinkingEventType.plan,
+          'todo' => _ThinkingEventType.todo,
+          'subagents' => _ThinkingEventType.subagents,
           _ => _ThinkingEventType.status,
         };
 
@@ -199,6 +308,14 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
             icon: _thinkingIconFromKey(iconKey),
             active: asBool(eMap['active']),
             tools: tools,
+            items:
+                (type == _ThinkingEventType.plan ||
+                    type == _ThinkingEventType.todo)
+                ? parseStatusItems(eMap['items'])
+                : const <_AgentStatusItem>[],
+            subagents: type == _ThinkingEventType.subagents
+                ? parseSubagentItems(eMap['items'])
+                : const <_SubagentStatusItem>[],
             reasoningStart: asInt(eMap['reasoning_start']),
             reasoningLength: asInt(eMap['reasoning_len']),
           ),
@@ -230,6 +347,11 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
         return reasoningContent.substring(start, end).trim().isNotEmpty;
       case _ThinkingEventType.tools:
         return event.tools.isNotEmpty;
+      case _ThinkingEventType.plan:
+      case _ThinkingEventType.todo:
+        return false;
+      case _ThinkingEventType.subagents:
+        return event.subagents.isNotEmpty;
       case _ThinkingEventType.intent:
       case _ThinkingEventType.status:
         if (event.transient && !includeTransient) return false;
@@ -1992,6 +2114,22 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
       }
       final String title = e.title.trim();
       final String sub = (e.subtitle ?? '').trim();
+      if (e.type == _ThinkingEventType.plan ||
+          e.type == _ThinkingEventType.todo) {
+        continue;
+      }
+      if (e.type == _ThinkingEventType.subagents) {
+        if (e.subagents.isEmpty) continue;
+        if (title.isNotEmpty) sb.writeln(title);
+        for (final item in e.subagents) {
+          final String summary = (item.summary ?? '').trim();
+          sb.writeln(
+            '- [${item.status}] ${item.name}${summary.isEmpty ? '' : ': $summary'}',
+          );
+        }
+        sb.writeln();
+        continue;
+      }
       if (title.isNotEmpty) sb.writeln(title);
       if (sub.isNotEmpty) sb.writeln(sub);
       if (e.type == _ThinkingEventType.tools && e.tools.isNotEmpty) {

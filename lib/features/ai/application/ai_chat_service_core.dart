@@ -32,6 +32,28 @@ extension AIChatServiceCoreExt on AIChatService {
         '- If your answer relies on the user’s local records (chats/transfers/screenshot contents), attach evidence references [evidence: X] for key claims (X must be a screenshot filename from tool outputs or provided context). Do not fabricate evidence.',
       ),
     );
+    if (names.contains('delegate_subagents')) {
+      sb.writeln(
+        _loc(
+          '- delegate_subagents 是 Codex 风格子代理委派工具：只有在用户明确要求子代理/并行代理/多路审查，或复杂任务确实需要拆成独立分析流时才调用；不要自动生成子代理。',
+          '- delegate_subagents is a Codex-style delegation tool. Use it only when the user explicitly asks for subagents/parallel agents/multi-pass review, or when the task genuinely benefits from independent analysis streams. Do not spawn child agents automatically.',
+        ),
+      );
+      sb.writeln(
+        _loc(
+          '- 子代理可以调用除 delegate_subagents / TODO 状态工具以外的可用工具；请把每个子任务写成独立、可执行、可总结的探索/执行/审查任务，并在拿到结果后由主模型统一合并答复。',
+          '- Child agents can call available tools except delegate_subagents and TODO/status tools. Write each child task as an independent executable exploration/worker/reviewer assignment, then consolidate their results in the main answer.',
+        ),
+      );
+    }
+    if (names.contains('update_todos')) {
+      sb.writeln(
+        _loc(
+          '- update_todos 只用于主 agent 的任务 TODO。用户明确要求 TODO 时应创建；否则仅在任务复杂、需要显式跟踪进度时创建。最多 6 项。子代理不是 TODO。',
+          '- update_todos is only for the main agent task TODO list. Create it when the user explicitly asks for TODOs, or when the task is complex enough to need visible progress tracking. Max 6 items. Subagents are not TODOs.',
+        ),
+      );
+    }
     final bool hasRetrievalTools =
         names.contains('search_segments') ||
         names.contains('search_screenshots_ocr') ||

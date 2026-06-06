@@ -194,6 +194,20 @@ flutter build apk --debug
 flutter build apk --release --split-per-abi --tree-shake-icons --obfuscate --split-debug-info=build/symbols
 ```
 
+#### 功能测试与回归保护
+
+新增或修改功能时，应优先补充功能测试，验证真实业务行为和可观察结果，避免只围绕文案、布局或实现细节编写脆弱测试。推荐按垂直切片推进：每个功能变更至少覆盖一条成功路径和一条关键边界路径，并把曾经修复过的缺陷沉淀为回归测试。
+
+当前重点回归面包括：
+
+- AI 工具循环、图片生成、工具结果回填、TODO 状态和子代理状态事件。
+- AI 请求网关的 Responses / Chat Completions / Anthropic / Codex compatible 请求形状、流式去重和搜索元数据解析。
+- 截图数据库的分库写入、动态时间线分页、备份清单、合并导入和统计重建。
+
+非生成源码文件应保持在 3500 行以内；`test/codebase_structure_test.dart` 会覆盖 `lib` 下的 Dart 源码和 `android/app/src/main/kotlin` 下的 Android Kotlin 业务源码。如果功能继续增长，应按业务能力拆分为同一 Dart library 下的 `part` 文件、同包 Kotlin helper，或更清晰的模块。`lib/l10n/app_localizations*.dart` 是 `flutter gen-l10n` 生成文件，不手动拆分。
+
+AI 对话的工具循环支持 TODO 与子代理协议：主模型可通过 `update_todos` 更新当前任务 TODO，最多 6 项；TODO 只在聊天输入框上方的 TODO 面板显示，不再作为思考时间线内容展示。模型可在用户明确要求子代理/并行代理，或复杂任务确实需要独立探索流时调用 `delegate_subagents` 委派一层并发子代理。子代理本身不是 TODO；子代理可使用普通工具能力，但不能继续创建子代理，也不能更新主 TODO。主循环会等待全部子代理结果并把结构化汇总作为 tool result 回传给主模型；只有真实子代理委派会产生 `subagent_update`。子代理入口位于输入区工具栏并通过底部抽屉展示当前子代理列表、上下文占用和只读详情入口；父会话列表中也会把子代理会话挂在对应主会话下方。以上事件都会写入 `ui_thinking_json`，调整相关协议时需要同步更新 `test/ui_thinking_json_patcher_test.dart` 和工具循环功能测试。
+
 > 本地开发构建如果没有显式传入 `--build-name`，会使用 `pubspec.yaml` 中的默认版本 `999.999.999+999999999`。
 > 这样可避免自构建包因为低于 GitHub Releases 最新版本而触发云端更新提示。
 > 正式发布工作流会从 Git tag 解析真实版本，并通过 `--build-name` / `--build-number` 覆盖该默认值。Android 覆盖安装实际比较的是 `versionCode`（即 `+` 后面的 build number），不是界面显示的 `versionName`。

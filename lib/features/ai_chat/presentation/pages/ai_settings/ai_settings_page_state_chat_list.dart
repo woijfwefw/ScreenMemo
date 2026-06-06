@@ -1,6 +1,187 @@
 part of '../ai_settings_page.dart';
 
 extension _AISettingsPageStateChatListExt on _AISettingsPageState {
+  List<_AgentStatusItem> _currentTodoItems() {
+    for (int i = _messages.length - 1; i >= 0; i--) {
+      final List<_ThinkingBlock> blocks =
+          _thinkingBlocksByIndex[i] ?? const <_ThinkingBlock>[];
+      for (int bi = blocks.length - 1; bi >= 0; bi--) {
+        final _ThinkingBlock block = blocks[bi];
+        for (int ei = block.events.length - 1; ei >= 0; ei--) {
+          final _ThinkingEvent event = block.events[ei];
+          if (event.type == _ThinkingEventType.todo && event.items.isNotEmpty) {
+            return event.items;
+          }
+        }
+      }
+    }
+    return const <_AgentStatusItem>[];
+  }
+
+  List<_SubagentStatusItem> _allSubagentItems() {
+    final Map<String, _SubagentStatusItem> byId =
+        <String, _SubagentStatusItem>{};
+    for (int i = 0; i < _messages.length; i++) {
+      final List<_ThinkingBlock> blocks =
+          _thinkingBlocksByIndex[i] ?? const <_ThinkingBlock>[];
+      for (final _ThinkingBlock block in blocks) {
+        for (final _ThinkingEvent event in block.events) {
+          if (event.type != _ThinkingEventType.subagents) continue;
+          for (final _SubagentStatusItem item in event.subagents) {
+            final String key = item.id.trim().isNotEmpty ? item.id : item.name;
+            final _SubagentStatusItem? existing = byId[key];
+            if (existing == null) {
+              byId[key] = item;
+              continue;
+            }
+            existing.name = item.name;
+            existing.status = item.status;
+            existing.role = item.role ?? existing.role;
+            existing.summary = item.summary ?? existing.summary;
+            existing.model = item.model ?? existing.model;
+            existing.conversationCid =
+                item.conversationCid ?? existing.conversationCid;
+            existing.contextTokensEstimate =
+                item.contextTokensEstimate ?? existing.contextTokensEstimate;
+            existing.contextCapTokens =
+                item.contextCapTokens ?? existing.contextCapTokens;
+            existing.contextPercent =
+                item.contextPercent ?? existing.contextPercent;
+            existing.durationMs = item.durationMs ?? existing.durationMs;
+          }
+        }
+      }
+    }
+    return byId.values.toList(growable: false);
+  }
+
+  String _formatSubagentContextPercent({
+    required int tokens,
+    required int cap,
+    int? fallbackPercent,
+  }) {
+    if (tokens > 0 && cap > 0) {
+      final double percent = tokens * 100.0 / cap;
+      if (percent > 0 && percent < 0.1) return '<0.1%';
+      if (percent < 10) return '${percent.toStringAsFixed(1)}%';
+      return '${percent.round().clamp(0, 999)}%';
+    }
+    final int explicit = fallbackPercent ?? 0;
+    if (explicit > 0) return '${explicit.clamp(0, 999)}%';
+    return '-';
+  }
+
+  List<_SubagentStatusItem> _mergeSubagentItemsWithRows(
+    List<_SubagentStatusItem> items,
+    List<Map<String, dynamic>> rows,
+  ) {
+    final List<_SubagentStatusItem> merged = items
+        .map(
+          (_SubagentStatusItem item) => _SubagentStatusItem(
+            id: item.id,
+            name: item.name,
+            status: item.status,
+            role: item.role,
+            summary: item.summary,
+            model: item.model,
+            conversationCid: item.conversationCid,
+            contextTokensEstimate: item.contextTokensEstimate,
+            contextCapTokens: item.contextCapTokens,
+            contextPercent: item.contextPercent,
+            durationMs: item.durationMs,
+          ),
+        )
+        .toList(growable: true);
+
+    int asInt(Object? value) {
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      return int.tryParse((value ?? '').toString().trim()) ?? 0;
+    }
+
+    _SubagentStatusItem itemFromRow(Map<String, dynamic> row) {
+      final String cid = ((row['cid'] as String?) ?? '').trim();
+      final String id = ((row['subagent_id'] as String?) ?? '').trim();
+      final String title = ((row['title'] as String?) ?? '').trim();
+      final String role = ((row['subagent_role'] as String?) ?? '').trim();
+      final String model = ((row['model'] as String?) ?? '').trim();
+      final int tokens = asInt(row['subagent_context_tokens']);
+      final int cap = asInt(row['subagent_context_cap_tokens']);
+      return _SubagentStatusItem(
+        id: id.isEmpty
+            ? (cid.isEmpty ? 'subagent_${merged.length + 1}' : cid)
+            : id,
+        name: title.isEmpty ? 'Subagent' : title,
+        status: 'completed',
+        role: role.isEmpty ? null : role,
+        model: model.isEmpty ? null : model,
+        conversationCid: cid.isEmpty ? null : cid,
+        contextTokensEstimate: tokens > 0 ? tokens : null,
+        contextCapTokens: cap > 0 ? cap : null,
+        contextPercent: tokens > 0 && cap > 0
+            ? ((tokens * 100) / cap).round().clamp(0, 999)
+            : null,
+      );
+    }
+
+    String rowKey(Map<String, dynamic> row) {
+      final String cid = ((row['cid'] as String?) ?? '').trim();
+      if (cid.isNotEmpty) return 'cid:$cid';
+      final String id = ((row['subagent_id'] as String?) ?? '').trim();
+      if (id.isNotEmpty) return 'id:$id';
+      final String title = ((row['title'] as String?) ?? '').trim();
+      return 'name:$title';
+    }
+
+    String itemKey(_SubagentStatusItem item) {
+      final String cid = (item.conversationCid ?? '').trim();
+      if (cid.isNotEmpty) return 'cid:$cid';
+      final String id = item.id.trim();
+      if (id.isNotEmpty) return 'id:$id';
+      return 'name:${item.name.trim()}';
+    }
+
+    final Map<String, _SubagentStatusItem> byKey =
+        <String, _SubagentStatusItem>{
+          for (final _SubagentStatusItem item in merged) itemKey(item): item,
+        };
+
+    for (final Map<String, dynamic> row in rows) {
+      final String key = rowKey(row);
+      if (key == 'name:') continue;
+      final _SubagentStatusItem rowItem = itemFromRow(row);
+      final _SubagentStatusItem? existing = byKey[key];
+      if (existing == null) {
+        merged.add(rowItem);
+        byKey[itemKey(rowItem)] = rowItem;
+        continue;
+      }
+      existing.name = rowItem.name;
+      existing.role = existing.role ?? rowItem.role;
+      existing.model = existing.model ?? rowItem.model;
+      existing.conversationCid =
+          existing.conversationCid ?? rowItem.conversationCid;
+      existing.contextTokensEstimate =
+          existing.contextTokensEstimate ?? rowItem.contextTokensEstimate;
+      existing.contextCapTokens =
+          existing.contextCapTokens ?? rowItem.contextCapTokens;
+      existing.contextPercent =
+          existing.contextPercent ?? rowItem.contextPercent;
+    }
+
+    return merged;
+  }
+
+  String _subagentContextCompactLabel(_SubagentStatusItem item) {
+    final int tokens = item.contextTokensEstimate ?? 0;
+    final int cap = item.contextCapTokens ?? 0;
+    return _formatSubagentContextPercent(
+      tokens: tokens,
+      cap: cap,
+      fallbackPercent: item.contextPercent,
+    );
+  }
+
   Widget _buildChatList() {
     if (_messages.isEmpty) {
       final l10n = AppLocalizations.of(context);
@@ -1161,28 +1342,46 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
     required VoidCallback? onTap,
     Color? color,
     Color? background,
+    Widget? child,
+    Widget? overlay,
+    bool circular = false,
   }) {
     final theme = Theme.of(context);
+    final BorderRadius buttonRadius = BorderRadius.circular(
+      circular ? 18 : AppTheme.radiusLg,
+    );
     return Tooltip(
       message: tooltip,
       preferBelow: false,
       child: SizedBox(
         width: 36,
         height: 36,
-        child: Material(
-          color: background ?? Colors.transparent,
-          borderRadius: BorderRadius.circular(18),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(18),
-            onTap: onTap,
-            child: Icon(
-              icon,
-              size: 22,
-              color: onTap == null
-                  ? theme.colorScheme.onSurfaceVariant.withOpacity(0.38)
-                  : (color ?? theme.colorScheme.onSurfaceVariant),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Material(
+              color: background ?? Colors.transparent,
+              borderRadius: buttonRadius,
+              child: InkWell(
+                borderRadius: buttonRadius,
+                onTap: onTap,
+                child: Center(
+                  child:
+                      child ??
+                      Icon(
+                        icon,
+                        size: 22,
+                        color: onTap == null
+                            ? theme.colorScheme.onSurfaceVariant.withOpacity(
+                                0.38,
+                              )
+                            : (color ?? theme.colorScheme.onSurfaceVariant),
+                      ),
+                ),
+              ),
             ),
-          ),
+            if (overlay != null) overlay,
+          ],
         ),
       ),
     );
@@ -1319,30 +1518,32 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
     );
   }
 
-  // 常规底部输入栏：圆角容器内第一行输入，第二行功能键。
+  // 常规底部输入栏：TODO 独立显示在输入卡片上方，输入卡片内保留文本区和工具栏。
   Widget _buildComposerBar() {
     final theme = Theme.of(context);
-    String _middleEllipsis(String s, int maxChars) {
+    final List<_AgentStatusItem> todoItems = _currentTodoItems();
+    final List<_SubagentStatusItem> subagents = _allSubagentItems();
+    String middleEllipsis(String s, int maxChars) {
       if (s.length <= maxChars) return s;
       if (maxChars <= 3) return s.substring(0, maxChars);
       final keep = maxChars - 1; // one char for ellipsis
       final head = (keep / 2).floor();
       final tail = keep - head;
-      return s.substring(0, head) + '…' + s.substring(s.length - tail);
+      return '${s.substring(0, head)}…${s.substring(s.length - tail)}';
     }
 
     final String modelLabel = (() {
       final mctx = (_ctxChatModel ?? '').trim();
-      if (mctx.isNotEmpty) return _middleEllipsis(mctx, 18);
+      if (mctx.isNotEmpty) return middleEllipsis(mctx, 18);
       final legacy = _modelController.text.trim();
-      return legacy.isEmpty ? 'AI' : _middleEllipsis(legacy, 18);
+      return legacy.isEmpty ? 'AI' : middleEllipsis(legacy, 18);
     })();
     final placeholder = AppLocalizations.of(
       context,
     ).sendMessageToModelPlaceholder(modelLabel);
     final Color drawColor = _imageDrawMode
         ? theme.colorScheme.primary
-        : theme.colorScheme.onSurfaceVariant.withOpacity(0.45);
+        : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.45);
     final l10n = AppLocalizations.of(context);
     final String sendTooltip = _sending
         ? l10n.composerStopTooltip
@@ -1359,34 +1560,66 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
         ? theme.colorScheme.error
         : theme.colorScheme.onPrimary;
 
+    if (widget.readOnly) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppTheme.spacing4,
+          AppTheme.spacing2,
+          AppTheme.spacing4,
+          MediaQuery.of(context).padding.bottom + AppTheme.spacing4,
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTheme.spacing3,
+            vertical: AppTheme.spacing2,
+          ),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            border: Border.all(
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.65),
+            ),
+          ),
+          child: Text(
+            _isZhLocale() ? '子代理对话为只读' : 'Subagent conversation is read-only',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final double bottomInset = MediaQuery.of(context).padding.bottom;
+    const double composerCornerRadius = AppTheme.radiusXl * 2;
+    final BorderRadius composerBorderRadius = BorderRadius.vertical(
+      top: Radius.circular(composerCornerRadius),
+    );
     final Widget barInner = Container(
+      width: double.infinity,
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: composerBorderRadius,
         border: Border.all(
-          color: theme.colorScheme.outlineVariant.withOpacity(0.65),
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.65),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.shadow.withOpacity(0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       padding: EdgeInsets.fromLTRB(
+        AppTheme.spacing4,
         AppTheme.spacing3,
-        AppTheme.spacing2,
-        AppTheme.spacing3,
-        AppTheme.spacing2,
+        AppTheme.spacing4,
+        bottomInset + AppTheme.spacing3,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildComposerAttachments(),
           ConstrainedBox(
             constraints: const BoxConstraints(
-              minHeight: _composerInputRowHeight,
+              minHeight: _composerInputRowHeight * 1.45,
               maxHeight: _composerInputRowHeight * 6.0,
             ),
             child: TextField(
@@ -1402,7 +1635,9 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
                 hintText: placeholder,
                 hintMaxLines: 2,
                 hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.6,
+                  ),
                 ),
                 isDense: true,
                 border: InputBorder.none,
@@ -1421,8 +1656,9 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
               },
             ),
           ),
-          const SizedBox(height: AppTheme.spacing2),
+          const SizedBox(height: AppTheme.spacing1),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               _buildComposerIconButton(
                 icon: Icons.add_rounded,
@@ -1437,7 +1673,7 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
                     : l10n.composerEnableDrawingModeTooltip,
                 color: drawColor,
                 background: _imageDrawMode
-                    ? theme.colorScheme.primaryContainer.withOpacity(0.55)
+                    ? theme.colorScheme.primaryContainer.withValues(alpha: 0.55)
                     : null,
                 onTap: () {
                   final bool next = !_imageDrawMode;
@@ -1452,8 +1688,66 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
                   );
                 },
               ),
-              const Spacer(),
-              _buildReasoningMenuButton(),
+              const SizedBox(width: AppTheme.spacing1),
+              _buildComposerIconButton(
+                icon: Icons.smart_toy_outlined,
+                tooltip: _isZhLocale() ? '子代理' : 'Subagents',
+                onTap: subagents.isEmpty ? null : _showSubagentsSheet,
+                child: CircleAvatar(
+                  radius: 12,
+                  backgroundColor: subagents.isEmpty
+                      ? theme.colorScheme.surfaceContainer
+                      : theme.colorScheme.primaryContainer,
+                  child: Icon(
+                    Icons.smart_toy_outlined,
+                    size: 15,
+                    color: subagents.isEmpty
+                        ? theme.colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.38,
+                          )
+                        : theme.colorScheme.primary,
+                  ),
+                ),
+                overlay: subagents.isEmpty
+                    ? null
+                    : Positioned(
+                        right: -1,
+                        bottom: -1,
+                        child: Container(
+                          constraints: const BoxConstraints(minWidth: 16),
+                          height: 16,
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: theme.colorScheme.surfaceContainerHighest,
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            '${subagents.length}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onPrimary,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              height: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+              ),
+              const SizedBox(width: AppTheme.spacing2),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 156),
+                    child: _buildReasoningMenuButton(),
+                  ),
+                ),
+              ),
               const SizedBox(width: AppTheme.spacing2),
               _buildComposerIconButton(
                 icon: _sending
@@ -1463,6 +1757,7 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
                 color: sendForeground,
                 background: sendBackground,
                 onTap: _sending ? _cancelRequest : _sendMessage,
+                circular: true,
               ),
             ],
           ),
@@ -1471,13 +1766,404 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
     );
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppTheme.spacing4,
-        AppTheme.spacing2,
-        AppTheme.spacing4,
-        MediaQuery.of(context).padding.bottom + AppTheme.spacing4,
+      padding: const EdgeInsets.only(top: AppTheme.spacing2),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (todoItems.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTheme.spacing4,
+              ),
+              child: _buildComposerTodoPanel(todoItems),
+            ),
+            const SizedBox(height: AppTheme.spacing2),
+          ],
+          barInner,
+        ],
       ),
-      child: barInner,
+    );
+  }
+
+  Widget _buildComposerTodoPanel(List<_AgentStatusItem> items) {
+    final theme = Theme.of(context);
+    final int done = items
+        .where((item) => item.status == 'completed' || item.status == 'done')
+        .length;
+    final bool expanded = _composerTodoExpanded;
+    Widget buildCollapsed() {
+      final _AgentStatusItem? active = items
+          .cast<_AgentStatusItem?>()
+          .firstWhere(
+            (item) =>
+                item != null &&
+                (item.status == 'in_progress' ||
+                    item.status == 'working' ||
+                    item.status == 'running'),
+            orElse: () => null,
+          );
+      return Row(
+        children: [
+          Icon(
+            Icons.checklist_rounded,
+            size: 16,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              active?.text ?? '$done/${items.length} TODO',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Text(
+            '$done/${items.length}',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      );
+    }
+
+    Widget buildExpanded() {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (int i = 0; i < items.length; i++)
+            Padding(
+              padding: EdgeInsets.only(bottom: i == items.length - 1 ? 0 : 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Icon(
+                      _statusIconForComposer(items[i].status),
+                      size: 15,
+                      color: _statusColorForComposer(theme, items[i].status),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      items[i].text,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        height: 1.25,
+                        decoration:
+                            items[i].status == 'completed' ||
+                                items[i].status == 'done'
+                            ? TextDecoration.lineThrough
+                            : TextDecoration.none,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.8),
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          onTap: () =>
+              _setState(() => _composerTodoExpanded = !_composerTodoExpanded),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTheme.spacing3,
+              vertical: AppTheme.spacing2,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: expanded ? buildExpanded() : buildCollapsed()),
+                const SizedBox(width: 6),
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: Icon(
+                    expanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _statusIconForComposer(String status) {
+    switch (status.trim()) {
+      case 'completed':
+      case 'done':
+        return Icons.check_circle_rounded;
+      case 'in_progress':
+      case 'working':
+      case 'running':
+        return Icons.radio_button_checked_rounded;
+      case 'blocked':
+      case 'failed':
+        return Icons.error_rounded;
+      default:
+        return Icons.radio_button_unchecked_rounded;
+    }
+  }
+
+  Color _statusColorForComposer(ThemeData theme, String status) {
+    switch (status.trim()) {
+      case 'completed':
+      case 'done':
+        return theme.colorScheme.primary;
+      case 'blocked':
+      case 'failed':
+        return theme.colorScheme.error;
+      default:
+        return theme.colorScheme.onSurfaceVariant;
+    }
+  }
+
+  Future<void> _showSubagentsSheet() async {
+    final String parentCid = (_activeConversationCid ?? '').trim();
+    final List<_SubagentStatusItem> initialSubagents = _allSubagentItems();
+    if (initialSubagents.isEmpty && parentCid.isEmpty) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        return FractionallySizedBox(
+          heightFactor: 0.78,
+          child: UISheetSurface(
+            child: SafeArea(
+              top: false,
+              child: Column(
+                children: [
+                  const SizedBox(height: AppTheme.spacing3),
+                  const UISheetHandle(),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.smart_toy_outlined,
+                          size: 20,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _isZhLocale() ? '子代理' : 'Subagents',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ValueListenableBuilder<int>(
+                      valueListenable: _subagentListVersion,
+                      builder: (context, _, __) {
+                        final Future<List<Map<String, dynamic>>> rowsFuture =
+                            parentCid.isEmpty
+                            ? Future<List<Map<String, dynamic>>>.value(
+                                const <Map<String, dynamic>>[],
+                              )
+                            : AISettingsService.instance
+                                  .listSubagentConversations(parentCid);
+                        return FutureBuilder<List<Map<String, dynamic>>>(
+                          future: rowsFuture,
+                          builder: (context, snapshot) {
+                            final List<_SubagentStatusItem> subagents =
+                                _mergeSubagentItemsWithRows(
+                                  _allSubagentItems(),
+                                  snapshot.data ??
+                                      const <Map<String, dynamic>>[],
+                                );
+                            if (subagents.isEmpty) {
+                              return Center(
+                                child: Text(
+                                  _isZhLocale() ? '暂无子代理' : 'No subagents yet',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              );
+                            }
+                            return ListView.separated(
+                              itemCount: subagents.length,
+                              separatorBuilder: (_, __) => Divider(
+                                height: 1,
+                                color: theme.colorScheme.outlineVariant,
+                              ),
+                              itemBuilder: (context, index) {
+                                final _SubagentStatusItem item =
+                                    subagents[index];
+                                return _buildSubagentSheetItem(
+                                  sheetContext,
+                                  item,
+                                );
+                              },
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSubagentSheetItem(
+    BuildContext sheetContext,
+    _SubagentStatusItem item,
+  ) {
+    final theme = Theme.of(sheetContext);
+    final String summary = (item.summary ?? '').trim();
+    final String contextLabel = _subagentContextCompactLabel(item);
+    final String model = (item.model ?? '').trim();
+    final bool canOpen = (item.conversationCid ?? '').trim().isNotEmpty;
+    return InkWell(
+      onTap: canOpen
+          ? () {
+              Navigator.of(sheetContext).pop();
+              _openSubagentConversation(item);
+            }
+          : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTheme.spacing4,
+          vertical: AppTheme.spacing3,
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: canOpen
+                  ? theme.colorScheme.primaryContainer
+                  : theme.colorScheme.surfaceContainerHighest,
+              child: Icon(
+                Icons.smart_toy_outlined,
+                size: 18,
+                color: canOpen
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(width: AppTheme.spacing3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    [
+                      if ((item.role ?? '').trim().isNotEmpty)
+                        item.role!.trim(),
+                      item.status,
+                      if (model.isNotEmpty) model,
+                    ].join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  if (summary.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      summary,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: AppTheme.spacing3),
+            SizedBox(
+              width: 68,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    contextLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: canOpen
+                        ? theme.colorScheme.onSurfaceVariant
+                        : theme.colorScheme.outline,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openSubagentConversation(_SubagentStatusItem item) {
+    final String cid = (item.conversationCid ?? '').trim();
+    if (cid.isEmpty) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AISettingsPage(conversationCid: cid, readOnly: true),
+      ),
     );
   }
 
@@ -1486,9 +2172,19 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
     final Color foreground = _reasoningLevel.isEnabled
         ? theme.colorScheme.primary
         : theme.colorScheme.onSurfaceVariant;
+    final Color background = _reasoningLevel.isEnabled
+        ? Color.alphaBlend(
+            theme.colorScheme.primary.withValues(alpha: 0.08),
+            theme.colorScheme.surfaceContainerHighest,
+          )
+        : theme.colorScheme.surface;
+    final Color borderColor = _reasoningLevel.isEnabled
+        ? theme.colorScheme.primary.withValues(alpha: 0.32)
+        : theme.colorScheme.outlineVariant.withValues(alpha: 0.75);
     return UIActionMenuButton<AIReasoningLevel>(
       tooltip: _reasoningLevelLabel(_reasoningLevel),
       selectedValue: _reasoningLevel,
+      padding: EdgeInsets.zero,
       minWidth: 180,
       maxWidth: 220,
       offset: const Offset(0, -8),
@@ -1506,16 +2202,19 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
             ),
           )
           .toList(growable: false),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppTheme.spacing2,
-          vertical: AppTheme.spacing1,
+      child: Container(
+        height: 36,
+        constraints: const BoxConstraints(maxWidth: 156),
+        padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacing3),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+          border: Border.all(color: borderColor),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 108),
+            Flexible(
               child: Text(
                 _reasoningLevelLabel(_reasoningLevel),
                 maxLines: 1,
@@ -1526,7 +2225,7 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
                 ),
               ),
             ),
-            const SizedBox(width: 2),
+            const SizedBox(width: AppTheme.spacing1),
             Icon(Icons.arrow_drop_down_rounded, size: 18, color: foreground),
           ],
         ),

@@ -112,7 +112,162 @@ class _ClarifyState {
   final List<_ProbeCandidate> candidates = <_ProbeCandidate>[];
 }
 
-enum _ThinkingEventType { status, intent, reasoning, tools }
+enum _ThinkingEventType {
+  status,
+  intent,
+  reasoning,
+  tools,
+  plan,
+  todo,
+  subagents,
+}
+
+class _AgentStatusItem {
+  _AgentStatusItem({
+    required this.id,
+    required this.text,
+    required this.status,
+  });
+
+  final String id;
+  String text;
+  String status;
+}
+
+class _SubagentStatusItem {
+  _SubagentStatusItem({
+    required this.id,
+    required this.name,
+    required this.status,
+    this.role,
+    this.summary,
+    this.model,
+    this.conversationCid,
+    this.contextTokensEstimate,
+    this.contextCapTokens,
+    this.contextPercent,
+    this.durationMs,
+  });
+
+  final String id;
+  String name;
+  String status;
+  String? role;
+  String? summary;
+  String? model;
+  String? conversationCid;
+  int? contextTokensEstimate;
+  int? contextCapTokens;
+  int? contextPercent;
+  int? durationMs;
+}
+
+class _ReadOnlyConversationMeta {
+  const _ReadOnlyConversationMeta({
+    required this.providerName,
+    required this.model,
+    required this.contextTokens,
+    required this.contextCapTokens,
+  });
+
+  final String providerName;
+  final String model;
+  final int contextTokens;
+  final int contextCapTokens;
+
+  int get percent {
+    if (contextTokens <= 0 || contextCapTokens <= 0) return 0;
+    return ((contextTokens * 100) / contextCapTokens).round().clamp(0, 999);
+  }
+
+  String get percentLabel {
+    if (contextTokens <= 0 || contextCapTokens <= 0) return '-';
+    final double value = contextTokens * 100.0 / contextCapTokens;
+    if (value > 0 && value < 0.1) return '<0.1%';
+    if (value < 10) return '${value.toStringAsFixed(1)}%';
+    return '${value.round().clamp(0, 999)}%';
+  }
+}
+
+class _ReadOnlyConversationUsageBar extends StatelessWidget
+    implements PreferredSizeWidget {
+  const _ReadOnlyConversationUsageBar({required this.metaFuture});
+
+  final Future<_ReadOnlyConversationMeta>? metaFuture;
+
+  static const double _barHeight = 6.0;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(0);
+
+  static bool _isZhContext(BuildContext context) => Localizations.localeOf(
+    context,
+  ).languageCode.toLowerCase().startsWith('zh');
+
+  static String _fmtCompactInt(int value) {
+    final int v = value.clamp(0, 1 << 62).toInt();
+    if (v < 1000) return v.toString();
+    if (v < 10000) {
+      final String s = (v / 1000).toStringAsFixed(1);
+      return '${s.endsWith('.0') ? s.substring(0, s.length - 2) : s}k';
+    }
+    if (v < 1000000) return '${(v / 1000).round()}k';
+    final String s = (v / 1000000).toStringAsFixed(1);
+    return '${s.endsWith('.0') ? s.substring(0, s.length - 2) : s}m';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_ReadOnlyConversationMeta>(
+      future: metaFuture,
+      builder: (context, snapshot) {
+        final theme = Theme.of(context);
+        final _ReadOnlyConversationMeta? meta = snapshot.data;
+        final int tokens = meta?.contextTokens ?? 0;
+        final int cap = meta?.contextCapTokens ?? 0;
+        final double ratio = cap > 0
+            ? (tokens / cap).clamp(0.0, 1.0).toDouble()
+            : 0.0;
+        final String usedText = tokens > 0 ? _fmtCompactInt(tokens) : '-';
+        final String capText = cap > 0 ? _fmtCompactInt(cap) : '-';
+        final String percentText = meta?.percentLabel ?? '-';
+        final String tooltip = _isZhContext(context)
+            ? '子代理上下文 · $usedText/$capText · $percentText'
+            : 'Subagent context · $usedText/$capText · $percentText';
+
+        return SizedBox(
+          height: 0,
+          child: OverflowBox(
+            alignment: Alignment.bottomLeft,
+            minHeight: _barHeight,
+            maxHeight: _barHeight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTheme.spacing4,
+              ),
+              child: Tooltip(
+                message: tooltip,
+                child: Transform.translate(
+                  offset: const Offset(0, -AppTheme.spacing2),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      minHeight: _barHeight,
+                      value: ratio,
+                      backgroundColor:
+                          theme.colorScheme.surfaceContainerHighest,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
 
 class _ThinkingToolChip {
   _ThinkingToolChip({
@@ -147,6 +302,8 @@ class _ThinkingEvent {
     this.active = false,
     this.transient = false,
     this.tools = const <_ThinkingToolChip>[],
+    this.items = const <_AgentStatusItem>[],
+    this.subagents = const <_SubagentStatusItem>[],
     this.reasoningStart,
     this.reasoningLength,
   });
@@ -158,6 +315,8 @@ class _ThinkingEvent {
   bool active; // shimmer when active=true
   bool transient; // 只用于当前请求的临时加载提示，不持久化
   final List<_ThinkingToolChip> tools;
+  final List<_AgentStatusItem> items;
+  final List<_SubagentStatusItem> subagents;
   int? reasoningStart;
   int? reasoningLength;
 }
@@ -226,7 +385,14 @@ class _GatewayLogFileWriter {
 /// AI 设置与测试页面：配置 OpenAI 兼容接口并进行多轮聊天测试
 class AISettingsPage extends StatefulWidget {
   final bool embedded;
-  const AISettingsPage({super.key, this.embedded = false});
+  final String? conversationCid;
+  final bool readOnly;
+  const AISettingsPage({
+    super.key,
+    this.embedded = false,
+    this.conversationCid,
+    this.readOnly = false,
+  });
 
   @override
   State<AISettingsPage> createState() => _AISettingsPageState();
@@ -293,6 +459,7 @@ class _AISettingsPageState extends State<AISettingsPage>
   // The active conversation CID that the chat list currently represents.
   // Used to make "send" stable even if the user switches conversations mid-request.
   String? _activeConversationCid;
+  Future<_ReadOnlyConversationMeta>? _readOnlyConversationMetaFuture;
   // Monotonic token for the currently active send/stream loop. Changing this
   // detaches the UI from an in-flight background request.
   int _sendEpoch = 0;
@@ -306,6 +473,7 @@ class _AISettingsPageState extends State<AISettingsPage>
   AIReasoningLevel _reasoningLevel = AIReasoningLevel.auto;
   bool _webSearch = false; // "联网搜索"开关（先做样式，后续可接搜索参数）
   bool _imageDrawMode = false;
+  bool _composerTodoExpanded = false;
   bool _pickingComposerImages = false;
   bool _processingComposerImages = false;
   int _composerImageSkeletonCount = 0;
@@ -335,6 +503,7 @@ class _AISettingsPageState extends State<AISettingsPage>
   // 每条助手消息的思考块（索引 -> blocks）
   final Map<int, List<_ThinkingBlock>> _thinkingBlocksByIndex =
       <int, List<_ThinkingBlock>>{};
+  final ValueNotifier<int> _subagentListVersion = ValueNotifier<int>(0);
   // 每条助手消息的正文缓存。思考过程统一显示在正文之前，正文只保留连续文本。
   final Map<int, List<String>> _contentSegmentsByIndex = <int, List<String>>{};
   // 每条助手消息附带的证据图片（索引 -> 附件列表）
@@ -439,6 +608,107 @@ class _AISettingsPageState extends State<AISettingsPage>
     } catch (_) {}
   }
 
+  void _refreshReadOnlyConversationMetaFuture() {
+    _readOnlyConversationMetaFuture = _loadReadOnlyConversationMeta();
+  }
+
+  int _safeMetaInt(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse((value ?? '').toString().trim()) ?? 0;
+  }
+
+  Future<_ReadOnlyConversationMeta> _loadReadOnlyConversationMeta() async {
+    final String cid = (widget.conversationCid ?? '').trim();
+    Map<String, dynamic>? row;
+    if (cid.isNotEmpty) {
+      try {
+        row = await ScreenshotDatabase.instance.getAiConversationByCid(cid);
+      } catch (_) {
+        row = null;
+      }
+    }
+
+    int providerId = _safeMetaInt(row?['provider_id']);
+    String model = ((row?['model'] as String?) ?? '').trim();
+    final int contextTokens = _safeMetaInt(row?['subagent_context_tokens']);
+    final int contextCapTokens = _safeMetaInt(
+      row?['subagent_context_cap_tokens'],
+    );
+
+    if (providerId <= 0 || model.isEmpty) {
+      try {
+        final Map<String, dynamic>? ctx = await ScreenshotDatabase.instance
+            .getAIContext('chat');
+        if (providerId <= 0) providerId = _safeMetaInt(ctx?['provider_id']);
+        if (model.isEmpty) {
+          model = ((ctx?['model'] as String?) ?? '').trim();
+        }
+      } catch (_) {}
+    }
+
+    String providerName = '';
+    if (providerId > 0) {
+      try {
+        final AIProvider? provider = await AIProvidersService.instance
+            .getProvider(providerId);
+        providerName = (provider?.name ?? '').trim();
+      } catch (_) {
+        providerName = '';
+      }
+    }
+    if (model.isEmpty) {
+      try {
+        model = (await _settings.getModel()).trim();
+      } catch (_) {
+        model = '';
+      }
+    }
+
+    return _ReadOnlyConversationMeta(
+      providerName: providerName,
+      model: model,
+      contextTokens: contextTokens,
+      contextCapTokens: contextCapTokens,
+    );
+  }
+
+  Widget _buildReadOnlyAppBarTitle(BuildContext context) {
+    final theme = Theme.of(context);
+    final String title = _isZhLocale() ? '子代理' : 'Subagent';
+    return FutureBuilder<_ReadOnlyConversationMeta>(
+      future: _readOnlyConversationMetaFuture,
+      builder: (context, snapshot) {
+        final _ReadOnlyConversationMeta? meta = snapshot.data;
+        final List<String> parts = <String>[
+          if ((meta?.providerName ?? '').trim().isNotEmpty)
+            meta!.providerName.trim(),
+          if ((meta?.model ?? '').trim().isNotEmpty) meta!.model.trim(),
+        ];
+        final String subtitle = parts.join(' · ');
+        if (subtitle.isEmpty) {
+          return Text(title, maxLines: 1, overflow: TextOverflow.ellipsis);
+        }
+        return Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(text: title),
+              TextSpan(
+                text: ' · $subtitle',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        );
+      },
+    );
+  }
+
   void _markDynamicEntryPerf(
     String step, {
     String? detail,
@@ -473,11 +743,21 @@ class _AISettingsPageState extends State<AISettingsPage>
     _uiPerf.clear(restart: true);
     _uiPerf.log('page.initState');
     unawaited(_loadPerfOverlayEnabled());
+    if (widget.readOnly) {
+      _refreshReadOnlyConversationMetaFuture();
+    }
     _loadAll();
     _loadChatContextSelection();
     _warmChatAppIconCache();
     _ctxChangedSub = AISettingsService.instance.onContextChanged.listen((ctx) {
       if (!mounted) return;
+      final String fixedWidgetCid = (widget.conversationCid ?? '').trim();
+      if (fixedWidgetCid.isNotEmpty &&
+          ctx != 'chat:history:$fixedWidgetCid' &&
+          ctx != 'chat:deleted' &&
+          ctx != 'chat:cleared') {
+        return;
+      }
       if (ctx == 'chat:history' || ctx.startsWith('chat:history:')) {
         final String activeCid = (_activeConversationCid ?? '').trim();
         if (ctx.startsWith('chat:history:')) {
@@ -772,6 +1052,7 @@ class _AISettingsPageState extends State<AISettingsPage>
       }
     } catch (_) {}
     _gatewayLogFilePathByIndex.clear();
+    _subagentListVersion.dispose();
     _uiPerf.dispose();
     super.dispose();
   }
@@ -918,47 +1199,63 @@ class _AISettingsPageState extends State<AISettingsPage>
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        leadingWidth: 96,
-        leading: Builder(
-          builder: (ctx) => Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.menu),
-                tooltip: AppLocalizations.of(context).actionMenu,
-                onPressed: () => Scaffold.of(ctx).openDrawer(),
+        leadingWidth: widget.readOnly ? 56 : 96,
+        leading: widget.readOnly
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                onPressed: () => Navigator.of(context).maybePop(),
+              )
+            : Builder(
+                builder: (ctx) => Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.menu),
+                      tooltip: AppLocalizations.of(context).actionMenu,
+                      onPressed: () => Scaffold.of(ctx).openDrawer(),
+                    ),
+                    const AIImageGenerationMenuButton(),
+                  ],
+                ),
               ),
-              const AIImageGenerationMenuButton(),
-            ],
-          ),
-        ),
-        title: Text(AppLocalizations.of(context).aiSettingsTitle),
+        title: widget.readOnly
+            ? _buildReadOnlyAppBarTitle(context)
+            : Text(AppLocalizations.of(context).aiSettingsTitle),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
-        bottom: const ChatContextAppBarUsageBar(),
-        actions: [
-          const ChatContextAppBarAction(),
-          IconButton(
-            tooltip: _showPerfOverlay
-                ? 'Hide perf overlay'
-                : 'Show perf overlay',
-            onPressed: () {
-              _setState(() => _showPerfOverlay = !_showPerfOverlay);
-              _uiPerf.log(
-                _showPerfOverlay ? 'perfOverlay.show' : 'perfOverlay.hide',
-              );
-              unawaited(
-                _settings.setAiChatPerfOverlayEnabled(_showPerfOverlay),
-              );
-            },
-            icon: Icon(
-              _showPerfOverlay
-                  ? Icons.timer_off_outlined
-                  : Icons.timer_outlined,
-            ),
-          ),
-        ],
+        bottom: widget.readOnly
+            ? _ReadOnlyConversationUsageBar(
+                metaFuture: _readOnlyConversationMetaFuture,
+              )
+            : const ChatContextAppBarUsageBar(),
+        actions: widget.readOnly
+            ? const <Widget>[]
+            : [
+                const ChatContextAppBarAction(),
+                IconButton(
+                  tooltip: _showPerfOverlay
+                      ? 'Hide perf overlay'
+                      : 'Show perf overlay',
+                  onPressed: () {
+                    _setState(() => _showPerfOverlay = !_showPerfOverlay);
+                    _uiPerf.log(
+                      _showPerfOverlay
+                          ? 'perfOverlay.show'
+                          : 'perfOverlay.hide',
+                    );
+                    unawaited(
+                      _settings.setAiChatPerfOverlayEnabled(_showPerfOverlay),
+                    );
+                  },
+                  icon: Icon(
+                    _showPerfOverlay
+                        ? Icons.timer_off_outlined
+                        : Icons.timer_outlined,
+                  ),
+                ),
+              ],
       ),
-      drawer: const AppSideDrawer(),
+      drawer: widget.readOnly ? null : const AppSideDrawer(),
       drawerEnableOpenDragGesture: false, // 关闭默认边缘拖拽，改用自定义"任意位置"滑动
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: bodyWithPerf,

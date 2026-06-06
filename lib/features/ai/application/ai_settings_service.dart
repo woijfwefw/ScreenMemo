@@ -4,7 +4,6 @@ import 'package:flutter/widgets.dart';
 import 'package:screen_memo/data/database/screenshot_database.dart';
 import 'package:screen_memo/core/localization/locale_service.dart';
 import 'package:screen_memo/features/ai/application/ai_providers_service.dart';
-import 'package:screen_memo/features/ai/application/ai_context_budgets.dart';
 import 'package:screen_memo/features/ai/application/provider_request_headers.dart';
 import 'package:flutter/services.dart'; // Added for MethodChannel
 import 'package:screen_memo/core/constants/user_settings_keys.dart';
@@ -980,10 +979,14 @@ class AISettingsService {
   Future<List<Map<String, dynamic>>> listAiConversations({
     int? limit,
     int? offset,
+    bool includeSubagents = false,
+    String? parentCid,
   }) {
     return ScreenshotDatabase.instance.listAiConversations(
       limit: limit,
       offset: offset,
+      includeSubagents: includeSubagents,
+      parentCid: parentCid,
     );
   }
 
@@ -995,6 +998,49 @@ class AISettingsService {
     );
     await setActiveConversationCid(cid);
     return cid;
+  }
+
+  Future<String> createSubagentConversation({
+    required String parentCid,
+    required int parentAssistantCreatedAt,
+    required String parentToolCallId,
+    required String subagentId,
+    required String title,
+    required String role,
+    int? providerId,
+    String? model,
+    required int contextTokens,
+    required int contextCapTokens,
+  }) async {
+    final db = ScreenshotDatabase.instance;
+    final String normalizedParent = parentCid.trim();
+    final String normalizedAgentId = subagentId.trim();
+    final String normalizedCallId = parentToolCallId.trim();
+    final String cid =
+        'subagent:${normalizedParent.hashCode.abs()}:$parentAssistantCreatedAt:${normalizedCallId.hashCode.abs()}:${normalizedAgentId.hashCode.abs()}';
+    return db.createAiConversation(
+      cid: cid,
+      title: title.trim().isEmpty ? normalizedAgentId : title.trim(),
+      providerId: providerId,
+      model: (model ?? '').trim().isEmpty ? null : model!.trim(),
+      conversationKind: 'subagent',
+      parentCid: normalizedParent,
+      parentAssistantCreatedAt: parentAssistantCreatedAt,
+      parentToolCallId: normalizedCallId,
+      subagentId: normalizedAgentId,
+      subagentRole: role.trim(),
+      subagentContextTokens: contextTokens,
+      subagentContextCapTokens: contextCapTokens,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> listSubagentConversations(
+    String parentCid,
+  ) {
+    return ScreenshotDatabase.instance.listAiConversations(
+      parentCid: parentCid,
+      includeSubagents: true,
+    );
   }
 
   Future<bool> renameConversation(String cid, String title) {

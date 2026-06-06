@@ -1,265 +1,5 @@
 part of 'ai_chat_service.dart';
 
-class _ToolUiThinkingPersister {
-  _ToolUiThinkingPersister({
-    required this.cid,
-    required this.displayUserMessage,
-    required this.turnCreatedAtMs,
-    required this.assistantCreatedAtMs,
-    required this.toolsTitle,
-    required this.settings,
-    required this.isPersistenceBlocked,
-    String? seededUiThinkingJson,
-  }) : uiThinkingJson = ((seededUiThinkingJson ?? '').trim().isNotEmpty)
-           ? seededUiThinkingJson!.trim()
-           : null;
-
-  final String cid;
-  final String displayUserMessage;
-  final int turnCreatedAtMs;
-  final int assistantCreatedAtMs;
-  final String toolsTitle;
-  final AISettingsService settings;
-  final bool Function({required String cid, required int createdAtMs})
-  isPersistenceBlocked;
-
-  String? uiThinkingJson;
-
-  final List<Map<String, dynamic>> _payloads = <Map<String, dynamic>>[];
-  Timer? _debounce;
-  Future<void> _flushChain = Future<void>.value();
-  bool _fallbackInserted = false;
-  bool _disposed = false;
-  int _reasoningLength = 0;
-  bool _finished = false;
-  Duration? _finishedReasoningDuration;
-
-  bool get _blocked =>
-      isPersistenceBlocked(cid: cid, createdAtMs: turnCreatedAtMs);
-
-  Map<String, dynamic>? _tryDecodePayload(String raw) {
-    final String t = raw.trim();
-    if (t.isEmpty) return null;
-    try {
-      final Object? decoded = jsonDecode(t);
-      if (decoded is Map) return Map<String, dynamic>.from(decoded);
-    } catch (_) {}
-    return null;
-  }
-
-  void handle(AIStreamEvent event) {
-    if (_disposed || _blocked) return;
-    if (event.kind == 'reasoning') {
-      final String data = event.data;
-      if (data.trim().isEmpty || data.startsWith('- ')) return;
-      final int start = _reasoningLength;
-      _reasoningLength += data.length;
-      _payloads.add(<String, dynamic>{
-        'type': 'reasoning_delta',
-        'reasoning_start': start,
-        'reasoning_len': data.length,
-      });
-      uiThinkingJson = patchUiThinkingJsonWithToolUiEvent(
-        uiThinkingJson,
-        _payloads.last,
-        assistantCreatedAtMs: assistantCreatedAtMs,
-        toolsTitle: toolsTitle,
-      );
-      _scheduleFlush();
-      return;
-    }
-    if (event.kind != 'ui') return;
-    final Map<String, dynamic>? payload = _tryDecodePayload(event.data);
-    if (payload == null) return;
-    final String type = (payload['type'] ?? '').toString().trim();
-    if (type != 'tool_batch_begin' && type != 'tool_call_end') return;
-
-    _payloads.add(payload);
-    uiThinkingJson = patchUiThinkingJsonWithToolUiEvent(
-      uiThinkingJson,
-      payload,
-      assistantCreatedAtMs: assistantCreatedAtMs,
-      toolsTitle: toolsTitle,
-    );
-    _scheduleFlush();
-  }
-
-  void _scheduleFlush() {
-    _debounce?.cancel();
-    // Keep this fairly low-frequency to avoid excessive DB churn while still
-    // making the tool timeline resilient to conversation switches.
-    _debounce = Timer(const Duration(milliseconds: 400), () {
-      unawaited(flushNow());
-    });
-  }
-
-  void markFinished({Duration? reasoningDuration}) {
-    if (_blocked) return;
-    _finished = true;
-    if (reasoningDuration != null && reasoningDuration.inMilliseconds > 0) {
-      _finishedReasoningDuration = reasoningDuration;
-    }
-    uiThinkingJson = patchUiThinkingJsonFinish(
-      uiThinkingJson,
-      reasoningDuration: _finishedReasoningDuration,
-    );
-  }
-
-  Future<void> flushNow() {
-    _debounce?.cancel();
-    _debounce = null;
-    if (_disposed) return Future<void>.value();
-    if (_blocked) {
-      _payloads.clear();
-      _finished = false;
-      return Future<void>.value();
-    }
-    if (_payloads.isEmpty && !_finished) return Future<void>.value();
-
-    final Future<void> next = _flushChain.then((_) async {
-      await _flushOnce();
-    });
-    _flushChain = next.catchError((_) {});
-    return _flushChain;
-  }
-
-  Future<void> _ensurePlaceholderExists(String uiJson) async {
-    final String cidTrim = cid.trim();
-    if (cidTrim.isEmpty) return;
-    if (_blocked) return;
-    final List<AIMessage> existing = await settings.getChatHistoryByCid(
-      cidTrim,
-    );
-    final List<AIMessage> out = List<AIMessage>.from(existing);
-
-    int assistantIdx = -1;
-    for (int i = out.length - 1; i >= 0; i--) {
-      final AIMessage m = out[i];
-      if (m.role != 'assistant') continue;
-      if (m.createdAt.millisecondsSinceEpoch == assistantCreatedAtMs) {
-        assistantIdx = i;
-        break;
-      }
-    }
-
-    if (assistantIdx >= 0) {
-      final AIMessage base = out[assistantIdx];
-      out[assistantIdx] = AIMessage(
-        role: base.role,
-        content: base.content,
-        createdAt: base.createdAt,
-        reasoningContent: base.reasoningContent,
-        reasoningDuration: base.reasoningDuration,
-        uiThinkingJson: uiJson,
-        usagePromptTokens: base.usagePromptTokens,
-        usageCompletionTokens: base.usageCompletionTokens,
-        usageTotalTokens: base.usageTotalTokens,
-        usageCacheHitTokens: base.usageCacheHitTokens,
-        usageCacheMissTokens: base.usageCacheMissTokens,
-        responseDuration: base.responseDuration,
-        webSearchCalls: base.webSearchCalls,
-        citations: base.citations,
-      );
-      await settings.saveChatHistoryByCid(cidTrim, out);
-      return;
-    }
-
-    // Fallback: insert after the matching user message if present.
-    final String userTrim = displayUserMessage.trim();
-    int userIdx = -1;
-    for (int i = out.length - 1; i >= 0; i--) {
-      final AIMessage m = out[i];
-      if (m.role == 'user' && m.content.trim() == userTrim) {
-        userIdx = i;
-        break;
-      }
-    }
-
-    final AIMessage placeholder = AIMessage(
-      role: 'assistant',
-      content: '',
-      createdAt: DateTime.fromMillisecondsSinceEpoch(assistantCreatedAtMs),
-      uiThinkingJson: uiJson,
-    );
-
-    if (userIdx >= 0) {
-      out.insert(userIdx + 1, placeholder);
-    } else {
-      if (userTrim.isNotEmpty) {
-        out.add(AIMessage(role: 'user', content: userTrim));
-      }
-      out.add(placeholder);
-    }
-    await settings.saveChatHistoryByCid(cidTrim, out);
-  }
-
-  Future<void> _flushOnce() async {
-    final String cidTrim = cid.trim();
-    if (cidTrim.isEmpty || assistantCreatedAtMs <= 0) return;
-    if (_blocked) {
-      _payloads.clear();
-      _finished = false;
-      return;
-    }
-    final List<Map<String, dynamic>> payloads = List<Map<String, dynamic>>.from(
-      _payloads,
-    );
-
-    final String? base = await ScreenshotDatabase.instance
-        .getAiAssistantUiThinkingJson(cidTrim, assistantCreatedAtMs);
-    String? next = (base ?? '').trim().isNotEmpty ? base : uiThinkingJson;
-    for (final Map<String, dynamic> p in payloads) {
-      next = patchUiThinkingJsonWithToolUiEvent(
-        next,
-        p,
-        assistantCreatedAtMs: assistantCreatedAtMs,
-        toolsTitle: toolsTitle,
-      );
-    }
-    if (_finished) {
-      next = patchUiThinkingJsonFinish(
-        next,
-        reasoningDuration: _finishedReasoningDuration,
-      );
-    }
-    final String t = (next ?? '').trim();
-    if (t.isEmpty) return;
-    if (_blocked) {
-      _payloads.clear();
-      _finished = false;
-      return;
-    }
-
-    int updated = await ScreenshotDatabase.instance
-        .updateAiAssistantUiThinkingJson(cidTrim, assistantCreatedAtMs, t);
-
-    if (updated <= 0 && !_fallbackInserted) {
-      _fallbackInserted = true;
-      try {
-        await _ensurePlaceholderExists(t);
-      } catch (_) {}
-      updated = await ScreenshotDatabase.instance
-          .updateAiAssistantUiThinkingJson(cidTrim, assistantCreatedAtMs, t);
-    }
-
-    if (updated > 0) {
-      uiThinkingJson = t;
-      if (payloads.isNotEmpty) {
-        final int removeCount = payloads.length.clamp(0, _payloads.length);
-        _payloads.removeRange(0, removeCount);
-      }
-      if (_finished) _finished = false;
-      settings.notifyChatHistoryChanged(cidTrim);
-    }
-  }
-
-  void dispose() {
-    _disposed = true;
-    _debounce?.cancel();
-    _debounce = null;
-  }
-}
-
 extension AIChatServiceSendExt on AIChatService {
   static const int _minHistoryReserveTokens = 512;
   static const int _summaryAppsPromptMaxItems = 60;
@@ -301,155 +41,6 @@ extension AIChatServiceSendExt on AIChatService {
     final String id = callId.trim();
     if (assistantCreatedAtMs <= 0 || id.isEmpty) return id;
     return '$assistantCreatedAtMs:$id';
-  }
-
-  AIMessage _assistantMessageFromGatewayResult(
-    AIGatewayResult result, {
-    String? uiThinkingJson,
-    Duration? responseDuration,
-    List<AIMessage> rawTurnTranscript = const <AIMessage>[],
-    Map<String, String> localEvidencePaths = const <String, String>{},
-  }) {
-    final String content = AIMessage.resolveEvidenceRefsToLocalPaths(
-      _appendMissingGeneratedImageMarkers(result.content, rawTurnTranscript),
-      localEvidencePaths,
-    );
-    unawaited(
-      FlutterLogger.nativeDebug(
-        'AIUsageTrace',
-        [
-          'SERVICE_RESULT_TO_MESSAGE',
-          'model=${result.modelUsed} contentLen=${content.length} reasoningLen=${result.reasoning?.length ?? 0} toolCalls=${result.toolCalls.length}',
-          'prompt=${result.usagePromptTokens ?? '-'} completion=${result.usageCompletionTokens ?? '-'} total=${result.usageTotalTokens ?? '-'} cacheHit=${result.usageCacheHitTokens ?? '-'} cacheMiss=${result.usageCacheMissTokens ?? '-'} responseMs=${responseDuration?.inMilliseconds ?? '-'}',
-        ].join('\n'),
-      ).catchError((_) {}),
-    );
-    return AIMessage(
-      role: 'assistant',
-      content: content,
-      reasoningContent: result.reasoning,
-      reasoningDuration: result.reasoningDuration,
-      uiThinkingJson: (uiThinkingJson ?? '').trim().isEmpty
-          ? null
-          : uiThinkingJson!.trim(),
-      usagePromptTokens: result.usagePromptTokens,
-      usageCompletionTokens: result.usageCompletionTokens,
-      usageTotalTokens: result.usageTotalTokens,
-      usageCacheHitTokens: result.usageCacheHitTokens,
-      usageCacheMissTokens: result.usageCacheMissTokens,
-      responseDuration: responseDuration,
-      webSearchCalls: result.webSearchCalls,
-      citations: result.citations,
-    );
-  }
-
-  String _appendMissingGeneratedImageMarkers(
-    String content,
-    List<AIMessage> rawTurnTranscript,
-  ) {
-    final List<String> markers = _extractGeneratedImageMarkersFromToolMessages(
-      rawTurnTranscript,
-    );
-    if (markers.isEmpty) return content;
-    String out = content.trimRight();
-    bool changed = false;
-    for (final String marker in markers) {
-      if (marker.trim().isEmpty) continue;
-      if (out.contains(marker)) continue;
-      if (out.isNotEmpty) out = '$out\n\n';
-      out = '$out$marker';
-      changed = true;
-    }
-    return changed ? out : content;
-  }
-
-  List<String> _extractGeneratedImageMarkersFromToolMessages(
-    List<AIMessage> messages,
-  ) {
-    final List<String> out = <String>[];
-    final Set<String> seen = <String>{};
-    for (final AIMessage message in messages) {
-      if (message.role != 'tool') continue;
-      final Map<String, dynamic> obj = _safeJsonObject(message.content);
-      if ((obj['tool'] as String?)?.trim() != 'generate_image') continue;
-      for (final String marker in _extractGeneratedImageMarkersFromToolPayload(
-        obj,
-      )) {
-        if (marker.isNotEmpty && seen.add(marker)) out.add(marker);
-      }
-    }
-    return out;
-  }
-
-  List<String> _extractGeneratedImageMarkersFromToolPayload(
-    Map<String, dynamic> obj,
-  ) {
-    final List<String> out = <String>[];
-    final Set<String> seen = <String>{};
-    final dynamic rawMarkers = obj['markers'];
-    if (rawMarkers is List) {
-      for (final dynamic value in rawMarkers) {
-        final String marker = value?.toString().trim() ?? '';
-        if (marker.isNotEmpty && seen.add(marker)) out.add(marker);
-      }
-    }
-    final dynamic images = obj['images'];
-    if (images is List) {
-      for (final dynamic raw in images) {
-        if (raw is! Map) continue;
-        final Map<String, dynamic> item = Map<String, dynamic>.from(raw);
-        String marker = (item['marker'] ?? '').toString().trim();
-        if (marker.isEmpty) {
-          final String filename = (item['filename'] ?? '').toString().trim();
-          if (filename.isNotEmpty) marker = '[generated-image: $filename]';
-        }
-        if (marker.isNotEmpty && seen.add(marker)) out.add(marker);
-      }
-    }
-    return out;
-  }
-
-  Future<List<String>> _generatedImageMarkersForToolCallFallback(
-    String toolCallId,
-  ) async {
-    final String callId = toolCallId.trim();
-    if (callId.isEmpty) return const <String>[];
-    final List<Map<String, dynamic>> rows = await ScreenshotDatabase.instance
-        .listAiGeneratedImagesByToolCallId(callId);
-    final List<String> out = <String>[];
-    final Set<String> seen = <String>{};
-    for (final Map<String, dynamic> row in rows) {
-      final String path = (row['file_path'] as String?)?.trim() ?? '';
-      final String filename = _basename(path).trim();
-      if (filename.isEmpty) continue;
-      final String marker = '[generated-image: $filename]';
-      if (seen.add(marker)) out.add(marker);
-    }
-    unawaited(
-      FlutterLogger.nativeInfo(
-        'AI_IMAGE',
-        'tool.fallback_markers call=$callId rows=${rows.length} markers=${out.join("|")}',
-      ),
-    );
-    return out;
-  }
-
-  Future<List<String>> _generatedImageMarkersForToolPayloadOrFallback(
-    Map<String, dynamic> obj,
-    String toolCallId,
-  ) async {
-    final List<String> markers = _extractGeneratedImageMarkersFromToolPayload(
-      obj,
-    );
-    if (markers.isNotEmpty) return markers;
-    return _generatedImageMarkersForToolCallFallback(toolCallId);
-  }
-
-  bool _isSuccessfulGenerateImageToolPayload(Map<String, dynamic> obj) {
-    if ((obj['tool'] as String?)?.trim() != 'generate_image') return false;
-    if (!_toBool(obj['ok'])) return false;
-    if ((_toInt(obj['count']) ?? 0) <= 0) return false;
-    return _extractGeneratedImageMarkersFromToolPayload(obj).isNotEmpty;
   }
 
   String? _toolMessagesResultJson(List<AIMessage> messages) {
@@ -1245,14 +836,6 @@ extension AIChatServiceSendExt on AIChatService {
     return value;
   }
 
-  String _usageCallPhase({
-    required bool isToolLoop,
-    required AIGatewayResult result,
-  }) {
-    if (!isToolLoop) return 'final_answer';
-    return result.toolCalls.isEmpty ? 'final_answer' : 'tool_loop';
-  }
-
   String _buildPromptBreakdownJson({
     required String model,
     required String systemPrompt,
@@ -1339,103 +922,6 @@ extension AIChatServiceSendExt on AIChatService {
         'parts': parts,
         'tools_count': tools.length,
         'include_history': includeHistory,
-      });
-    } catch (_) {
-      return '';
-    }
-  }
-
-  bool _looksLikeToolUsageInstruction(String text) {
-    final String t = text.trim();
-    if (t.isEmpty) return false;
-    final String lower = t.toLowerCase();
-    // Heuristic: detect the common tool-instruction preface (zh/en).
-    return lower.contains('tool calling is enabled') ||
-        lower.contains('available tools:') ||
-        t.contains('已启用工具调用') ||
-        t.contains('可用工具：');
-  }
-
-  String _buildPromptBreakdownJsonFromMessages({
-    required String model,
-    required List<AIMessage> messages,
-    required List<Map<String, dynamic>> tools,
-  }) {
-    int msgTokens(AIMessage m) => PromptBudget.approxTokensForMessageJson(m);
-
-    final Map<String, int> parts = <String, int>{};
-
-    final int toolsSchemaTokens = _approxToolSchemaTokens(tools);
-    if (toolsSchemaTokens > 0) parts['tool_schema'] = toolsSchemaTokens;
-
-    bool firstSystem = true;
-    int lastUserIdx = -1;
-    for (int i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role == 'user') {
-        lastUserIdx = i;
-        break;
-      }
-    }
-
-    for (int i = 0; i < messages.length; i++) {
-      final AIMessage m = messages[i];
-      final String role = m.role;
-      final int t = msgTokens(m);
-      if (t <= 0) continue;
-
-      if (role == 'system') {
-        if (firstSystem) {
-          parts['system_prompt'] = (parts['system_prompt'] ?? 0) + t;
-          firstSystem = false;
-          continue;
-        }
-        final String content = m.content;
-        final String trimmed = content.trim();
-        if (trimmed.contains('<conversation_context>')) {
-          parts['conversation_context'] =
-              (parts['conversation_context'] ?? 0) + t;
-        } else if (trimmed.contains('<user_memory>')) {
-          parts['user_memory'] = (parts['user_memory'] ?? 0) + t;
-        } else if (trimmed.contains('<atomic_memory>')) {
-          parts['atomic_memory'] = (parts['atomic_memory'] ?? 0) + t;
-        } else if (_looksLikeToolUsageInstruction(trimmed)) {
-          parts['tool_instruction'] = (parts['tool_instruction'] ?? 0) + t;
-        } else {
-          parts['extra_system'] = (parts['extra_system'] ?? 0) + t;
-        }
-        continue;
-      }
-
-      if (role == 'user') {
-        final String k = (i == lastUserIdx) ? 'user_message' : 'history_user';
-        parts[k] = (parts[k] ?? 0) + t;
-        continue;
-      }
-
-      if (role == 'assistant') {
-        parts['history_assistant'] = (parts['history_assistant'] ?? 0) + t;
-        continue;
-      }
-
-      if (role == 'tool') {
-        parts['history_tool'] = (parts['history_tool'] ?? 0) + t;
-        continue;
-      }
-
-      // Unknown role: keep it under "extra_system" so we don't drop tokens.
-      parts['extra_system'] = (parts['extra_system'] ?? 0) + t;
-    }
-
-    final int total = parts.values.fold(0, (a, b) => a + b);
-
-    try {
-      return jsonEncode(<String, dynamic>{
-        'v': 1,
-        'model': model,
-        'total_tokens': total,
-        'parts': parts,
-        'tools_count': tools.length,
-        'include_history': true,
       });
     } catch (_) {
       return '';
@@ -2909,6 +2395,7 @@ extension AIChatServiceSendExt on AIChatService {
       bool preferStreaming = true,
       String trimStage = 'model_call',
       bool isToolLoop = false,
+      void Function(AIStreamEvent event)? streamEventSink,
       int? forcedPromptEstBefore,
       String? forcedBreakdownJson,
     }) async {
@@ -2993,7 +2480,9 @@ extension AIChatServiceSendExt on AIChatService {
         );
       } catch (_) {}
 
-      if (emitEvent != null && preferStreaming) {
+      final void Function(AIStreamEvent event)? effectiveEmitEvent =
+          streamEventSink ?? emitEvent;
+      if (effectiveEmitEvent != null && preferStreaming) {
         final AIGatewayStreamingSession session = _gateway.startStreaming(
           endpoints: endpoints,
           messages: messages,
@@ -3007,7 +2496,7 @@ extension AIChatServiceSendExt on AIChatService {
         );
         final Future<AIGatewayResult> completed = session.completed;
         await for (final AIGatewayEvent e in session.stream) {
-          emitEvent(AIStreamEvent(e.kind, e.data));
+          effectiveEmitEvent(AIStreamEvent(e.kind, e.data));
         }
         final AIGatewayResult result = await completed;
         if (_isConversationPersistenceBlockedOrStale(
@@ -3096,95 +2585,23 @@ extension AIChatServiceSendExt on AIChatService {
         _loc('请求模型生成工具调用/答案…', 'Calling model for tool calls/answer…'),
       );
     }
-    final Stopwatch firstReq = Stopwatch()..start();
-    Timer? firstHeartbeatStarter;
-    Timer? firstHeartbeatTicker;
-    if (tools.isNotEmpty && emitEvent != null) {
-      firstHeartbeatStarter = Timer(const Duration(seconds: 12), () {
-        firstHeartbeatTicker = Timer.periodic(const Duration(seconds: 10), (_) {
-          final int secs = firstReq.elapsed.inSeconds;
-          if (secs <= 0) return;
-          _emitProgress(
-            emitEvent,
-            _loc(
-              '等待模型响应中… 已等待 ${secs}s',
-              'Waiting for model… ${secs}s elapsed',
-            ),
-          );
-        });
-      });
-    }
-    late AIGatewayResult result;
-    try {
-      working = _replaceImageMessagesWithPlaceholder(
-        working,
-        keepMostRecent: true,
-        cid: cid,
-        stage: 'tool_loop_initial_image',
-        model: modelForBudget,
-      );
-      working = _enforceToolLoopPromptBudget(
-        working,
-        pinnedUser: pinnedUserMessage,
-        maxPromptTokens: _toolLoopBudgetTokensForPrompt(
-          budgets: budgets,
-          toolsSchemaTokens: toolsSchemaTokens,
-          effectivePromptCapTokens: effectivePromptCapTokens,
-        ),
-        emitEvent: emitEvent,
-        cid: cid,
-        stage: 'tool_loop_initial_budget',
-        model: modelForBudget,
-      );
-      result = await callModel(
-        messages: working,
-        toolsForCall: tools,
-        toolChoiceForCall: toolChoice,
-        preferStreaming: true,
-        trimStage: 'tool_loop_initial_call',
-        isToolLoop: tools.isNotEmpty,
-        forcedPromptEstBefore: promptEstBefore,
-        forcedBreakdownJson: promptBreakdownJson,
-      );
-    } finally {
-      firstHeartbeatStarter?.cancel();
-      firstHeartbeatTicker?.cancel();
-      firstReq.stop();
-    }
-    // Important: drop/replace multimodal image payloads after they have been sent
-    // once; otherwise we will re-upload base64 blobs on every follow-up call.
-    working = _replaceImageMessagesWithPlaceholder(
-      working,
-      keepMostRecent: false,
+    AIGatewayResult result = await _runInitialToolLoopModelCall(
+      working: working,
+      requestMessages: requestMessages,
       cid: cid,
-      stage: 'tool_loop_post_initial_image',
-      model: modelForBudget,
+      pinnedUserCreatedAtMs: pinnedUserCreatedAtMs,
+      pinnedUserMessage: pinnedUserMessage,
+      tools: tools,
+      toolChoice: toolChoice,
+      budgets: budgets,
+      toolsSchemaTokens: toolsSchemaTokens,
+      effectivePromptCapTokens: effectivePromptCapTokens,
+      modelForBudget: modelForBudget,
+      emitEvent: emitEvent,
+      callModel: callModel,
+      promptEstBefore: promptEstBefore,
+      promptBreakdownJson: promptBreakdownJson,
     );
-    if (tools.isNotEmpty && result.toolCalls.isEmpty) {
-      final AIGatewayResult coerced = _maybeCoerceToolCallsFromText(
-        result,
-        tools,
-      );
-      if (coerced.toolCalls.isNotEmpty) {
-        _emitProgress(
-          emitEvent,
-          _loc(
-            '检测到模型以文本格式输出工具调用，已自动解析并继续执行。',
-            'Detected text-form tool calls; parsed and continuing.',
-          ),
-        );
-        result = coerced;
-      }
-    }
-    if (tools.isNotEmpty) {
-      _emitProgress(
-        emitEvent,
-        _loc(
-          '模型已响应：tool_calls=${result.toolCalls.length}（${firstReq.elapsedMilliseconds}ms）',
-          'Model responded: tool_calls=${result.toolCalls.length} (${firstReq.elapsedMilliseconds}ms)',
-        ),
-      );
-    }
 
     // If tools are enabled but the model doesn't call any tool for lookup-style tasks
     // (or it outputs "searched/evidence" claims in plain text), do one extra "tool-first"
@@ -3195,106 +2612,24 @@ extension AIChatServiceSendExt on AIChatService {
         result.toolCalls.isEmpty &&
         (forceToolFirstIfNoToolCalls ||
             _contentLooksLikeItReferencesEvidence(result.content));
-    if (shouldForceRetrievalRetry) {
-      _emitProgress(
-        emitEvent,
-        _loc(
-          '模型未调用工具；为避免草率结论，触发强制检索重试…',
-          'No tool calls; forcing a retrieval retry to avoid premature answers…',
-        ),
-      );
-
-      List<AIMessage> retryMessages = List<AIMessage>.from(requestMessages)
-        ..add(
-          AIMessage(
-            role: 'user',
-            content: _loc(
-              '请先至少调用一次检索类工具（search_segments 或 search_screenshots_ocr）。'
-                  '若第一次结果为空，请更换关键词并至少再检索一次；必要时调整时间范围（start_local/end_local）或 offset/limit 分页继续检索。'
-                  '确认后再输出最终回答；不要在未检索前直接下结论，也不要臆造 [evidence: ...]。',
-              'Call at least one retrieval tool first (search_segments or search_screenshots_ocr), '
-                  'if the first result is empty, try a different query and search again; '
-                  'adjust the time window (start_local/end_local) or page via offset/limit if needed, then answer. '
-                  'Do not conclude (or fabricate evidence) before searching.',
-            ),
-          ),
-        );
-
-      final Stopwatch retryReq = Stopwatch()..start();
-      Timer? retryHeartbeatStarter;
-      Timer? retryHeartbeatTicker;
-      if (emitEvent != null) {
-        retryHeartbeatStarter = Timer(const Duration(seconds: 12), () {
-          retryHeartbeatTicker = Timer.periodic(const Duration(seconds: 10), (
-            _,
-          ) {
-            final int secs = retryReq.elapsed.inSeconds;
-            if (secs <= 0) return;
-            _emitProgress(
-              emitEvent,
-              _loc(
-                '等待模型响应中… 已等待 ${secs}s',
-                'Waiting for model… ${secs}s elapsed',
-              ),
-            );
-          });
-        });
-      }
-      try {
-        retryMessages = _replaceImageMessagesWithPlaceholder(
-          retryMessages,
-          keepMostRecent: true,
-          cid: cid,
-          stage: 'tool_loop_force_retry_image',
-          model: modelForBudget,
-        );
-        retryMessages = _enforceToolLoopPromptBudget(
-          retryMessages,
-          pinnedUser: pinnedUserMessage,
-          maxPromptTokens: _toolLoopBudgetTokensForPrompt(
-            budgets: budgets,
-            toolsSchemaTokens: toolsSchemaTokens,
-            effectivePromptCapTokens: effectivePromptCapTokens,
-          ),
-          emitEvent: emitEvent,
-          cid: cid,
-          stage: 'tool_loop_force_retry_budget',
-          model: modelForBudget,
-        );
-        result = await callModel(
-          messages: retryMessages,
-          toolsForCall: tools,
-          toolChoiceForCall: toolChoice,
-          preferStreaming: true,
-          trimStage: 'tool_loop_force_retry_call',
-          isToolLoop: true,
-        );
-      } finally {
-        retryHeartbeatStarter?.cancel();
-        retryHeartbeatTicker?.cancel();
-        retryReq.stop();
-      }
-      retryMessages = _replaceImageMessagesWithPlaceholder(
-        retryMessages,
-        keepMostRecent: false,
-        cid: cid,
-        stage: 'tool_loop_force_retry_post_image',
-        model: modelForBudget,
-      );
-      if (result.toolCalls.isEmpty) {
-        result = _maybeCoerceToolCallsFromText(result, tools);
-      }
-      _emitProgress(
-        emitEvent,
-        _loc(
-          '重试后模型已响应：tool_calls=${result.toolCalls.length}（${retryReq.elapsedMilliseconds}ms）',
-          'Retry responded: tool_calls=${result.toolCalls.length} (${retryReq.elapsedMilliseconds}ms)',
-        ),
-      );
-
-      // Keep the same message list that produced the tool calls.
-      working = List<AIMessage>.from(retryMessages);
-    }
+    final forceRetrievalRetry = await _runForceRetrievalRetryIfNeeded(
+      shouldRun: shouldForceRetrievalRetry,
+      requestMessages: requestMessages,
+      working: working,
+      result: result,
+      tools: tools,
+      toolChoice: toolChoice,
+      cid: cid,
+      pinnedUserMessage: pinnedUserMessage,
+      budgets: budgets,
+      toolsSchemaTokens: toolsSchemaTokens,
+      effectivePromptCapTokens: effectivePromptCapTokens,
+      modelForBudget: modelForBudget,
+      emitEvent: emitEvent,
+      callModel: callModel,
+    );
+    result = forceRetrievalRetry.result;
+    working = forceRetrievalRetry.working;
 
     // HARD RULE: 禁止在 maxToolIters<=0（无限制）时引入任何“固定轮次上限/安全上限”。
     // 若担心模型陷入循环，优先用“无进展”护栏 + 强提示引导退出循环，
@@ -3349,75 +2684,18 @@ extension AIChatServiceSendExt on AIChatService {
       working.add(assistantToolCallMessage);
       rawTurnTranscript.add(assistantToolCallMessage);
 
-      final List<Map<String, dynamic>> uiTools = await Future.wait(
-        result.toolCalls
-            .map((c) async {
-              final Map<String, dynamic> args = _safeJsonObject(
-                c.argumentsJson,
-              );
-              final List<String> appNames = _normalizeAppNamesArg(args);
-              final List<String> appPkgs = await _resolveAppPackagesFromArgs(
-                args,
-              );
-              final String detailRef = _toolDetailRef(
-                uiAssistantCreatedAtMs ?? 0,
-                c.id,
-              );
-              if (cid.isNotEmpty &&
-                  (uiAssistantCreatedAtMs ?? 0) > 0 &&
-                  c.id.trim().isNotEmpty &&
-                  !_isConversationPersistenceBlockedOrStale(
-                    cid: cid,
-                    createdAtMs: pinnedUserCreatedAtMs,
-                  )) {
-                final int assistantAt = uiAssistantCreatedAtMs!;
-                unawaited(() async {
-                  if (_isConversationPersistenceBlockedOrStale(
-                    cid: cid,
-                    createdAtMs: pinnedUserCreatedAtMs,
-                  )) {
-                    return;
-                  }
-                  await ScreenshotDatabase.instance.upsertAiToolCallDetail(
-                    conversationId: cid,
-                    assistantCreatedAt: assistantAt,
-                    callId: c.id,
-                    toolName: c.name,
-                    argumentsJson: c.argumentsJson,
-                    clearResult: true,
-                  );
-                }());
-              }
-              return <String, dynamic>{
-                'call_id': c.id,
-                'tool_name': c.name,
-                'label': _toolCallUiLabel(c),
-                if (detailRef.isNotEmpty) 'detail_ref': detailRef,
-                if (appNames.isNotEmpty) 'app_names': appNames,
-                if (appPkgs.isNotEmpty) 'app_package_names': appPkgs,
-                if (c.name == 'generate_image')
-                  'generated_image_loading_count':
-                      AIImageGenerationParams.normalizeCount(args['count']),
-              };
-            })
-            .toList(growable: false),
+      final List<Map<String, dynamic>> uiTools =
+          await _buildUiToolsForToolCalls(
+            result: result,
+            cid: cid,
+            uiAssistantCreatedAtMs: uiAssistantCreatedAtMs,
+            pinnedUserCreatedAtMs: pinnedUserCreatedAtMs,
+          );
+      _emitToolBatchUiEvents(
+        emitEvent: emitEvent,
+        uiTools: uiTools,
+        iters: iters,
       );
-      for (final Map<String, dynamic> uiTool in uiTools) {
-        if ((uiTool['tool_name'] as String?)?.trim() != 'generate_image') {
-          continue;
-        }
-        unawaited(
-          FlutterLogger.nativeInfo(
-            'AI_IMAGE',
-            'tool.batch_begin call=${uiTool['call_id']} loadingCount=${uiTool['generated_image_loading_count']} assistantAt=$uiAssistantCreatedAtMs cid=$cid',
-          ),
-        );
-      }
-      _emitUi(emitEvent, <String, dynamic>{
-        'type': 'tool_batch_begin',
-        'iteration': iters,
-        'tools': uiTools,
-      });
 
       // Execute each tool call and append tool + follow-up user messages
       int idxInBatch = 0;
@@ -3453,14 +2731,47 @@ extension AIChatServiceSendExt on AIChatService {
         final Map<String, String> localEvidencePathsForTool =
             <String, String>{};
         final Stopwatch toolSw = Stopwatch()..start();
-        final List<AIMessage> rawToolMsgs = await _executeToolCall(
-          call,
-          toolStartMs: toolStartMs,
-          toolEndMs: toolEndMs,
-          conversationCid: cid,
-          assistantCreatedAtMs: uiAssistantCreatedAtMs,
-          localEvidencePaths: localEvidencePathsForTool,
-        );
+        final List<AIMessage> rawToolMsgs = _isAgentStatusTool(call)
+            ? await _executeAgentStatusToolCall(call, emitEvent: emitEvent)
+            : _isDelegateSubagentsTool(call)
+            ? await _executeDelegateSubagentsToolCall(
+                call,
+                rootMessages: working,
+                userTask: actualUserMessage,
+                parentConversationCid: cid,
+                parentAssistantCreatedAtMs: uiAssistantCreatedAtMs ?? 0,
+                modelForContextCap: modelForBudget,
+                contextCapTokens: effectivePromptCapTokens,
+                emitEvent: emitEvent,
+                callModel:
+                    ({
+                      required List<AIMessage> messages,
+                      required List<Map<String, dynamic>> toolsForCall,
+                      required Object? toolChoiceForCall,
+                      required bool preferStreaming,
+                      required String trimStage,
+                      required bool isToolLoop,
+                      void Function(AIStreamEvent event)? streamEventSink,
+                    }) {
+                      return callModel(
+                        messages: messages,
+                        toolsForCall: toolsForCall,
+                        toolChoiceForCall: toolChoiceForCall,
+                        preferStreaming: preferStreaming,
+                        trimStage: trimStage,
+                        isToolLoop: isToolLoop,
+                        streamEventSink: streamEventSink,
+                      );
+                    },
+              )
+            : await _executeToolCall(
+                call,
+                toolStartMs: toolStartMs,
+                toolEndMs: toolEndMs,
+                conversationCid: cid,
+                assistantCreatedAtMs: uiAssistantCreatedAtMs,
+                localEvidencePaths: localEvidencePathsForTool,
+              );
         if (localEvidencePathsForTool.isNotEmpty) {
           localEvidencePathsThisTurn.addAll(localEvidencePathsForTool);
         }
@@ -3587,17 +2898,15 @@ extension AIChatServiceSendExt on AIChatService {
             'paths': localEvidencePathsForTool,
           });
         }
-        _emitUi(emitEvent, <String, dynamic>{
-          'type': 'tool_call_end',
-          'call_id': call.id,
-          'tool_name': call.name,
-          'result_summary': toolSummary,
-          'duration_ms': toolSw.elapsedMilliseconds,
-          'detail_ref': _toolDetailRef(uiAssistantCreatedAtMs ?? 0, call.id),
-          if (toolPayloadForUi != null &&
-              (toolPayloadForUi['tool'] as String?)?.trim() == 'generate_image')
-            'generated_image_markers': generatedImageMarkersForUi,
-        });
+        _emitToolCompletionUiEvent(
+          emitEvent: emitEvent,
+          call: call,
+          toolSummary: toolSummary,
+          durationMs: toolSw.elapsedMilliseconds,
+          uiAssistantCreatedAtMs: uiAssistantCreatedAtMs,
+          toolPayloadForUi: toolPayloadForUi,
+          generatedImageMarkersForUi: generatedImageMarkersForUi,
+        );
         if (toolPayloadForUi != null &&
             (toolPayloadForUi['tool'] as String?)?.trim() == 'generate_image') {
           unawaited(
@@ -3786,113 +3095,26 @@ extension AIChatServiceSendExt on AIChatService {
           lastRetrievalCount == 0 &&
           result.toolCalls.isEmpty &&
           _contentLooksLikeHardNoResultsConclusion(result.content);
-      if (shouldForceContinueSearch) {
-        forcedEmptySearchRetry = true;
-        final String suffix = lastRetrievalTool.isEmpty
-            ? ''
-            : '（$lastRetrievalTool count=0）';
-        _emitProgress(
-          emitEvent,
-          _loc(
-            '检索结果为空且模型准备直接下结论$suffix；触发继续检索重试…',
-            'Empty search results and the model is about to conclude$suffix; forcing a continued-search retry…',
-          ),
-        );
-
-        List<AIMessage> retryMessages = List<AIMessage>.from(working)
-          ..add(
-            AIMessage(
-              role: 'user',
-              content: _loc(
-                '注意：上一次检索结果为空（count=0），不能据此直接断言“没有/未找到”。\n'
-                    '在输出最终答复前，请按以下流程继续：\n'
-                    '1) 至少再调用 2 次检索类工具（search_segments / search_screenshots_ocr / search_ai_image_meta），并更换关键词（拆词/同义词/英文）。\n'
-                    '2) 若本次查询范围较大，请调整 start_local/end_local 覆盖不同时间段，或使用 offset/limit 分页获取更多结果；若工具返回 paging.prev/paging.next，也可使用它们继续。\n'
-                    '3) 若多次检索仍为空，先给出“已覆盖范围/未覆盖范围/证据缺口”，仅在硬阻塞时允许询问 1 条关键线索。\n'
-                    '确认后再给最终答复；不要臆造证据或 [evidence: ...]。',
-                'Note: the last retrieval returned count=0, so you must not conclude “not found” yet.\n'
-                    'Before answering, do ALL of the following:\n'
-                    '1) Make at least 2 more retrieval calls (search_segments / search_screenshots_ocr / search_ai_image_meta) with alternative keywords (split words / synonyms / English).\n'
-                    '2) If the overall range is large, adjust start_local/end_local to cover different windows or page via offset/limit; if the tool returns paging.prev/paging.next you may use them as well.\n'
-                    '3) If still empty, report covered scope / uncovered scope / evidence gaps first; ask at most ONE key follow-up only on hard blockers.\n'
-                    'Do not fabricate evidence or [evidence: ...].',
-              ),
-            ),
-          );
-
-        final Stopwatch retryReq = Stopwatch()..start();
-        Timer? retryHeartbeatStarter;
-        Timer? retryHeartbeatTicker;
-        if (emitEvent != null) {
-          retryHeartbeatStarter = Timer(const Duration(seconds: 12), () {
-            retryHeartbeatTicker = Timer.periodic(const Duration(seconds: 10), (
-              _,
-            ) {
-              final int secs = retryReq.elapsed.inSeconds;
-              if (secs <= 0) return;
-              _emitProgress(
-                emitEvent,
-                _loc(
-                  '等待模型响应中… 已等待 ${secs}s',
-                  'Waiting for model… ${secs}s elapsed',
-                ),
-              );
-            });
-          });
-        }
-        try {
-          retryMessages = _replaceImageMessagesWithPlaceholder(
-            retryMessages,
-            keepMostRecent: true,
-            cid: cid,
-            stage: 'tool_loop_empty_retry_image',
-            model: modelForBudget,
-          );
-          retryMessages = _enforceToolLoopPromptBudget(
-            retryMessages,
-            pinnedUser: pinnedUserMessage,
-            maxPromptTokens: _toolLoopBudgetTokensForPrompt(
-              budgets: budgets,
-              toolsSchemaTokens: toolsSchemaTokens,
-              effectivePromptCapTokens: effectivePromptCapTokens,
-            ),
-            emitEvent: emitEvent,
-            cid: cid,
-            stage: 'tool_loop_empty_retry_budget',
-            model: modelForBudget,
-          );
-          result = await callModel(
-            messages: retryMessages,
-            toolsForCall: tools,
-            toolChoiceForCall: toolChoice,
-            preferStreaming: true,
-            trimStage: 'tool_loop_empty_retry_call',
-            isToolLoop: true,
-          );
-        } finally {
-          retryHeartbeatStarter?.cancel();
-          retryHeartbeatTicker?.cancel();
-          retryReq.stop();
-        }
-        retryMessages = _replaceImageMessagesWithPlaceholder(
-          retryMessages,
-          keepMostRecent: false,
-          cid: cid,
-          stage: 'tool_loop_empty_retry_post_image',
-          model: modelForBudget,
-        );
-        if (result.toolCalls.isEmpty) {
-          result = _maybeCoerceToolCallsFromText(result, tools);
-        }
-        _emitProgress(
-          emitEvent,
-          _loc(
-            '继续检索重试后模型已响应：tool_calls=${result.toolCalls.length}（${retryReq.elapsedMilliseconds}ms）',
-            'Continued-search retry responded: tool_calls=${result.toolCalls.length} (${retryReq.elapsedMilliseconds}ms)',
-          ),
-        );
-        working = List<AIMessage>.from(retryMessages);
-      }
+      final continueSearchRetry = await _runContinueSearchRetryIfNeeded(
+        shouldRun: shouldForceContinueSearch,
+        lastRetrievalTool: lastRetrievalTool,
+        working: working,
+        result: result,
+        tools: tools,
+        toolChoice: toolChoice,
+        cid: cid,
+        pinnedUserMessage: pinnedUserMessage,
+        budgets: budgets,
+        toolsSchemaTokens: toolsSchemaTokens,
+        effectivePromptCapTokens: effectivePromptCapTokens,
+        modelForBudget: modelForBudget,
+        emitEvent: emitEvent,
+        callModel: callModel,
+        forcedEmptySearchRetry: forcedEmptySearchRetry,
+      );
+      result = continueSearchRetry.result;
+      working = continueSearchRetry.working;
+      forcedEmptySearchRetry = continueSearchRetry.forcedEmptySearchRetry;
 
       final bool shouldForceAutoPagingRetry =
           tools.isNotEmpty &&
@@ -3902,106 +3124,25 @@ extension AIChatServiceSendExt on AIChatService {
           result.toolCalls.isEmpty &&
           lastRetrievalHasPagingSignal &&
           _contentLooksLikeClarificationStop(result.content);
-      if (shouldForceAutoPagingRetry) {
-        forcedEmptySearchRetry = true;
-        _emitProgress(
-          emitEvent,
-          _loc(
-            '检测到可继续翻页但模型准备停机追问；触发自动翻页覆盖重试…',
-            'Paging is available but model is stopping for clarification; forcing an auto-paging retry…',
-          ),
-        );
-
-        List<AIMessage> retryMessages = List<AIMessage>.from(working)
-          ..add(
-            AIMessage(
-              role: 'user',
-              content: _loc(
-                '当前检索结果仍可继续扩展（存在 paging/clamped 提示）。\n'
-                    '请不要先向用户提问；先继续自动翻页覆盖范围并补充证据。\n'
-                    '输出时请明确：已覆盖范围、未覆盖范围、下一步计划。\n'
-                    '仅当出现硬阻塞（权限/数据源缺失/输入冲突）时，才允许询问 1 个关键问题。',
-                'Current retrieval can still be expanded (paging/clamped hints present).\n'
-                    'Do not ask the user first; continue auto-paging to expand coverage and gather evidence.\n'
-                    'In your answer, state covered scope, uncovered scope, and next steps.\n'
-                    'Only ask ONE key question on hard blockers (permission/data source/input conflict).',
-              ),
-            ),
-          );
-
-        final Stopwatch retryReq = Stopwatch()..start();
-        Timer? retryHeartbeatStarter;
-        Timer? retryHeartbeatTicker;
-        if (emitEvent != null) {
-          retryHeartbeatStarter = Timer(const Duration(seconds: 12), () {
-            retryHeartbeatTicker = Timer.periodic(const Duration(seconds: 10), (
-              _,
-            ) {
-              final int secs = retryReq.elapsed.inSeconds;
-              if (secs <= 0) return;
-              _emitProgress(
-                emitEvent,
-                _loc(
-                  '等待模型响应中… 已等待 ${secs}s',
-                  'Waiting for model… ${secs}s elapsed',
-                ),
-              );
-            });
-          });
-        }
-        try {
-          retryMessages = _replaceImageMessagesWithPlaceholder(
-            retryMessages,
-            keepMostRecent: true,
-            cid: cid,
-            stage: 'tool_loop_auto_paging_retry_image',
-            model: modelForBudget,
-          );
-          retryMessages = _enforceToolLoopPromptBudget(
-            retryMessages,
-            pinnedUser: pinnedUserMessage,
-            maxPromptTokens: _toolLoopBudgetTokensForPrompt(
-              budgets: budgets,
-              toolsSchemaTokens: toolsSchemaTokens,
-              effectivePromptCapTokens: effectivePromptCapTokens,
-            ),
-            emitEvent: emitEvent,
-            cid: cid,
-            stage: 'tool_loop_auto_paging_retry_budget',
-            model: modelForBudget,
-          );
-          result = await callModel(
-            messages: retryMessages,
-            toolsForCall: tools,
-            toolChoiceForCall: toolChoice,
-            preferStreaming: true,
-            trimStage: 'tool_loop_auto_paging_retry_call',
-            isToolLoop: true,
-          );
-        } finally {
-          retryHeartbeatStarter?.cancel();
-          retryHeartbeatTicker?.cancel();
-          retryReq.stop();
-        }
-        retryMessages = _replaceImageMessagesWithPlaceholder(
-          retryMessages,
-          keepMostRecent: false,
-          cid: cid,
-          stage: 'tool_loop_auto_paging_retry_post_image',
-          model: modelForBudget,
-        );
-        if (result.toolCalls.isEmpty) {
-          result = _maybeCoerceToolCallsFromText(result, tools);
-        }
-        _emitProgress(
-          emitEvent,
-          _loc(
-            '自动翻页覆盖重试后模型已响应：tool_calls=${result.toolCalls.length}（${retryReq.elapsedMilliseconds}ms）',
-            'Auto-paging retry responded: tool_calls=${result.toolCalls.length} (${retryReq.elapsedMilliseconds}ms)',
-          ),
-        );
-        working = List<AIMessage>.from(retryMessages);
-      }
+      final autoPagingRetry = await _runAutoPagingRetryIfNeeded(
+        shouldRun: shouldForceAutoPagingRetry,
+        working: working,
+        result: result,
+        tools: tools,
+        toolChoice: toolChoice,
+        cid: cid,
+        pinnedUserMessage: pinnedUserMessage,
+        budgets: budgets,
+        toolsSchemaTokens: toolsSchemaTokens,
+        effectivePromptCapTokens: effectivePromptCapTokens,
+        modelForBudget: modelForBudget,
+        emitEvent: emitEvent,
+        callModel: callModel,
+        forcedEmptySearchRetry: forcedEmptySearchRetry,
+      );
+      result = autoPagingRetry.result;
+      working = autoPagingRetry.working;
+      forcedEmptySearchRetry = autoPagingRetry.forcedEmptySearchRetry;
     }
 
     if (!unlimitedIters && result.toolCalls.isNotEmpty) {
@@ -4070,45 +3211,4 @@ extension AIChatServiceSendExt on AIChatService {
 
     return assistant;
   }
-
-  Future<AIMessage> sendMessageOneShot(
-    String userMessage, {
-    String context = 'chat',
-    Duration? timeout,
-    AIReasoningLevel reasoningLevel = AIReasoningLevel.auto,
-  }) async {
-    final List<AIEndpoint> endpoints = await _settings.getEndpointCandidates(
-      context: context,
-    );
-    final String systemPrompt = _systemPromptForLocale(
-      allowCharts: context == 'chat',
-    );
-    final List<AIMessage> requestMessages = _composeMessages(
-      systemMessage: systemPrompt,
-      history: const <AIMessage>[],
-      userMessage: userMessage,
-      includeHistory: false,
-    );
-
-    final Stopwatch responseSw = Stopwatch()..start();
-    final AIGatewayResult result = await _gateway.complete(
-      endpoints: endpoints,
-      messages: requestMessages,
-      responseStartMarker: AIChatService.responseStartMarker,
-      timeout: timeout,
-      preferStreaming: true,
-      logContext: context,
-      reasoningLevel: reasoningLevel,
-    );
-    responseSw.stop();
-
-    return _assistantMessageFromGatewayResult(
-      result,
-      responseDuration: responseSw.elapsed,
-    );
-  }
-
-  Future<void> clearConversation() => _settings.clearChatHistory();
-
-  Future<List<AIMessage>> getConversation() => _settings.getChatHistory();
 }

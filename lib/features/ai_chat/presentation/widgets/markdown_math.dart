@@ -126,7 +126,8 @@ String preprocessForChatMarkdown(String content) {
       // 对非代码块内容：先移除 <think>，再做 LaTeX 转标签（跳过行内代码片段）
       final s1 = _removeThinkBlocks(seg.text);
       final s2 = _replaceLatexToTagsSkippingInlineCode(s1);
-      final s3 = _normalizeEvidenceTagsSkippingInlineCode(s2);
+      final s2b = _normalizeEvidenceFilenameLists(s2);
+      final s3 = _normalizeEvidenceTagsSkippingInlineCode(s2b);
       final s4 = _removeTrailingPunctuationAfterEvidence(s3);
       final s5 = _ensureEvidenceBlocksOnOwnLine(s4);
       final s6 = _removeParenthesesAroundMarkdownLinksSkippingInlineCode(s5);
@@ -144,6 +145,75 @@ String _removeThinkBlocks(String text) {
     multiLine: true,
   );
   return text.replaceAll(thinkRegex, '');
+}
+
+String _normalizeEvidenceFilenameLists(String input) {
+  final List<String> lines = input.replaceAll('\r\n', '\n').split('\n');
+  final StringBuffer out = StringBuffer();
+  bool inEvidenceFilenameList = false;
+
+  bool isEvidenceFilenameHeader(String line) {
+    final String lower = line.toLowerCase();
+    final bool mentionsEvidence =
+        lower.contains('evidence') || line.contains('证据');
+    final bool mentionsFilename =
+        lower.contains('filename') ||
+        lower.contains('file name') ||
+        lower.contains('filenames') ||
+        line.contains('文件名');
+    return mentionsEvidence && mentionsFilename;
+  }
+
+  bool isListLikeLine(String line) {
+    final String t = line.trimLeft();
+    return t.startsWith('- ') ||
+        t.startsWith('* ') ||
+        t.startsWith('+ ') ||
+        RegExp(r'^\d+[.)]\s+').hasMatch(t) ||
+        t.startsWith('• ');
+  }
+
+  final RegExp imageNamePattern = RegExp(
+    r'`?([A-Za-z0-9][A-Za-z0-9._ -]*\.(?:webp|png|jpe?g))`?',
+    caseSensitive: false,
+  );
+
+  for (final String line in lines) {
+    if (isEvidenceFilenameHeader(line)) {
+      inEvidenceFilenameList = true;
+      out.writeln(line);
+      continue;
+    }
+
+    if (!inEvidenceFilenameList) {
+      out.writeln(line);
+      continue;
+    }
+
+    final String trimmed = line.trim();
+    if (trimmed.isEmpty) {
+      out.writeln(line);
+      continue;
+    }
+
+    final Iterable<RegExpMatch> matches = imageNamePattern.allMatches(line);
+    final List<String> names = matches
+        .map((RegExpMatch match) => (match.group(1) ?? '').trim())
+        .where((String name) => name.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+    if (names.isNotEmpty && isListLikeLine(line)) {
+      out.writeln(names.map((String name) => '[evidence: $name]').join(' '));
+      continue;
+    }
+
+    inEvidenceFilenameList = false;
+    out.writeln(line);
+  }
+
+  String result = out.toString();
+  if (result.endsWith('\n')) result = result.substring(0, result.length - 1);
+  return result;
 }
 
 /// 规范化模型输出的 evidence 引用格式，尽量修复以下常见错误：
