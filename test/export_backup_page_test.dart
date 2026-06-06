@@ -93,6 +93,40 @@ void main() {
     );
   }
 
+  Future<void> scrollToText(WidgetTester tester, String text) async {
+    final Finder finder = find.text(text);
+    if (finder.evaluate().isEmpty) {
+      try {
+        await tester.scrollUntilVisible(
+          finder,
+          300,
+          scrollable: find.byType(Scrollable).first,
+          maxScrolls: 30,
+        );
+      } catch (_) {
+        await tester.scrollUntilVisible(
+          finder,
+          -300,
+          scrollable: find.byType(Scrollable).first,
+          maxScrolls: 30,
+        );
+      }
+    } else {
+      await tester.ensureVisible(finder);
+    }
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> expectVisibleText(WidgetTester tester, String text) async {
+    await scrollToText(tester, text);
+    expect(find.text(text), findsOneWidget);
+  }
+
+  Future<void> tapVisibleText(WidgetTester tester, String text) async {
+    await scrollToText(tester, text);
+    await tester.tap(find.text(text));
+  }
+
   testWidgets('export page scans scope first and waits for manual start', (
     WidgetTester tester,
   ) async {
@@ -124,7 +158,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('开始导出'), findsOneWidget);
+    await expectVisibleText(tester, '开始导出');
     expect(find.text('截图文件'), findsOneWidget);
     expect(find.text('主数据库'), findsOneWidget);
     expect(exportCalls, 0);
@@ -205,24 +239,24 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('开始导出'), findsOneWidget);
+    await expectVisibleText(tester, '开始导出');
     expect(exportCalls, 0);
 
-    await tester.tap(find.text('开始导出'));
+    await tapVisibleText(tester, '开始导出');
     await tester.pump();
     expect(exportCalls, 1);
     expect(find.text('正在扫描全部持久化数据…'), findsOneWidget);
-    expect(find.text('取消导出'), findsOneWidget);
+    await expectVisibleText(tester, '取消导出');
 
     packingGate.complete();
     await tester.pump();
-    expect(find.text('50%'), findsWidgets);
+    await expectVisibleText(tester, '50%');
 
     completionGate.complete();
     await tester.pumpAndSettle();
-    expect(find.text('导出完成，可以确认备份已生成。'), findsOneWidget);
-    expect(find.text('复制路径'), findsOneWidget);
-    expect(find.text('Download/ScreenMemory/test.zip'), findsOneWidget);
+    await expectVisibleText(tester, '导出完成，可以确认备份已生成。');
+    await expectVisibleText(tester, '复制路径');
+    await expectVisibleText(tester, 'Download/ScreenMemory/test.zip');
   });
 
   testWidgets('cancel keeps page open and allows restart after cleanup', (
@@ -289,11 +323,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(ExportBackupPage), findsOneWidget);
 
-    await tester.tap(find.text('开始导出'));
+    await tapVisibleText(tester, '开始导出');
     await tester.pump();
-    expect(find.text('取消导出'), findsOneWidget);
+    await expectVisibleText(tester, '取消导出');
 
-    await tester.tap(find.text('取消导出'));
+    await tapVisibleText(tester, '取消导出');
     await tester.pump();
     expect(find.text('正在取消并清理'), findsOneWidget);
 
@@ -302,7 +336,7 @@ void main() {
 
     expect(find.byType(ExportBackupPage), findsOneWidget);
     expect(observer.popCount, 0);
-    expect(find.text('重新开始导出'), findsOneWidget);
+    await expectVisibleText(tester, '重新开始导出');
     expect(find.text('导出已取消，未完成的备份文件已清理。'), findsWidgets);
   });
 
@@ -345,12 +379,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('开始导出'));
+    await tapVisibleText(tester, '开始导出');
     await tester.pumpAndSettle();
 
-    expect(find.text('导出失败'), findsOneWidget);
+    await expectVisibleText(tester, '导出失败');
     expect(find.textContaining('boom'), findsOneWidget);
-    expect(find.text('重新开始导出'), findsOneWidget);
+    await expectVisibleText(tester, '重新开始导出');
   });
 
   testWidgets('database-only scope updates preview and executor scope', (
@@ -389,9 +423,9 @@ void main() {
 
     expect(find.text('截图文件'), findsNothing);
     expect(find.text('主数据库'), findsOneWidget);
-    expect(find.text('开始导出数据库'), findsOneWidget);
+    await expectVisibleText(tester, '开始导出数据库');
 
-    await tester.tap(find.text('开始导出数据库'));
+    await tapVisibleText(tester, '开始导出数据库');
     await tester.pump();
 
     expect(receivedScope, BackupExportScope.databasesOnly);

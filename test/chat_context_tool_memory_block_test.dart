@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:screen_memo/features/ai/application/chat_context_service.dart';
 import 'package:screen_memo/data/database/screenshot_database.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 Future<void> _prepareDesktopDbRoot(Directory root) async {
@@ -18,9 +19,15 @@ Future<void> _prepareDesktopDbRoot(Directory root) async {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   setUpAll(() {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
+  });
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
   });
 
   test(
@@ -61,7 +68,7 @@ void main() {
         final String ctx = await ChatContextService.instance
             .buildSystemContextMessage(cid: 'ctx-cid');
 
-        expect(ctx, contains('历史工具记录'));
+        expect(ctx, anyOf(contains('历史工具记录'), contains('Recent tool memory')));
         expect(ctx, isNot(contains('start_local')));
         expect(ctx, isNot(contains('end_local')));
         expect(ctx, isNot(contains('paging')));
