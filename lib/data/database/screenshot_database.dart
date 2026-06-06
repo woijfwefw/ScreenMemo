@@ -19,6 +19,7 @@ import 'package:screen_memo/features/backup/data/backup_inventory_service.dart';
 
 part 'screenshot_database_ai.dart';
 part 'screenshot_database_ai_segments.dart';
+part 'screenshot_database_ai_fts.dart';
 part 'screenshot_database_meta.dart';
 part 'screenshot_database_meta_management.dart';
 part 'screenshot_database_import_diagnostics.dart';
