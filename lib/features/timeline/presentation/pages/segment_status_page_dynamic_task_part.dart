@@ -340,9 +340,15 @@ extension _SegmentStatusDynamicTaskPart on _SegmentStatusPageState {
     final DateTime startedAt = DateTime.fromMillisecondsSinceEpoch(
       status.startedAt,
     );
-    final DateTime endedAt = status.completedAt > 0
-        ? DateTime.fromMillisecondsSinceEpoch(status.completedAt)
-        : DateTime.now();
+    final int endedAtMillis = status.completedAt > 0
+        ? status.completedAt
+        : (status.updatedAt > 0
+              ? status.updatedAt
+              : DateTime.now().millisecondsSinceEpoch);
+    DateTime endedAt = DateTime.fromMillisecondsSinceEpoch(endedAtMillis);
+    if (endedAt.isBefore(startedAt)) {
+      endedAt = startedAt;
+    }
     final List<File> files = await _listDynamicRebuildRequestLogFiles(
       logsRoot,
       startedAt: startedAt,

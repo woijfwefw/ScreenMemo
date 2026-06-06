@@ -211,7 +211,7 @@ bool _sameDynamicRebuildRequestLogsState(
 class _SegmentStatusPageState extends State<SegmentStatusPage>
     with SingleTickerProviderStateMixin {
   final ScreenshotDatabase _db = ScreenshotDatabase.instance;
-  static const bool _dynamicRebuildRequestLogsEnabled = false;
+  static const bool _dynamicRebuildRequestLogsEnabled = true;
   static const int _dynamicRebuildRequestLogsDisplayLimit = 10;
   Map<String, dynamic>? _active;
   List<Map<String, dynamic>> _segments = <Map<String, dynamic>>[];

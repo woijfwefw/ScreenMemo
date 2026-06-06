@@ -89,13 +89,14 @@ class _SegmentTimelineTabView extends StatefulWidget {
 }
 
 class _SegmentTimelineTabViewState extends State<_SegmentTimelineTabView>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   static const int _autoLoadThreshold = 3;
 
   TabController? _tabController;
   List<String> _orderedKeys = const <String>[];
   String? _lastReportedDateKey;
   String? _lastAutoLoadTriggerKey;
+  String? _lastWidgetSelectedDateKey;
   bool _autoLoadCheckQueued = false;
 
   void _handleTabSelectionChanged() {
@@ -458,20 +459,40 @@ class _SegmentTimelineTabViewState extends State<_SegmentTimelineTabView>
       }
     }
     final int desiredIndex = _desiredTabIndex(ordered, fallbackIndex);
+    final String normalizedWidgetSelectedDateKey =
+        (widget.selectedDateKey ?? '').trim();
+    final String? widgetSelectedDateKey =
+        normalizedWidgetSelectedDateKey.isEmpty
+        ? null
+        : normalizedWidgetSelectedDateKey;
+    final bool widgetSelectedDateChanged =
+        widgetSelectedDateKey != _lastWidgetSelectedDateKey;
     final bool shouldRecreateController =
-        _tabController == null ||
-        _tabController!.length != ordered.length ||
-        _tabController!.index != desiredIndex;
+        _tabController == null || _tabController!.length != ordered.length;
     if (shouldRecreateController) {
-      _tabController?.removeListener(_handleTabSelectionChanged);
-      _tabController?.dispose();
+      final TabController? previousController = _tabController;
+      previousController?.removeListener(_handleTabSelectionChanged);
       _tabController = TabController(
         length: ordered.length,
         vsync: this,
         initialIndex: desiredIndex,
       );
       _tabController!.addListener(_handleTabSelectionChanged);
+      if (previousController != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          previousController.dispose();
+        });
+      }
+    } else if (widgetSelectedDateChanged && widgetSelectedDateKey != null) {
+      final int selectedIndex = ordered.indexOf(widgetSelectedDateKey);
+      final TabController? controller = _tabController;
+      if (controller != null &&
+          selectedIndex >= 0 &&
+          selectedIndex != controller.index) {
+        controller.index = selectedIndex;
+      }
     }
+    _lastWidgetSelectedDateKey = widgetSelectedDateKey;
     _reportActiveDateKey();
     _queueAutoLoadCheck();
 

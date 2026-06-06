@@ -44,6 +44,7 @@ Map<String, Object?> _mockDynamicRebuildStatus = <String, Object?>{
 };
 String? _mockTodayLogsDir;
 final List<Directory> _tempDirsToDelete = <Directory>[];
+int _tempDirCounter = 0;
 
 String _dateKey(DateTime date) {
   return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
@@ -55,6 +56,18 @@ String _tabLabel(DateTime date) => '${date.month}月${date.day}日 1';
 
 Future<void> _prepareDesktopDbRoot(Directory root) async {
   await ScreenshotDatabase.instance.initializeForDesktop(root.path);
+}
+
+Directory _createTestTempDir(String prefix) {
+  final Directory base = Directory(p.join('build', 'test_tmp'));
+  base.createSync(recursive: true);
+  final int nonce = DateTime.now().microsecondsSinceEpoch;
+  final int counter = _tempDirCounter++;
+  final Directory dir = Directory(
+    p.join(base.path, '${prefix}_${nonce}_$counter'),
+  );
+  dir.createSync(recursive: true);
+  return dir;
 }
 
 void _scheduleTempDelete(Directory tmp) {
@@ -121,6 +134,19 @@ Future<void> _seedTimelineDays(List<DateTime> days) async {
   await detailBatch.commit(noResult: true);
 }
 
+Future<void> _prepareTimelineFixture(
+  WidgetTester tester,
+  Directory tmp,
+  List<DateTime> days,
+) async {
+  await tester.runAsync(() async {
+    final Directory root = Directory(p.join(tmp.path, 'root'));
+    root.createSync(recursive: true);
+    await _prepareDesktopDbRoot(root);
+    await _seedTimelineDays(days);
+  });
+}
+
 Widget _buildHarness() {
   return MaterialApp(
     locale: const Locale('zh'),
@@ -136,6 +162,9 @@ Future<void> _pumpUntilFound(
   int maxPumps = 40,
 }) async {
   for (int i = 0; i < maxPumps; i++) {
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    });
     await tester.pump(const Duration(milliseconds: 100));
     if (finder.evaluate().isNotEmpty) return;
   }
@@ -224,19 +253,14 @@ void main() {
   testWidgets(
     'auto loads older tabs when current tab reaches the visible tail',
     (WidgetTester tester) async {
-      final Directory tmp = await Directory.systemTemp.createTemp(
-        'screen_memo_segment_page_auto_',
-      );
+      final Directory tmp = _createTestTempDir('screen_memo_segment_page_auto');
       try {
-        final Directory root = Directory(p.join(tmp.path, 'root'));
-        await root.create(recursive: true);
-        await _prepareDesktopDbRoot(root);
         final DateTime latest = DateTime(2024, 4, 10);
         final List<DateTime> days = List<DateTime>.generate(
           33,
           (int index) => latest.subtract(Duration(days: index)),
         );
-        await _seedTimelineDays(days);
+        await _prepareTimelineFixture(tester, tmp, days);
 
         await tester.pumpWidget(_buildHarness());
         await _pumpUntilFound(tester, find.text(_summaryText(latest)));
@@ -265,19 +289,16 @@ void main() {
   testWidgets('refresh keeps the currently selected older tab', (
     WidgetTester tester,
   ) async {
-    final Directory tmp = await Directory.systemTemp.createTemp(
-      'screen_memo_segment_page_refresh_',
+    final Directory tmp = _createTestTempDir(
+      'screen_memo_segment_page_refresh',
     );
     try {
-      final Directory root = Directory(p.join(tmp.path, 'root'));
-      await root.create(recursive: true);
-      await _prepareDesktopDbRoot(root);
       final DateTime latest = DateTime(2024, 4, 10);
       final List<DateTime> days = List<DateTime>.generate(
         33,
         (int index) => latest.subtract(Duration(days: index)),
       );
-      await _seedTimelineDays(days);
+      await _prepareTimelineFixture(tester, tmp, days);
 
       await tester.pumpWidget(_buildHarness());
       await _pumpUntilFound(tester, find.text(_summaryText(latest)));
@@ -293,8 +314,7 @@ void main() {
       await _pumpUntilFound(tester, find.text(_tabLabel(olderSelectedDay)));
       await tester.ensureVisible(find.text(_tabLabel(olderSelectedDay)));
       await tester.tap(find.text(_tabLabel(olderSelectedDay)));
-      await tester.pump(const Duration(milliseconds: 200));
-      expect(find.text(_summaryText(olderSelectedDay)), findsWidgets);
+      await _pumpUntilFound(tester, find.text(_summaryText(olderSelectedDay)));
 
       await tester.tap(find.byIcon(Icons.refresh));
       await tester.pump();
@@ -311,19 +331,16 @@ void main() {
   testWidgets('date overlay calendar jumps to a day in another month', (
     WidgetTester tester,
   ) async {
-    final Directory tmp = await Directory.systemTemp.createTemp(
-      'screen_memo_segment_page_calendar_jump_',
+    final Directory tmp = _createTestTempDir(
+      'screen_memo_segment_page_calendar_jump',
     );
     try {
-      final Directory root = Directory(p.join(tmp.path, 'root'));
-      await root.create(recursive: true);
-      await _prepareDesktopDbRoot(root);
       final DateTime latest = DateTime(2024, 4, 10);
       final List<DateTime> days = List<DateTime>.generate(
         45,
         (int index) => latest.subtract(Duration(days: index)),
       );
-      await _seedTimelineDays(days);
+      await _prepareTimelineFixture(tester, tmp, days);
 
       await tester.pumpWidget(_buildHarness());
       await _pumpUntilFound(tester, find.text(_summaryText(latest)));
@@ -342,6 +359,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
 
       final DateTime targetDay = DateTime(2024, 3, 1);
+      await _pumpUntilFound(tester, find.text('1 条'));
       await tester.tap(
         find.byKey(
           ValueKey<String>('segment-calendar-day-${_dateKey(targetDay)}'),
@@ -361,15 +379,12 @@ void main() {
   testWidgets('selected day action starts target day backfill', (
     WidgetTester tester,
   ) async {
-    final Directory tmp = await Directory.systemTemp.createTemp(
-      'screen_memo_segment_page_day_backfill_',
+    final Directory tmp = _createTestTempDir(
+      'screen_memo_segment_page_day_backfill',
     );
     try {
-      final Directory root = Directory(p.join(tmp.path, 'root'));
-      await root.create(recursive: true);
-      await _prepareDesktopDbRoot(root);
       final DateTime day = DateTime(2024, 4, 10);
-      await _seedTimelineDays(<DateTime>[day]);
+      await _prepareTimelineFixture(tester, tmp, <DateTime>[day]);
 
       await tester.pumpWidget(_buildHarness());
       await _pumpUntilFound(tester, find.text(_summaryText(day)));
@@ -407,15 +422,12 @@ void main() {
   testWidgets('selected day action starts target day rebuild', (
     WidgetTester tester,
   ) async {
-    final Directory tmp = await Directory.systemTemp.createTemp(
-      'screen_memo_segment_page_day_rebuild_',
+    final Directory tmp = _createTestTempDir(
+      'screen_memo_segment_page_day_rebuild',
     );
     try {
-      final Directory root = Directory(p.join(tmp.path, 'root'));
-      await root.create(recursive: true);
-      await _prepareDesktopDbRoot(root);
       final DateTime day = DateTime(2024, 4, 10);
-      await _seedTimelineDays(<DateTime>[day]);
+      await _prepareTimelineFixture(tester, tmp, <DateTime>[day]);
 
       await tester.pumpWidget(_buildHarness());
       await _pumpUntilFound(tester, find.text(_summaryText(day)));
@@ -451,15 +463,12 @@ void main() {
   testWidgets('rebuild scope can switch to all days', (
     WidgetTester tester,
   ) async {
-    final Directory tmp = await Directory.systemTemp.createTemp(
-      'screen_memo_segment_page_all_rebuild_',
+    final Directory tmp = _createTestTempDir(
+      'screen_memo_segment_page_all_rebuild',
     );
     try {
-      final Directory root = Directory(p.join(tmp.path, 'root'));
-      await root.create(recursive: true);
-      await _prepareDesktopDbRoot(root);
       final DateTime day = DateTime(2024, 4, 10);
-      await _seedTimelineDays(<DateTime>[day]);
+      await _prepareTimelineFixture(tester, tmp, <DateTime>[day]);
 
       await tester.pumpWidget(_buildHarness());
       await _pumpUntilFound(tester, find.text(_summaryText(day)));
@@ -494,15 +503,12 @@ void main() {
   testWidgets('backfill scope can switch to all days', (
     WidgetTester tester,
   ) async {
-    final Directory tmp = await Directory.systemTemp.createTemp(
-      'screen_memo_segment_page_all_backfill_',
+    final Directory tmp = _createTestTempDir(
+      'screen_memo_segment_page_all_backfill',
     );
     try {
-      final Directory root = Directory(p.join(tmp.path, 'root'));
-      await root.create(recursive: true);
-      await _prepareDesktopDbRoot(root);
       final DateTime day = DateTime(2024, 4, 10);
-      await _seedTimelineDays(<DateTime>[day]);
+      await _prepareTimelineFixture(tester, tmp, <DateTime>[day]);
 
       await tester.pumpWidget(_buildHarness());
       await _pumpUntilFound(tester, find.text(_summaryText(day)));
@@ -537,19 +543,14 @@ void main() {
   testWidgets('paused rebuild hides newer unreconstructed tabs', (
     WidgetTester tester,
   ) async {
-    final Directory tmp = await Directory.systemTemp.createTemp(
-      'screen_memo_segment_page_cutoff_',
-    );
+    final Directory tmp = _createTestTempDir('screen_memo_segment_page_cutoff');
     try {
-      final Directory root = Directory(p.join(tmp.path, 'root'));
-      await root.create(recursive: true);
-      await _prepareDesktopDbRoot(root);
       final DateTime latest = DateTime(2024, 4, 10);
       final List<DateTime> days = List<DateTime>.generate(
         6,
         (int index) => latest.subtract(Duration(days: index)),
       );
-      await _seedTimelineDays(days);
+      await _prepareTimelineFixture(tester, tmp, days);
       final DateTime cutoffDay = latest.subtract(const Duration(days: 2));
       _mockDynamicRebuildStatus = <String, Object?>{
         'taskId': 'dynamic_rebuild_test',
@@ -599,20 +600,17 @@ void main() {
   testWidgets('dynamic rebuild sheet shows native request logs', (
     WidgetTester tester,
   ) async {
-    final Directory tmp = await Directory.systemTemp.createTemp(
-      'screen_memo_segment_page_logs_',
-    );
+    final Directory tmp = _createTestTempDir('screen_memo_segment_page_logs');
     try {
-      final Directory root = Directory(p.join(tmp.path, 'root'));
       final Directory logsDir = Directory(
         p.join(tmp.path, 'output', 'logs', '2026', '03', '12'),
       );
-      await root.create(recursive: true);
-      await logsDir.create(recursive: true);
-      await _prepareDesktopDbRoot(root);
-      await _seedTimelineDays(<DateTime>[DateTime(2024, 4, 10)]);
+      await _prepareTimelineFixture(tester, tmp, <DateTime>[
+        DateTime(2024, 4, 10),
+      ]);
+      logsDir.createSync(recursive: true);
       final File infoLog = File(p.join(logsDir.path, '12_info.log'));
-      await infoLog.writeAsString('''
+      infoLog.writeAsStringSync('''
 2026-03-12 09:00:00.000 [INFO] SegmentSummaryManager: AIREQ PROMPT_BEGIN id=seg101
 2026-03-12 09:00:00.001 [INFO] SegmentSummaryManager: AI 提示词完整内容开始 >>>
 2026-03-12 09:00:00.002 [INFO] SegmentSummaryManager: prompt 101
@@ -681,7 +679,12 @@ void main() {
       );
 
       await tester.tap(find.byTooltip('动态任务'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await _pumpUntilFound(
+        tester,
+        find.textContaining('segment=102'),
+        maxPumps: 80,
+      );
 
       expect(find.text('当前模型：gpt-4.1'), findsOneWidget);
       expect(find.text('重建请求'), findsOneWidget);
@@ -698,14 +701,13 @@ void main() {
   testWidgets('idle dynamic task sheet hides progress and workers', (
     WidgetTester tester,
   ) async {
-    final Directory tmp = await Directory.systemTemp.createTemp(
-      'screen_memo_segment_page_idle_task_',
+    final Directory tmp = _createTestTempDir(
+      'screen_memo_segment_page_idle_task',
     );
     try {
-      final Directory root = Directory(p.join(tmp.path, 'root'));
-      await root.create(recursive: true);
-      await _prepareDesktopDbRoot(root);
-      await _seedTimelineDays(<DateTime>[DateTime(2024, 4, 10)]);
+      await _prepareTimelineFixture(tester, tmp, <DateTime>[
+        DateTime(2024, 4, 10),
+      ]);
 
       await tester.pumpWidget(_buildHarness());
       await _pumpUntilFound(
@@ -737,14 +739,13 @@ void main() {
   testWidgets('stopped dynamic task sheet hides progress and workers', (
     WidgetTester tester,
   ) async {
-    final Directory tmp = await Directory.systemTemp.createTemp(
-      'screen_memo_segment_page_stopped_task_',
+    final Directory tmp = _createTestTempDir(
+      'screen_memo_segment_page_stopped_task',
     );
     try {
-      final Directory root = Directory(p.join(tmp.path, 'root'));
-      await root.create(recursive: true);
-      await _prepareDesktopDbRoot(root);
-      await _seedTimelineDays(<DateTime>[DateTime(2024, 4, 10)]);
+      await _prepareTimelineFixture(tester, tmp, <DateTime>[
+        DateTime(2024, 4, 10),
+      ]);
       _mockDynamicRebuildStatus = <String, Object?>{
         'taskId': 'dynamic_rebuild_stopped',
         'taskMode': 'rebuild',
@@ -821,14 +822,13 @@ void main() {
   testWidgets(
     'dynamic rebuild sheet shows concurrency controls and worker cards',
     (WidgetTester tester) async {
-      final Directory tmp = await Directory.systemTemp.createTemp(
-        'screen_memo_segment_page_concurrency_',
+      final Directory tmp = _createTestTempDir(
+        'screen_memo_segment_page_concurrency',
       );
       try {
-        final Directory root = Directory(p.join(tmp.path, 'root'));
-        await root.create(recursive: true);
-        await _prepareDesktopDbRoot(root);
-        await _seedTimelineDays(<DateTime>[DateTime(2024, 4, 10)]);
+        await _prepareTimelineFixture(tester, tmp, <DateTime>[
+          DateTime(2024, 4, 10),
+        ]);
         _mockDynamicRebuildStatus = <String, Object?>{
           'taskId': 'dynamic_rebuild_parallel',
           'status': 'running',
@@ -917,7 +917,8 @@ void main() {
         );
 
         await tester.tap(find.byTooltip('动态任务'));
-        await tester.pumpAndSettle();
+        await tester.pump();
+        await _pumpUntilFound(tester, find.text('线程 1'), maxPumps: 80);
 
         expect(find.text('并发天数'), findsOneWidget);
         expect(find.text('线程 1'), findsOneWidget);
