@@ -66,6 +66,7 @@ class _ScreenMemoAppState extends State<ScreenMemoApp>
     _themeService.dispose();
     _localeService.removeListener(_onLocaleChanged);
     WidgetsBinding.instance.removeObserver(this);
+    AppHealthService.instance.stopAutoMonitor();
     super.dispose();
   }
 
