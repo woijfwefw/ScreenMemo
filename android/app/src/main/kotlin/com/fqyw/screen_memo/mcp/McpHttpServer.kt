@@ -210,7 +210,13 @@ class McpHttpServer(
                     if (name.isEmpty()) throw IllegalArgumentException("tool name is required")
                     registry.callTool(name, arguments)
                 }
-                else -> return jsonRpcError(id, -32601, "Method not found")
+                else -> {
+                    if (!registry.hasTool(method)) {
+                        return jsonRpcError(id, -32601, "Method not found")
+                    }
+                    val params = request.optJSONObject("params") ?: JSONObject()
+                    registry.callTool(method, params)
+                }
             }
             jsonRpcResult(id, result)
         } catch (e: IllegalArgumentException) {

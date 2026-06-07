@@ -8,7 +8,22 @@ class McpToolRegistry(
     context: Context,
     private val serviceStatusProvider: () -> Map<String, Any?>,
 ) {
+    companion object {
+        private val TOOL_NAMES = listOf(
+            "screenmemo_status",
+            "list_recent_dynamics",
+            "search_dynamics",
+            "get_dynamic_context",
+            "get_segment",
+            "search_docs",
+            "search_screenshots",
+            "get_evidence_images",
+        )
+    }
+
     private val repository = ScreenMemoMcpRepository(context.applicationContext)
+
+    fun hasTool(name: String): Boolean = TOOL_NAMES.contains(name)
 
     fun listTools(): JSONArray {
         return JSONArray()
