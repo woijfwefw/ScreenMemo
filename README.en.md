@@ -36,77 +36,57 @@ ScreenMemo is a local-first smart screenshot memo and retrieval tool. It automat
 
 ## Screenshots
 
-The screenshots below cover some of the pages people use most often. More details and screens are not shown here, and you are welcome to try the app yourself.
+The screenshots below are grouped by feature theme. Each image shows a complete usage scenario.
 
 <table>
   <tr>
     <td align="center" valign="top">
-      <img src="assets/screenshots/home-overview.jpg" alt="Home Overview" width="240" loading="lazy" />
-      <div align="center"><sub>Home Overview</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-overview-search-timeline.jpg" alt="Core entry points: capture, search, and timeline" width="420" loading="lazy" />
+      <div align="center"><sub>Core entry points: capture, search, and timeline</sub></div>
     </td>
     <td align="center" valign="top">
-      <img src="assets/screenshots/search-semantic-results.jpg" alt="Semantic Search" width="240" loading="lazy" />
-      <div align="center"><sub>Semantic Search</sub></div>
-    </td>
-    <td align="center" valign="top">
-      <img src="assets/screenshots/timeline-replay-generation.jpg" alt="Timeline & Replay" width="240" loading="lazy" />
-      <div align="center"><sub>Timeline & Replay</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-search-tabs-results-summary.jpg" alt="Search and result summaries" width="420" loading="lazy" />
+      <div align="center"><sub>Search and result summaries</sub></div>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top">
-      <img src="assets/screenshots/event-detail.jpg" alt="Activity Detail" width="240" loading="lazy" />
-      <div align="center"><sub>Activity Detail</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-timeline-replay-controls.jpg" alt="Timeline, calendar, and replay generation" width="420" loading="lazy" />
+      <div align="center"><sub>Timeline, calendar, and replay generation</sub></div>
     </td>
     <td align="center" valign="top">
-      <img src="assets/screenshots/favorites-notes.jpg" alt="Favorites & Notes" width="240" loading="lazy" />
-      <div align="center"><sub>Favorites & Notes</sub></div>
-    </td>
-    <td align="center" valign="top">
-      <img src="assets/screenshots/settings-overview.jpg" alt="Settings Overview" width="240" loading="lazy" />
-      <div align="center"><sub>Settings Overview</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-ai-review-summary-log.jpg" alt="AI review, daily summary, and request logs" width="420" loading="lazy" />
+      <div align="center"><sub>AI review, daily summary, and request logs</sub></div>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top">
-      <img src="assets/screenshots/daySummary.jpg" alt="Daily Summary" width="240" loading="lazy" />
-      <div align="center"><sub>Daily Summary</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-ai-memory-search-chart.jpg" alt="AI memory search and charting" width="420" loading="lazy" />
+      <div align="center"><sub>AI memory search and charting</sub></div>
     </td>
     <td align="center" valign="top">
-      <img src="assets/screenshots/storage-analysis.jpg" alt="Storage Analysis" width="240" loading="lazy" />
-      <div align="center"><sub>Storage Analysis</sub></div>
-    </td>
-    <td align="center" valign="top">
-      <img src="assets/screenshots/ai-review-chat.jpg" alt="AI Review Chat" width="240" loading="lazy" />
-      <div align="center"><sub>AI Review Chat</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-favorites-loading-note.jpg" alt="Favorites, loading states, and notes" width="420" loading="lazy" />
+      <div align="center"><sub>Favorites, loading states, and notes</sub></div>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top">
-      <img src="assets/screenshots/addAi.jpg" alt="AI Providers" width="240" loading="lazy" />
-      <div align="center"><sub>AI Providers</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-capture-settings-storage.jpg" alt="Capture settings, compression, and storage analysis" width="420" loading="lazy" />
+      <div align="center"><sub>Capture settings, compression, and storage analysis</sub></div>
     </td>
     <td align="center" valign="top">
-      <img src="assets/screenshots/prompt.jpg" alt="Prompt Manager" width="240" loading="lazy" />
-      <div align="center"><sub>Prompt Manager</sub></div>
-    </td>
-    <td align="center" valign="top">
-      <img src="assets/screenshots/nsfw-search-results.jpg" alt="NSFW Search Results" width="240" loading="lazy" />
-      <div align="center"><sub>NSFW Search Results</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-settings-permissions-dynamic.jpg" alt="Settings, permissions, and dynamic tasks" width="420" loading="lazy" />
+      <div align="center"><sub>Settings, permissions, and dynamic tasks</sub></div>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top">
-      <img src="assets/screenshots/ai-sensitive-content-analysis.jpg" alt="Sensitive Content Analysis" width="240" loading="lazy" />
-      <div align="center"><sub>Sensitive Content Analysis</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-mcp-ai-provider-models.jpg" alt="MCP service, AI providers, and semantic models" width="420" loading="lazy" />
+      <div align="center"><sub>MCP service, AI providers, and semantic models</sub></div>
     </td>
     <td align="center" valign="top">
-      <img src="assets/screenshots/ai-tool-calling-report.jpg" alt="AI Tool-Calling Report" width="240" loading="lazy" />
-      <div align="center"><sub>AI Tool-Calling Report</sub></div>
-    </td>
-    <td align="center" valign="top">
-      <img src="assets/screenshots/deep-link-entry.jpg" alt="Deep Link" width="240" loading="lazy" />
-      <div align="center"><sub>Deep Link</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-privacy-nsfw-controls.jpg" alt="Privacy mode and sensitive-content controls" width="420" loading="lazy" />
+      <div align="center"><sub>Privacy mode and sensitive-content controls</sub></div>
     </td>
   </tr>
 </table>
@@ -188,9 +168,7 @@ flutter build apk --debug
 flutter build apk --release --split-per-abi --tree-shake-icons --obfuscate --split-debug-info=build/symbols
 ```
 
-> Local development builds use the default version `999.999.999+999999999` from `pubspec.yaml` unless `--build-name` is passed explicitly.
-> This prevents self-built packages from triggering cloud update prompts simply because their version is lower than the latest GitHub Release.
-> The official release workflow parses the real version from the Git tag and overrides this default with `--build-name` / `--build-number`. Android upgrade checks compare `versionCode` (the build number after `+`), not the user-facing `versionName`.
+#### Feature Tests and Regression Protection
 
 Android JVM unit tests:
 
@@ -206,6 +184,16 @@ cd android
 ./gradlew test
 ```
 
+## MCP Service
+
+ScreenMemo can manually start a read-only LAN MCP service on the phone, allowing AI clients on the same local network to read activity summaries, search results, context snippets, and a small number of explicitly requested evidence images.
+
+- Enable the LAN MCP service manually in the Android app under "Settings -> MCP Service".
+- The endpoint is fixed at `http://<phone-lan-ip>:37621/mcp`, and requests must include `Authorization: Bearer <token>`.
+- Standard MCP clients should use `tools/list` to discover tools and `tools/call` to invoke them. For compatibility with some clients, declared tool names can also be called directly as JSON-RPC `method` values.
+- OCR text and image base64 are not returned by default. Sensitive content is only returned when tool parameters explicitly enable `include_ocr`, or when calling `get_evidence_images`, with quantity and length limits.
+- If port `37621` is occupied, the settings page shows a startup error and does not automatically switch to a random port.
+
 ## FAQ
 
 <details>
@@ -215,6 +203,7 @@ cd android
 - Formula: Monthly usage (GB) ≈ `(60 ÷ interval seconds) × 60 × 24 × 30 × image size(KB) ÷ 1024 ÷ 1024`
 - To reduce usage: increase the capture interval, enable target-size compression, enable expiration cleanup, and only capture the apps you actually care about
 - Existing historical screenshots can be globally compressed by target size from "Settings → Screenshot Settings → Global History Compression"; canceling immediately stops starting new image-processing tasks
+- After replay videos are saved to the system gallery, the app automatically deletes its internal temporary video copy; existing replay copies can be cleaned up from "Storage Analysis → Replay Videos"
 </details>
 
 <details>
@@ -228,8 +217,6 @@ cd android
 <summary>Which AI providers are supported?</summary>
 
 - Built-in provider types currently include `OpenAI`, `Azure OpenAI`, `Claude`, `Gemini`, and `Custom`
-- `Custom` is suitable for OpenAI-compatible self-hosted or third-party endpoints
-- Different AI contexts can use different providers and models
 </details>
 
 <details>

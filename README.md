@@ -36,87 +36,60 @@ ScreenMemo 是一款在本地运行的智能截屏备忘与检索工具：自动
 
 ## 应用截图
 
-下面展示的是一些高频页面截图，更多细节和页面没有一一展开，欢迎体验。
+下面按功能主题展示组合截图，每张图都对应一组完整使用场景。
 
 <table>
   <tr>
     <td align="center" valign="top">
-      <img src="assets/screenshots/home-overview.jpg" alt="首页概览" width="240" loading="lazy" />
-      <div align="center"><sub>首页概览</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-overview-search-timeline.jpg" alt="核心入口：记录、搜索和时间线" width="420" loading="lazy" />
+      <div align="center"><sub>核心入口：记录、搜索和时间线</sub></div>
     </td>
     <td align="center" valign="top">
-      <img src="assets/screenshots/search-semantic-results.jpg" alt="语义搜索" width="240" loading="lazy" />
-      <div align="center"><sub>语义搜索</sub></div>
-    </td>
-    <td align="center" valign="top">
-      <img src="assets/screenshots/timeline-replay-generation.jpg" alt="时间线与回放" width="240" loading="lazy" />
-      <div align="center"><sub>时间线与回放</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-search-tabs-results-summary.jpg" alt="搜索与结果总结" width="420" loading="lazy" />
+      <div align="center"><sub>搜索与结果总结</sub></div>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top">
-      <img src="assets/screenshots/event-detail.jpg" alt="Activity 详情" width="240" loading="lazy" />
-      <div align="center"><sub>Activity 详情</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-timeline-replay-controls.jpg" alt="时间线、日历与回放生成" width="420" loading="lazy" />
+      <div align="center"><sub>时间线、日历与回放生成</sub></div>
     </td>
     <td align="center" valign="top">
-      <img src="assets/screenshots/favorites-notes.jpg" alt="收藏与备注" width="240" loading="lazy" />
-      <div align="center"><sub>收藏与备注</sub></div>
-    </td>
-    <td align="center" valign="top">
-      <img src="assets/screenshots/settings-overview.jpg" alt="设置总览" width="240" loading="lazy" />
-      <div align="center"><sub>设置总览</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-ai-review-summary-log.jpg" alt="AI 回顾、每日总结与请求日志" width="420" loading="lazy" />
+      <div align="center"><sub>AI 回顾、每日总结与请求日志</sub></div>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top">
-      <img src="assets/screenshots/daySummary.jpg" alt="每日总结" width="240" loading="lazy" />
-      <div align="center"><sub>每日总结</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-ai-memory-search-chart.jpg" alt="AI 记忆检索与图表整理" width="420" loading="lazy" />
+      <div align="center"><sub>AI 记忆检索与图表整理</sub></div>
     </td>
     <td align="center" valign="top">
-      <img src="assets/screenshots/storage-analysis.jpg" alt="存储分析" width="240" loading="lazy" />
-      <div align="center"><sub>存储分析</sub></div>
-    </td>
-    <td align="center" valign="top">
-      <img src="assets/screenshots/ai-review-chat.jpg" alt="AI 回顾对话" width="240" loading="lazy" />
-      <div align="center"><sub>AI 回顾对话</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-favorites-loading-note.jpg" alt="收藏、加载与备注" width="420" loading="lazy" />
+      <div align="center"><sub>收藏、加载与备注</sub></div>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top">
-      <img src="assets/screenshots/addAi.jpg" alt="AI 提供商" width="240" loading="lazy" />
-      <div align="center"><sub>AI 提供商</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-capture-settings-storage.jpg" alt="采集设置、压缩与存储分析" width="420" loading="lazy" />
+      <div align="center"><sub>采集设置、压缩与存储分析</sub></div>
     </td>
     <td align="center" valign="top">
-      <img src="assets/screenshots/prompt.jpg" alt="Prompt 管理" width="240" loading="lazy" />
-      <div align="center"><sub>Prompt 管理</sub></div>
-    </td>
-    <td align="center" valign="top">
-      <img src="assets/screenshots/nsfw-search-results.jpg" alt="NSFW 搜索结果" width="240" loading="lazy" />
-      <div align="center"><sub>NSFW 搜索结果</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-settings-permissions-dynamic.jpg" alt="设置、权限与动态任务" width="420" loading="lazy" />
+      <div align="center"><sub>设置、权限与动态任务</sub></div>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top">
-      <img src="assets/screenshots/ai-sensitive-content-analysis.jpg" alt="敏感内容分析" width="240" loading="lazy" />
-      <div align="center"><sub>敏感内容分析</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-mcp-ai-provider-models.jpg" alt="MCP 服务、AI 提供商与语义模型" width="420" loading="lazy" />
+      <div align="center"><sub>MCP 服务、AI 提供商与语义模型</sub></div>
     </td>
     <td align="center" valign="top">
-      <img src="assets/screenshots/ai-tool-calling-report.jpg" alt="AI 工具调用报告" width="240" loading="lazy" />
-      <div align="center"><sub>AI 工具调用报告</sub></div>
-    </td>
-    <td align="center" valign="top">
-      <img src="assets/screenshots/deep-link-entry.jpg" alt="深度链接" width="240" loading="lazy" />
-      <div align="center"><sub>深度链接</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-privacy-nsfw-controls.jpg" alt="隐私模式与敏感内容控制" width="420" loading="lazy" />
+      <div align="center"><sub>隐私模式与敏感内容控制</sub></div>
     </td>
   </tr>
 </table>
-
-## 动态时间线操作
-
-- 动态任务面板中的“补全”支持在确认前选择“补全当天”或“补全全部”；默认使用当前日期 Tab 对应的当天补全，避免误触全量补全。
-- 动态任务面板中的“重建”同样支持在确认前选择“重建当天”或“重建全部”；默认使用当前日期 Tab 对应的当天重建，只清理并重建该日动态与相关总结元数据。
-- 动态时间线的日期 Tab 右侧提供日历入口，底部抽屉按月加载每天动态数量，并只展示当前库内存在动态的年份，支持通过年份、月份和日期快速跳转到某一天。
-- 截图列表与全局时间线同步使用轻量日期 Tab：首屏只加载当前日期内容，邻近日期后台预取，右侧日历入口支持按月查看每天截图数量并快速跳转到指定日期。
 
 ## 快速开始
 
@@ -196,22 +169,6 @@ flutter build apk --release --split-per-abi --tree-shake-icons --obfuscate --spl
 
 #### 功能测试与回归保护
 
-新增或修改功能时，应优先补充功能测试，验证真实业务行为和可观察结果，避免只围绕文案、布局或实现细节编写脆弱测试。推荐按垂直切片推进：每个功能变更至少覆盖一条成功路径和一条关键边界路径，并把曾经修复过的缺陷沉淀为回归测试。
-
-当前重点回归面包括：
-
-- AI 工具循环、图片生成、工具结果回填、TODO 状态和子代理状态事件。
-- AI 请求网关的 Responses / Chat Completions / Anthropic / Codex compatible 请求形状、流式去重和搜索元数据解析。
-- 截图数据库的分库写入、动态时间线分页、备份清单、合并导入和统计重建。
-
-非生成源码文件应保持在 3500 行以内；`test/codebase_structure_test.dart` 会覆盖 `lib` 下的 Dart 源码和 `android/app/src/main/kotlin` 下的 Android Kotlin 业务源码。如果功能继续增长，应按业务能力拆分为同一 Dart library 下的 `part` 文件、同包 Kotlin helper，或更清晰的模块。`lib/l10n/app_localizations*.dart` 是 `flutter gen-l10n` 生成文件，不手动拆分。
-
-AI 对话的工具循环支持 TODO 与子代理协议：主模型可通过 `update_todos` 更新当前任务 TODO，最多 6 项；TODO 只在聊天输入框上方的 TODO 面板显示，不再作为思考时间线内容展示。模型可在用户明确要求子代理/并行代理，或复杂任务确实需要独立探索流时调用 `delegate_subagents` 委派一层并发子代理。子代理本身不是 TODO；子代理可使用普通工具能力，但不能继续创建子代理，也不能更新主 TODO。主循环会等待全部子代理结果并把结构化汇总作为 tool result 回传给主模型；只有真实子代理委派会产生 `subagent_update`。子代理入口位于输入区工具栏并通过底部抽屉展示当前子代理列表、上下文占用和只读详情入口；父会话列表中也会把子代理会话挂在对应主会话下方。以上事件都会写入 `ui_thinking_json`，调整相关协议时需要同步更新 `test/ui_thinking_json_patcher_test.dart` 和工具循环功能测试。
-
-> 本地开发构建如果没有显式传入 `--build-name`，会使用 `pubspec.yaml` 中的默认版本 `999.999.999+999999999`。
-> 这样可避免自构建包因为低于 GitHub Releases 最新版本而触发云端更新提示。
-> 正式发布工作流会从 Git tag 解析真实版本，并通过 `--build-name` / `--build-number` 覆盖该默认值。Android 覆盖安装实际比较的是 `versionCode`（即 `+` 后面的 build number），不是界面显示的 `versionName`。
-
 Android 原生 JVM 单元测试：
 
 **Windows**
@@ -259,22 +216,6 @@ ScreenMemo 可以在手机上手动开启只读的局域网 MCP 服务，让同�
 <summary>支持哪些 AI 提供商？</summary>
 
 - 当前内置提供商类型包括 `OpenAI`、`Azure OpenAI`、`Claude`、`Gemini` 和 `Custom`
-- `Custom` 适合接入兼容 OpenAI 风格接口的自建或第三方中转服务
-- 不同 AI 上下文可以分别绑定不同的提供商与模型
-- 提供商编辑页支持配置自定义请求头，并提供 `OpenAI`、`Anthropic / Claude API`、`Codex compatible`、`Claude Code API key` 应用模板；模板会在后台自动切换匹配的请求格式，请求头会随聊天、模型刷新、Key 测试和图片生成一起发送，可用 `{api_key}`、`{uuid}`、`{session_id}`、`{thread_id}`、`{installation_id}`、`{window_id}`、`{timestamp_ms}` 占位符引用当前 Key 与同一次请求的动态身份值
-- `Codex compatible` 模板会切换到接近 Codex CLI 的 Responses 请求：路径默认 `/v1/responses`，请求头包含 `originator`、`User-Agent`、`session-id`、`thread-id`、`x-client-request-id`、`x-codex-window-id`，请求体包含 `instructions`、`input`、`tools`、`tool_choice`、`parallel_tool_calls`、`reasoning`、`store`、`stream`、`include`、`prompt_cache_key`、`client_metadata.x-codex-installation-id`
-- `Claude Code API key` 模板按本地 Claude Code 2.1.121 `--bare` + API key 模式抓包整理：请求头包含 `Accept`、`Authorization`、`x-api-key`、`anthropic-version`、`anthropic-beta`、`anthropic-dangerous-direct-browser-access`、`x-app`、`User-Agent`、`X-Claude-Code-Session-Id` 和 `x-stainless-*` SDK 指纹头，请求体使用 `/v1/messages?beta=true` 的 `model`、`messages`、`system`、`tools`、`metadata.user_id`、`max_tokens`、`stream` 结构；不写入 `host`、`content-length`、`connection`、`accept-encoding` 等传输层自动头
-- 当端点使用 Responses API 且模型名属于 GPT / ChatGPT / o 系列时，AI 请求会自动携带 OpenAI `web_search` 内置工具；实际能否联网搜索取决于所配置服务商是否支持该工具
-- 若服务商返回 OpenAI Responses 的 `web_search_call` 与 `url_citation` annotations，聊天气泡会以“搜索过程”实时展示 `in_progress` / `searching` / `completed` 状态、搜索关键词或打开的网页，并在搜索中和完成后显示已搜索网站数、已查看页面数，完成后持久化可点击来源
-- 当前兼容端点通常不会返回 favicon；移动端会用来源域名首字母或网页图标作为降级展示
-</details>
-
-<details>
-<summary>如何查看 AI 对话请求日志和缓存命中？</summary>
-
-- AI 对话请求会记录请求链路、接口地址、模型、输入 / 输出 token、总 token，以及服务商返回的缓存命中 / 未命中 token。
-- 在 AI 对话或相关日志查看入口打开请求日志后，概览页会显示“缓存命中”“缓存未命中”和“命中率”；原始日志中对应字段为 `cacheHitTokens` 和 `cacheMissTokens`。
-- 如果某次请求没有这些字段，通常表示当前服务商或接口响应没有返回缓存使用信息，而不是本地解析失败。
 </details>
 
 <details>

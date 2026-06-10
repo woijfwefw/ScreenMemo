@@ -36,77 +36,57 @@ ScreenMemo はローカルで動作するスマートなスクリーンショッ
 
 ## スクリーンショット
 
-以下は利用頻度の高いページの一部です。ここに載せていない画面や細かな機能もまだあるので、ぜひ実際に試してみてください。
+以下のスクリーンショットは機能テーマごとにまとめたものです。各画像はひとまとまりの利用シーンを示しています。
 
 <table>
   <tr>
     <td align="center" valign="top">
-      <img src="assets/screenshots/home-overview.jpg" alt="ホーム概要" width="240" loading="lazy" />
-      <div align="center"><sub>ホーム概要</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-overview-search-timeline.jpg" alt="主要入口：記録、検索、タイムライン" width="420" loading="lazy" />
+      <div align="center"><sub>主要入口：記録、検索、タイムライン</sub></div>
     </td>
     <td align="center" valign="top">
-      <img src="assets/screenshots/search-semantic-results.jpg" alt="セマンティック検索" width="240" loading="lazy" />
-      <div align="center"><sub>セマンティック検索</sub></div>
-    </td>
-    <td align="center" valign="top">
-      <img src="assets/screenshots/timeline-replay-generation.jpg" alt="タイムラインとリプレイ" width="240" loading="lazy" />
-      <div align="center"><sub>タイムラインとリプレイ</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-search-tabs-results-summary.jpg" alt="検索と結果サマリー" width="420" loading="lazy" />
+      <div align="center"><sub>検索と結果サマリー</sub></div>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top">
-      <img src="assets/screenshots/event-detail.jpg" alt="アクティビティ詳細" width="240" loading="lazy" />
-      <div align="center"><sub>アクティビティ詳細</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-timeline-replay-controls.jpg" alt="タイムライン、カレンダー、リプレイ生成" width="420" loading="lazy" />
+      <div align="center"><sub>タイムライン、カレンダー、リプレイ生成</sub></div>
     </td>
     <td align="center" valign="top">
-      <img src="assets/screenshots/favorites-notes.jpg" alt="お気に入りとメモ" width="240" loading="lazy" />
-      <div align="center"><sub>お気に入りとメモ</sub></div>
-    </td>
-    <td align="center" valign="top">
-      <img src="assets/screenshots/settings-overview.jpg" alt="設定概要" width="240" loading="lazy" />
-      <div align="center"><sub>設定概要</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-ai-review-summary-log.jpg" alt="AI レビュー、デイリーサマリー、リクエストログ" width="420" loading="lazy" />
+      <div align="center"><sub>AI レビュー、デイリーサマリー、リクエストログ</sub></div>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top">
-      <img src="assets/screenshots/daySummary.jpg" alt="デイリーサマリー" width="240" loading="lazy" />
-      <div align="center"><sub>デイリーサマリー</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-ai-memory-search-chart.jpg" alt="AI メモリー検索とグラフ整理" width="420" loading="lazy" />
+      <div align="center"><sub>AI メモリー検索とグラフ整理</sub></div>
     </td>
     <td align="center" valign="top">
-      <img src="assets/screenshots/storage-analysis.jpg" alt="ストレージ分析" width="240" loading="lazy" />
-      <div align="center"><sub>ストレージ分析</sub></div>
-    </td>
-    <td align="center" valign="top">
-      <img src="assets/screenshots/ai-review-chat.jpg" alt="AI レビューチャット" width="240" loading="lazy" />
-      <div align="center"><sub>AI レビューチャット</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-favorites-loading-note.jpg" alt="お気に入り、読み込み状態、メモ" width="420" loading="lazy" />
+      <div align="center"><sub>お気に入り、読み込み状態、メモ</sub></div>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top">
-      <img src="assets/screenshots/addAi.jpg" alt="AI プロバイダー" width="240" loading="lazy" />
-      <div align="center"><sub>AI プロバイダー</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-capture-settings-storage.jpg" alt="キャプチャ設定、圧縮、ストレージ分析" width="420" loading="lazy" />
+      <div align="center"><sub>キャプチャ設定、圧縮、ストレージ分析</sub></div>
     </td>
     <td align="center" valign="top">
-      <img src="assets/screenshots/prompt.jpg" alt="プロンプト管理" width="240" loading="lazy" />
-      <div align="center"><sub>プロンプト管理</sub></div>
-    </td>
-    <td align="center" valign="top">
-      <img src="assets/screenshots/nsfw-search-results.jpg" alt="NSFW 検索結果" width="240" loading="lazy" />
-      <div align="center"><sub>NSFW 検索結果</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-settings-permissions-dynamic.jpg" alt="設定、権限、動的タスク" width="420" loading="lazy" />
+      <div align="center"><sub>設定、権限、動的タスク</sub></div>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top">
-      <img src="assets/screenshots/ai-sensitive-content-analysis.jpg" alt="敏感コンテンツ分析" width="240" loading="lazy" />
-      <div align="center"><sub>敏感コンテンツ分析</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-mcp-ai-provider-models.jpg" alt="MCP サービス、AI プロバイダー、セマンティックモデル" width="420" loading="lazy" />
+      <div align="center"><sub>MCP サービス、AI プロバイダー、セマンティックモデル</sub></div>
     </td>
     <td align="center" valign="top">
-      <img src="assets/screenshots/ai-tool-calling-report.jpg" alt="AI ツール呼び出しレポート" width="240" loading="lazy" />
-      <div align="center"><sub>AI ツール呼び出しレポート</sub></div>
-    </td>
-    <td align="center" valign="top">
-      <img src="assets/screenshots/deep-link-entry.jpg" alt="ディープリンク" width="240" loading="lazy" />
-      <div align="center"><sub>ディープリンク</sub></div>
+      <img src="docs/sspai_article_pack/assets/combined/screenmemo-privacy-nsfw-controls.jpg" alt="プライバシーモードと敏感コンテンツ制御" width="420" loading="lazy" />
+      <div align="center"><sub>プライバシーモードと敏感コンテンツ制御</sub></div>
     </td>
   </tr>
 </table>
@@ -188,9 +168,7 @@ flutter build apk --debug
 flutter build apk --release --split-per-abi --tree-shake-icons --obfuscate --split-debug-info=build/symbols
 ```
 
-> ローカル開発ビルドで `--build-name` を明示しない場合、`pubspec.yaml` の既定バージョン `999.999.999+999999999` が使われます。
-> これにより、自分でビルドしたパッケージが GitHub Releases の最新バージョンより低いという理由だけでクラウド更新通知を出すことを避けられます。
-> 正式リリースのワークフローでは Git tag から実際のバージョンを解析し、`--build-name` / `--build-number` でこの既定値を上書きします。Android の上書きインストールで比較されるのは `versionCode`（`+` の後ろの build number）であり、画面表示用の `versionName` ではありません。
+#### 機能テストと回帰保護
 
 Android JVM 単体テスト：
 
@@ -206,6 +184,16 @@ cd android
 ./gradlew test
 ```
 
+## MCP サービス
+
+ScreenMemo はスマホ上で読み取り専用の LAN MCP サービスを手動で起動できます。同じローカルネットワーク上の AI クライアントは、動的サマリー、検索結果、コンテキスト断片、明示的に要求された少数の証拠画像を読み取れます。
+
+- Android アプリの「設定 → MCP サービス」から LAN MCP サービスを手動で有効化します。
+- Endpoint は `http://<phone-lan-ip>:37621/mcp` 固定で、リクエストには `Authorization: Bearer <token>` が必要です。
+- 標準 MCP クライアントは `tools/list` でツールを取得し、`tools/call` で呼び出します。一部クライアントとの互換性のため、宣言済みツール名を JSON-RPC の `method` として直接呼び出すこともできます。
+- 既定では OCR 原文や画像 base64 は返しません。ツール引数で明示的に `include_ocr` を有効化した場合、または `get_evidence_images` を呼び出した場合のみ、件数と長さの制限付きで敏感な内容を返します。
+- ポート `37621` が使用中の場合、設定画面に起動エラーが表示され、ランダムポートへ自動切り替えは行いません。
+
 ## FAQ
 
 <details>
@@ -215,6 +203,7 @@ cd android
 - 目安式：月間使用量（GB）≈ `(60 ÷ 間隔秒) × 60 × 24 × 30 × 画像サイズ(KB) ÷ 1024 ÷ 1024`
 - 削減策：取得間隔を長くする、目標サイズ圧縮を使う、期限切れ削除を有効にする、必要なアプリだけ取得する
 - 既存の過去スクリーンショットは「設定 → スクリーンショット設定 → グローバル履歴圧縮」から目標サイズで一括圧縮できます。キャンセルすると新しい画像処理の開始はすぐ停止します
+- リプレイ動画がシステムギャラリーに保存されると、アプリ内部の一時動画コピーは自動的に削除されます。既存のリプレイコピーは「ストレージ分析 → リプレイ動画」から整理できます
 </details>
 
 <details>
@@ -228,8 +217,6 @@ cd android
 <summary>どの AI プロバイダを利用できますか？</summary>
 
 - 現在の組み込みプロバイダ種別は `OpenAI`、`Azure OpenAI`、`Claude`、`Gemini`、`Custom` です
-- `Custom` は OpenAI 互換 API の自前 / サードパーティエンドポイント向けです
-- AI の用途ごとに別のプロバイダ / モデルを使えます
 </details>
 
 <details>
