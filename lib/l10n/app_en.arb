@@ -357,6 +357,10 @@
   },
   "autoAddNewAppsToCaptureTitle": "Auto-add new apps",
   "autoAddNewAppsToCaptureDesc": "Newly installed non-system apps are added to the capture list automatically.",
+  "windowScreenshotApiTitle": "Window-only capture",
+  "windowScreenshotApiDesc": "When enabled, ScreenMemo captures only the target app window. Android 14+ uses the window API first; other cases crop by window bounds.",
+  "windowScreenshotApiEnabledToast": "Window-only capture enabled",
+  "windowScreenshotApiDisabledToast": "Window-only capture disabled",
   "screenshotDedupeModeTitle": "Visual dedupe strength",
   "screenshotDedupeModeCurrent": "Current: {mode}",
   "@screenshotDedupeModeCurrent": {
@@ -2329,13 +2333,8 @@
   },
   "mcpStopped": "Stopped",
   "mcpLastErrorTitle": "Last error",
-  "mcpEndpointLabel": "Endpoint",
   "mcpNoLanIpDetected": "No LAN IP detected",
-  "mcpBearerTokenLabel": "Bearer token",
-  "mcpTokenCopyLabel": "Token",
-  "mcpUnavailable": "Unavailable",
   "mcpResetTokenTitle": "Reset token",
-  "mcpResetTokenSubtitle": "Immediately invalidates the previous token.",
   "mcpAiInstallTitle": "Give this to an AI",
   "mcpAiInstallCopyLabel": "Copy setup instructions",
   "mcpConnectionUnavailableHint": "Start the service and wait for a LAN IP to show copyable setup instructions here.",
@@ -2392,5 +2391,211 @@
       "label": {},
       "error": {}
     }
-  }
+  },
+  "externalMcpAddServerTitle": "Add external MCP server",
+  "externalMcpEditServerTitle": "Edit external MCP server",
+  "externalMcpNameLabel": "Name",
+  "externalMcpUrlLabel": "URL",
+  "externalMcpTransportLabel": "Transport",
+  "externalMcpTransportStreamableHttp": "Streamable HTTP",
+  "externalMcpTransportSse": "SSE",
+  "externalMcpHeadersJsonLabel": "Headers JSON",
+  "externalMcpHeadersJsonHint": "Authorization: Bearer ...",
+  "externalMcpEnabledLabel": "Enabled",
+  "externalMcpServersTitle": "External MCP servers",
+  "externalMcpImportJsonTooltip": "Import JSON",
+  "externalMcpAddServerTooltip": "Add server from JSON",
+  "externalMcpEmptyTitle": "No external MCP servers",
+  "externalMcpSyncAction": "Sync",
+  "settingsSkillsTitle": "Skills",
+  "settingsSkillsAddTitle": "Add skill",
+  "settingsSkillsSkillMdLabel": "SKILL.md",
+  "settingsSkillsSkillMdHint": "---\nname: my-skill\ndescription: \"...\"\n---\n\nInstructions...",
+  "settingsSkillsImportAction": "Import",
+  "settingsSkillsDeleteTitle": "Delete skill?",
+  "settingsSkillsDeleteMessage": "This removes {name} and all files in its skill folder.",
+  "settingsSkillsSavedToast": "Skill saved: {name}",
+  "settingsSkillsSaveFailed": "Failed to save skill: {error}",
+  "settingsSkillsDeletedToast": "Skill deleted.",
+  "settingsSkillsNotFoundToast": "Skill not found.",
+  "settingsSkillsDeleteFailed": "Failed to delete skill: {error}",
+  "settingsSkillsEnabledToast": "Skill enabled.",
+  "settingsSkillsDisabledToast": "Skill disabled.",
+  "settingsSkillsUpdateFailed": "Failed to update skill: {error}",
+  "settingsSkillsAddTooltip": "Add skill",
+  "settingsSkillsEmptyTitle": "No skills installed",
+  "settingsSkillsFileCount": "{count} files",
+  "settingsSkillsNewFileTitle": "New skill file",
+  "settingsSkillsRelativePathLabel": "Relative path",
+  "settingsSkillsRelativePathHint": "examples/basic.md",
+  "settingsSkillsContentLabel": "Content",
+  "settingsSkillsFileSavedToast": "File saved.",
+  "settingsSkillsFileSaveFailed": "Failed to save file: {error}",
+  "settingsSkillsDeleteFileTitle": "Delete file?",
+  "settingsSkillsDeleteFileMessage": "This removes {path} from {name}.",
+  "settingsSkillsFileDeletedToast": "File deleted.",
+  "settingsSkillsFileDeleteFailed": "Failed to delete file: {error}",
+  "settingsSkillsFileCopiedToast": "File copied.",
+  "settingsSkillsNewFileAction": "New file",
+  "settingsSkillsCopyFileTooltip": "Copy",
+  "settingsSkillsEditFileTooltip": "Edit",
+  "settingsSkillsDeleteFileTooltip": "Delete",
+  "settingsSkillsLoadFailed": "Failed to load skills: {error}",
+  "@settingsSkillsDeleteMessage": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "@settingsSkillsSavedToast": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "@settingsSkillsSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@settingsSkillsDeleteFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@settingsSkillsUpdateFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@settingsSkillsFileCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "@settingsSkillsFileSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@settingsSkillsDeleteFileMessage": {
+    "placeholders": {
+      "path": {},
+      "name": {}
+    }
+  },
+  "@settingsSkillsFileDeleteFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@settingsSkillsLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "externalMcpLoadServersFailed": "Failed to load external MCP servers: {error}",
+  "externalMcpSelectedFileUnavailable": "Selected file is unavailable.",
+  "externalMcpImportConfirmTitle": "Import external MCP servers?",
+  "externalMcpImportConfirmMessage": "Found {count} server(s). They will be saved enabled, then you can sync and enable individual tools.",
+  "externalMcpConfigImportedToast": "MCP config imported.",
+  "externalMcpImportFailed": "Import failed: {error}",
+  "externalMcpImportConfigFailed": "Failed to import MCP config: {error}",
+  "externalMcpHeadersJsonObjectError": "Headers JSON must be an object.",
+  "externalMcpServerSavedToast": "MCP server saved.",
+  "externalMcpSaveFailed": "Save failed: {error}",
+  "externalMcpSaveServerFailed": "Failed to save MCP server: {error}",
+  "externalMcpUpdateFailed": "Update failed: {error}",
+  "externalMcpServerUpdatedToast": "MCP server updated.",
+  "externalMcpUpdateServerFailed": "Failed to update MCP server: {error}",
+  "externalMcpSyncedToast": "Synced {count} tool(s).",
+  "externalMcpSyncFailed": "Sync failed: {error}",
+  "externalMcpSyncServerFailed": "Failed to sync MCP server: {error}",
+  "externalMcpDeleteServerTitle": "Delete external MCP server?",
+  "externalMcpDeleteServerMessage": "This removes {name} and all synced tool settings.",
+  "externalMcpDeleteFailed": "Delete failed: {error}",
+  "externalMcpServerDeletedToast": "MCP server deleted.",
+  "externalMcpDeleteServerFailed": "Failed to delete MCP server: {error}",
+  "externalMcpToolUpdateFailed": "Tool update failed: {error}",
+  "externalMcpUpdateToolFailed": "Failed to update MCP tool: {error}",
+  "externalMcpNoToolsSynced": "No tools synced yet.",
+  "@externalMcpLoadServersFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpImportConfirmMessage": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "@externalMcpImportFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpImportConfigFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpSaveServerFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpUpdateFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpUpdateServerFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpSyncedToast": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "@externalMcpSyncFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpSyncServerFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpDeleteServerMessage": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "@externalMcpDeleteFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpDeleteServerFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpToolUpdateFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpUpdateToolFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "externalMcpConfigJsonLabel": "MCP config JSON"
 }

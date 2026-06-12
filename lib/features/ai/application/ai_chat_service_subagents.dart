@@ -543,9 +543,9 @@ extension AIChatServiceSubagentsExt on AIChatService {
     required _SubagentModelCaller callModel,
     void Function(String content)? onLiveContent,
   }) async {
-    final List<Map<String, dynamic>> tools =
-        AIChatService.defaultSubagentTools();
-    final Object? toolChoice = tools.isEmpty ? null : 'auto';
+    List<Map<String, dynamic>> tools =
+        await AIChatService.defaultSubagentToolsAsync();
+    Object? toolChoice = tools.isEmpty ? null : 'auto';
     final List<AIMessage> working = List<AIMessage>.from(initialMessages);
     final List<AIMessage> display = List<AIMessage>.from(
       initialDisplayMessages,
@@ -588,6 +588,25 @@ extension AIChatServiceSubagentsExt on AIChatService {
       displaySaveDebounce?.cancel();
       displaySaveDebounce = null;
       await enqueueDisplaySave();
+    }
+
+    Future<void> refreshSubagentToolsAfterMcpChange() async {
+      tools = await AIChatService.defaultSubagentToolsAsync();
+      toolChoice = tools.isEmpty ? null : 'auto';
+      final String refreshedInstruction = _buildToolUsageInstruction(tools);
+      working.add(
+        AIMessage(
+          role: 'system',
+          content:
+              _loc(
+                'MCP 工具清单已刷新，本子代理后续可立即调用新启用的 MCP 工具。',
+                'MCP tool inventory has been refreshed. Newly enabled MCP tools are available for the rest of this subagent run.',
+              ) +
+              (refreshedInstruction.trim().isEmpty
+                  ? ''
+                  : '\n$refreshedInstruction'),
+        ),
+      );
     }
 
     AIMessage buildDisplayAssistant({
@@ -791,6 +810,7 @@ extension AIChatServiceSubagentsExt on AIChatService {
 
       final List<AIMessage> batchToolProtocolMessages = <AIMessage>[];
       final List<AIMessage> batchFollowUpMessages = <AIMessage>[];
+      bool mcpToolsChangedInBatch = false;
       for (final AIToolCall call in result.toolCalls) {
         totalToolCalls += 1;
         final Stopwatch toolSw = Stopwatch()..start();
@@ -822,6 +842,14 @@ extension AIChatServiceSubagentsExt on AIChatService {
           stage: 'subagent_${task.id}_tool_result',
           model: modelForBudget,
         );
+        if (rawToolMsgs.isNotEmpty) {
+          final Map<String, dynamic> payload = _safeJsonObject(
+            rawToolMsgs.first.content,
+          );
+          if (payload['tools_changed'] == true) {
+            mcpToolsChangedInBatch = true;
+          }
+        }
         toolSw.stop();
         batchToolProtocolMessages.addAll(
           toolMsgs.where((AIMessage message) => message.role == 'tool'),
@@ -881,6 +909,9 @@ extension AIChatServiceSubagentsExt on AIChatService {
 
       working.addAll(batchToolProtocolMessages);
       working.addAll(batchFollowUpMessages);
+      if (mcpToolsChangedInBatch) {
+        await refreshSubagentToolsAfterMcpChange();
+      }
       liveContent = '';
       turn = await runModelForDisplay(
         messages: working,

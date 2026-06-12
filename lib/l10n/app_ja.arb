@@ -355,6 +355,10 @@
   },
   "autoAddNewAppsToCaptureTitle": "新しいアプリを自動追加",
   "autoAddNewAppsToCaptureDesc": "新しくインストールされた非システムアプリをキャプチャ一覧へ自動追加します。",
+  "windowScreenshotApiTitle": "対象ウィンドウのみ撮影",
+  "windowScreenshotApiDesc": "有効にすると対象アプリのウィンドウだけを保存します。Android 14 以降ではウィンドウ API を優先し、それ以外はウィンドウ範囲で切り抜きます。",
+  "windowScreenshotApiEnabledToast": "対象ウィンドウのみ撮影を有効にしました",
+  "windowScreenshotApiDisabledToast": "対象ウィンドウのみ撮影を無効にしました",
   "screenshotDedupeModeTitle": "画面重複除外の強度",
   "screenshotDedupeModeCurrent": "現在：{mode}",
   "@screenshotDedupeModeCurrent": {
@@ -2329,13 +2333,8 @@
   },
   "mcpStopped": "停止中",
   "mcpLastErrorTitle": "前回のエラー",
-  "mcpEndpointLabel": "エンドポイント",
   "mcpNoLanIpDetected": "LAN IP が検出されていません",
-  "mcpBearerTokenLabel": "Bearer トークン",
-  "mcpTokenCopyLabel": "トークン",
-  "mcpUnavailable": "利用不可",
   "mcpResetTokenTitle": "トークンをリセット",
-  "mcpResetTokenSubtitle": "以前のトークンは直ちに無効になります。",
   "mcpAiInstallTitle": "AI に渡して設定",
   "mcpAiInstallCopyLabel": "設定手順をコピー",
   "mcpConnectionUnavailableHint": "サービスを起動し LAN IP が検出されると、ここにコピー可能な設定手順が表示されます。",
@@ -2392,5 +2391,211 @@
       "label": {},
       "error": {}
     }
-  }
+  },
+  "externalMcpAddServerTitle": "外部 MCP サーバーを追加",
+  "externalMcpEditServerTitle": "外部 MCP サーバーを編集",
+  "externalMcpNameLabel": "名前",
+  "externalMcpUrlLabel": "URL",
+  "externalMcpTransportLabel": "トランスポート",
+  "externalMcpTransportStreamableHttp": "Streamable HTTP",
+  "externalMcpTransportSse": "SSE",
+  "externalMcpHeadersJsonLabel": "ヘッダー JSON",
+  "externalMcpHeadersJsonHint": "Authorization: Bearer ...",
+  "externalMcpEnabledLabel": "有効",
+  "externalMcpServersTitle": "外部 MCP サーバー",
+  "externalMcpImportJsonTooltip": "JSON をインポート",
+  "externalMcpAddServerTooltip": "JSON からサーバーを追加",
+  "externalMcpEmptyTitle": "外部 MCP サーバーはありません",
+  "externalMcpSyncAction": "同期",
+  "settingsSkillsTitle": "Skills",
+  "settingsSkillsAddTitle": "Skill を追加",
+  "settingsSkillsSkillMdLabel": "SKILL.md",
+  "settingsSkillsSkillMdHint": "---\nname: my-skill\ndescription: \"...\"\n---\n\nInstructions...",
+  "settingsSkillsImportAction": "インポート",
+  "settingsSkillsDeleteTitle": "Skill を削除しますか？",
+  "settingsSkillsDeleteMessage": "{name} と skill フォルダー内のすべてのファイルを削除します。",
+  "settingsSkillsSavedToast": "Skill を保存しました：{name}",
+  "settingsSkillsSaveFailed": "Skill の保存に失敗しました：{error}",
+  "settingsSkillsDeletedToast": "Skill を削除しました。",
+  "settingsSkillsNotFoundToast": "Skill が見つかりません。",
+  "settingsSkillsDeleteFailed": "Skill の削除に失敗しました：{error}",
+  "settingsSkillsEnabledToast": "Skill を有効にしました。",
+  "settingsSkillsDisabledToast": "Skill を無効にしました。",
+  "settingsSkillsUpdateFailed": "Skill の更新に失敗しました：{error}",
+  "settingsSkillsAddTooltip": "Skill を追加",
+  "settingsSkillsEmptyTitle": "インストール済みの Skill はありません",
+  "settingsSkillsFileCount": "{count} 個のファイル",
+  "settingsSkillsNewFileTitle": "新しい Skill ファイル",
+  "settingsSkillsRelativePathLabel": "相対パス",
+  "settingsSkillsRelativePathHint": "examples/basic.md",
+  "settingsSkillsContentLabel": "内容",
+  "settingsSkillsFileSavedToast": "ファイルを保存しました。",
+  "settingsSkillsFileSaveFailed": "ファイルの保存に失敗しました：{error}",
+  "settingsSkillsDeleteFileTitle": "ファイルを削除しますか？",
+  "settingsSkillsDeleteFileMessage": "{name} から {path} を削除します。",
+  "settingsSkillsFileDeletedToast": "ファイルを削除しました。",
+  "settingsSkillsFileDeleteFailed": "ファイルの削除に失敗しました：{error}",
+  "settingsSkillsFileCopiedToast": "ファイルをコピーしました。",
+  "settingsSkillsNewFileAction": "新規ファイル",
+  "settingsSkillsCopyFileTooltip": "コピー",
+  "settingsSkillsEditFileTooltip": "編集",
+  "settingsSkillsDeleteFileTooltip": "削除",
+  "settingsSkillsLoadFailed": "Skills の読み込みに失敗しました：{error}",
+  "@settingsSkillsDeleteMessage": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "@settingsSkillsSavedToast": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "@settingsSkillsSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@settingsSkillsDeleteFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@settingsSkillsUpdateFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@settingsSkillsFileCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "@settingsSkillsFileSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@settingsSkillsDeleteFileMessage": {
+    "placeholders": {
+      "path": {},
+      "name": {}
+    }
+  },
+  "@settingsSkillsFileDeleteFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@settingsSkillsLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "externalMcpLoadServersFailed": "外部 MCP サーバーの読み込みに失敗しました：{error}",
+  "externalMcpSelectedFileUnavailable": "選択したファイルは利用できません。",
+  "externalMcpImportConfirmTitle": "外部 MCP サーバーをインポートしますか？",
+  "externalMcpImportConfirmMessage": "{count} 個のサーバーが見つかりました。有効な状態で保存され、後で同期して個別のツールを有効化できます。",
+  "externalMcpConfigImportedToast": "MCP 設定をインポートしました。",
+  "externalMcpImportFailed": "インポートに失敗しました：{error}",
+  "externalMcpImportConfigFailed": "MCP 設定のインポートに失敗しました：{error}",
+  "externalMcpHeadersJsonObjectError": "ヘッダー JSON はオブジェクトである必要があります。",
+  "externalMcpServerSavedToast": "MCP サーバーを保存しました。",
+  "externalMcpSaveFailed": "保存に失敗しました：{error}",
+  "externalMcpSaveServerFailed": "MCP サーバーの保存に失敗しました：{error}",
+  "externalMcpUpdateFailed": "更新に失敗しました：{error}",
+  "externalMcpServerUpdatedToast": "MCP サーバーを更新しました。",
+  "externalMcpUpdateServerFailed": "MCP サーバーの更新に失敗しました：{error}",
+  "externalMcpSyncedToast": "{count} 個のツールを同期しました。",
+  "externalMcpSyncFailed": "同期に失敗しました：{error}",
+  "externalMcpSyncServerFailed": "MCP サーバーの同期に失敗しました：{error}",
+  "externalMcpDeleteServerTitle": "外部 MCP サーバーを削除しますか？",
+  "externalMcpDeleteServerMessage": "{name} と同期済みのすべてのツール設定を削除します。",
+  "externalMcpDeleteFailed": "削除に失敗しました：{error}",
+  "externalMcpServerDeletedToast": "MCP サーバーを削除しました。",
+  "externalMcpDeleteServerFailed": "MCP サーバーの削除に失敗しました：{error}",
+  "externalMcpToolUpdateFailed": "ツールの更新に失敗しました：{error}",
+  "externalMcpUpdateToolFailed": "MCP ツールの更新に失敗しました：{error}",
+  "externalMcpNoToolsSynced": "まだツールは同期されていません。",
+  "@externalMcpLoadServersFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpImportConfirmMessage": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "@externalMcpImportFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpImportConfigFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpSaveServerFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpUpdateFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpUpdateServerFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpSyncedToast": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "@externalMcpSyncFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpSyncServerFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpDeleteServerMessage": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "@externalMcpDeleteFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpDeleteServerFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpToolUpdateFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpUpdateToolFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "externalMcpConfigJsonLabel": "MCP 設定 JSON"
 }

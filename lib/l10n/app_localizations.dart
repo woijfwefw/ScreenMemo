@@ -1608,6 +1608,30 @@ abstract class AppLocalizations {
   /// **'Newly installed non-system apps are added to the capture list automatically.'**
   String get autoAddNewAppsToCaptureDesc;
 
+  /// No description provided for @windowScreenshotApiTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Window-only capture'**
+  String get windowScreenshotApiTitle;
+
+  /// No description provided for @windowScreenshotApiDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, ScreenMemo captures only the target app window. Android 14+ uses the window API first; other cases crop by window bounds.'**
+  String get windowScreenshotApiDesc;
+
+  /// No description provided for @windowScreenshotApiEnabledToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Window-only capture enabled'**
+  String get windowScreenshotApiEnabledToast;
+
+  /// No description provided for @windowScreenshotApiDisabledToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Window-only capture disabled'**
+  String get windowScreenshotApiDisabledToast;
+
   /// No description provided for @screenshotDedupeModeTitle.
   ///
   /// In en, this message translates to:
@@ -7829,47 +7853,17 @@ abstract class AppLocalizations {
   /// **'Last error'**
   String get mcpLastErrorTitle;
 
-  /// No description provided for @mcpEndpointLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Endpoint'**
-  String get mcpEndpointLabel;
-
   /// No description provided for @mcpNoLanIpDetected.
   ///
   /// In en, this message translates to:
   /// **'No LAN IP detected'**
   String get mcpNoLanIpDetected;
 
-  /// No description provided for @mcpBearerTokenLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Bearer token'**
-  String get mcpBearerTokenLabel;
-
-  /// No description provided for @mcpTokenCopyLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Token'**
-  String get mcpTokenCopyLabel;
-
-  /// No description provided for @mcpUnavailable.
-  ///
-  /// In en, this message translates to:
-  /// **'Unavailable'**
-  String get mcpUnavailable;
-
   /// No description provided for @mcpResetTokenTitle.
   ///
   /// In en, this message translates to:
   /// **'Reset token'**
   String get mcpResetTokenTitle;
-
-  /// No description provided for @mcpResetTokenSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Immediately invalidates the previous token.'**
-  String get mcpResetTokenSubtitle;
 
   /// No description provided for @mcpAiInstallTitle.
   ///
@@ -7960,6 +7954,456 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to copy {label}: {error}'**
   String mcpCopyFailed(Object label, Object error);
+
+  /// No description provided for @externalMcpAddServerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add external MCP server'**
+  String get externalMcpAddServerTitle;
+
+  /// No description provided for @externalMcpEditServerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit external MCP server'**
+  String get externalMcpEditServerTitle;
+
+  /// No description provided for @externalMcpNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get externalMcpNameLabel;
+
+  /// No description provided for @externalMcpUrlLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'URL'**
+  String get externalMcpUrlLabel;
+
+  /// No description provided for @externalMcpTransportLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Transport'**
+  String get externalMcpTransportLabel;
+
+  /// No description provided for @externalMcpTransportStreamableHttp.
+  ///
+  /// In en, this message translates to:
+  /// **'Streamable HTTP'**
+  String get externalMcpTransportStreamableHttp;
+
+  /// No description provided for @externalMcpTransportSse.
+  ///
+  /// In en, this message translates to:
+  /// **'SSE'**
+  String get externalMcpTransportSse;
+
+  /// No description provided for @externalMcpHeadersJsonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Headers JSON'**
+  String get externalMcpHeadersJsonLabel;
+
+  /// No description provided for @externalMcpHeadersJsonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization: Bearer ...'**
+  String get externalMcpHeadersJsonHint;
+
+  /// No description provided for @externalMcpEnabledLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled'**
+  String get externalMcpEnabledLabel;
+
+  /// No description provided for @externalMcpServersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'External MCP servers'**
+  String get externalMcpServersTitle;
+
+  /// No description provided for @externalMcpImportJsonTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Import JSON'**
+  String get externalMcpImportJsonTooltip;
+
+  /// No description provided for @externalMcpAddServerTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Add server from JSON'**
+  String get externalMcpAddServerTooltip;
+
+  /// No description provided for @externalMcpEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No external MCP servers'**
+  String get externalMcpEmptyTitle;
+
+  /// No description provided for @externalMcpSyncAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync'**
+  String get externalMcpSyncAction;
+
+  /// No description provided for @settingsSkillsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Skills'**
+  String get settingsSkillsTitle;
+
+  /// No description provided for @settingsSkillsAddTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add skill'**
+  String get settingsSkillsAddTitle;
+
+  /// No description provided for @settingsSkillsSkillMdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'SKILL.md'**
+  String get settingsSkillsSkillMdLabel;
+
+  /// No description provided for @settingsSkillsSkillMdHint.
+  ///
+  /// In en, this message translates to:
+  /// **'---\nname: my-skill\ndescription: \"...\"\n---\n\nInstructions...'**
+  String get settingsSkillsSkillMdHint;
+
+  /// No description provided for @settingsSkillsImportAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get settingsSkillsImportAction;
+
+  /// No description provided for @settingsSkillsDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete skill?'**
+  String get settingsSkillsDeleteTitle;
+
+  /// No description provided for @settingsSkillsDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes {name} and all files in its skill folder.'**
+  String settingsSkillsDeleteMessage(Object name);
+
+  /// No description provided for @settingsSkillsSavedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Skill saved: {name}'**
+  String settingsSkillsSavedToast(Object name);
+
+  /// No description provided for @settingsSkillsSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save skill: {error}'**
+  String settingsSkillsSaveFailed(Object error);
+
+  /// No description provided for @settingsSkillsDeletedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Skill deleted.'**
+  String get settingsSkillsDeletedToast;
+
+  /// No description provided for @settingsSkillsNotFoundToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Skill not found.'**
+  String get settingsSkillsNotFoundToast;
+
+  /// No description provided for @settingsSkillsDeleteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to delete skill: {error}'**
+  String settingsSkillsDeleteFailed(Object error);
+
+  /// No description provided for @settingsSkillsEnabledToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Skill enabled.'**
+  String get settingsSkillsEnabledToast;
+
+  /// No description provided for @settingsSkillsDisabledToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Skill disabled.'**
+  String get settingsSkillsDisabledToast;
+
+  /// No description provided for @settingsSkillsUpdateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to update skill: {error}'**
+  String settingsSkillsUpdateFailed(Object error);
+
+  /// No description provided for @settingsSkillsAddTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Add skill'**
+  String get settingsSkillsAddTooltip;
+
+  /// No description provided for @settingsSkillsEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No skills installed'**
+  String get settingsSkillsEmptyTitle;
+
+  /// No description provided for @settingsSkillsFileCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} files'**
+  String settingsSkillsFileCount(Object count);
+
+  /// No description provided for @settingsSkillsNewFileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New skill file'**
+  String get settingsSkillsNewFileTitle;
+
+  /// No description provided for @settingsSkillsRelativePathLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Relative path'**
+  String get settingsSkillsRelativePathLabel;
+
+  /// No description provided for @settingsSkillsRelativePathHint.
+  ///
+  /// In en, this message translates to:
+  /// **'examples/basic.md'**
+  String get settingsSkillsRelativePathHint;
+
+  /// No description provided for @settingsSkillsContentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Content'**
+  String get settingsSkillsContentLabel;
+
+  /// No description provided for @settingsSkillsFileSavedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'File saved.'**
+  String get settingsSkillsFileSavedToast;
+
+  /// No description provided for @settingsSkillsFileSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save file: {error}'**
+  String settingsSkillsFileSaveFailed(Object error);
+
+  /// No description provided for @settingsSkillsDeleteFileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete file?'**
+  String get settingsSkillsDeleteFileTitle;
+
+  /// No description provided for @settingsSkillsDeleteFileMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes {path} from {name}.'**
+  String settingsSkillsDeleteFileMessage(Object path, Object name);
+
+  /// No description provided for @settingsSkillsFileDeletedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'File deleted.'**
+  String get settingsSkillsFileDeletedToast;
+
+  /// No description provided for @settingsSkillsFileDeleteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to delete file: {error}'**
+  String settingsSkillsFileDeleteFailed(Object error);
+
+  /// No description provided for @settingsSkillsFileCopiedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'File copied.'**
+  String get settingsSkillsFileCopiedToast;
+
+  /// No description provided for @settingsSkillsNewFileAction.
+  ///
+  /// In en, this message translates to:
+  /// **'New file'**
+  String get settingsSkillsNewFileAction;
+
+  /// No description provided for @settingsSkillsCopyFileTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get settingsSkillsCopyFileTooltip;
+
+  /// No description provided for @settingsSkillsEditFileTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get settingsSkillsEditFileTooltip;
+
+  /// No description provided for @settingsSkillsDeleteFileTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get settingsSkillsDeleteFileTooltip;
+
+  /// No description provided for @settingsSkillsLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load skills: {error}'**
+  String settingsSkillsLoadFailed(Object error);
+
+  /// No description provided for @externalMcpLoadServersFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load external MCP servers: {error}'**
+  String externalMcpLoadServersFailed(Object error);
+
+  /// No description provided for @externalMcpSelectedFileUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected file is unavailable.'**
+  String get externalMcpSelectedFileUnavailable;
+
+  /// No description provided for @externalMcpImportConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import external MCP servers?'**
+  String get externalMcpImportConfirmTitle;
+
+  /// No description provided for @externalMcpImportConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Found {count} server(s). They will be saved enabled, then you can sync and enable individual tools.'**
+  String externalMcpImportConfirmMessage(Object count);
+
+  /// No description provided for @externalMcpConfigImportedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'MCP config imported.'**
+  String get externalMcpConfigImportedToast;
+
+  /// No description provided for @externalMcpImportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Import failed: {error}'**
+  String externalMcpImportFailed(Object error);
+
+  /// No description provided for @externalMcpImportConfigFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to import MCP config: {error}'**
+  String externalMcpImportConfigFailed(Object error);
+
+  /// No description provided for @externalMcpHeadersJsonObjectError.
+  ///
+  /// In en, this message translates to:
+  /// **'Headers JSON must be an object.'**
+  String get externalMcpHeadersJsonObjectError;
+
+  /// No description provided for @externalMcpServerSavedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'MCP server saved.'**
+  String get externalMcpServerSavedToast;
+
+  /// No description provided for @externalMcpSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Save failed: {error}'**
+  String externalMcpSaveFailed(Object error);
+
+  /// No description provided for @externalMcpSaveServerFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save MCP server: {error}'**
+  String externalMcpSaveServerFailed(Object error);
+
+  /// No description provided for @externalMcpUpdateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Update failed: {error}'**
+  String externalMcpUpdateFailed(Object error);
+
+  /// No description provided for @externalMcpServerUpdatedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'MCP server updated.'**
+  String get externalMcpServerUpdatedToast;
+
+  /// No description provided for @externalMcpUpdateServerFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to update MCP server: {error}'**
+  String externalMcpUpdateServerFailed(Object error);
+
+  /// No description provided for @externalMcpSyncedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Synced {count} tool(s).'**
+  String externalMcpSyncedToast(Object count);
+
+  /// No description provided for @externalMcpSyncFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync failed: {error}'**
+  String externalMcpSyncFailed(Object error);
+
+  /// No description provided for @externalMcpSyncServerFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to sync MCP server: {error}'**
+  String externalMcpSyncServerFailed(Object error);
+
+  /// No description provided for @externalMcpDeleteServerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete external MCP server?'**
+  String get externalMcpDeleteServerTitle;
+
+  /// No description provided for @externalMcpDeleteServerMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes {name} and all synced tool settings.'**
+  String externalMcpDeleteServerMessage(Object name);
+
+  /// No description provided for @externalMcpDeleteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete failed: {error}'**
+  String externalMcpDeleteFailed(Object error);
+
+  /// No description provided for @externalMcpServerDeletedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'MCP server deleted.'**
+  String get externalMcpServerDeletedToast;
+
+  /// No description provided for @externalMcpDeleteServerFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to delete MCP server: {error}'**
+  String externalMcpDeleteServerFailed(Object error);
+
+  /// No description provided for @externalMcpToolUpdateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool update failed: {error}'**
+  String externalMcpToolUpdateFailed(Object error);
+
+  /// No description provided for @externalMcpUpdateToolFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to update MCP tool: {error}'**
+  String externalMcpUpdateToolFailed(Object error);
+
+  /// No description provided for @externalMcpNoToolsSynced.
+  ///
+  /// In en, this message translates to:
+  /// **'No tools synced yet.'**
+  String get externalMcpNoToolsSynced;
+
+  /// No description provided for @externalMcpConfigJsonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'MCP config JSON'**
+  String get externalMcpConfigJsonLabel;
 }
 
 class _AppLocalizationsDelegate

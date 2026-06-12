@@ -846,6 +846,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'Newly installed non-system apps are added to the capture list automatically.';
 
   @override
+  String get windowScreenshotApiTitle => 'Window-only capture';
+
+  @override
+  String get windowScreenshotApiDesc =>
+      'When enabled, ScreenMemo captures only the target app window. Android 14+ uses the window API first; other cases crop by window bounds.';
+
+  @override
+  String get windowScreenshotApiEnabledToast => 'Window-only capture enabled';
+
+  @override
+  String get windowScreenshotApiDisabledToast => 'Window-only capture disabled';
+
+  @override
   String get screenshotDedupeModeTitle => 'Visual dedupe strength';
 
   @override
@@ -4466,26 +4479,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mcpLastErrorTitle => 'Last error';
 
   @override
-  String get mcpEndpointLabel => 'Endpoint';
-
-  @override
   String get mcpNoLanIpDetected => 'No LAN IP detected';
 
   @override
-  String get mcpBearerTokenLabel => 'Bearer token';
-
-  @override
-  String get mcpTokenCopyLabel => 'Token';
-
-  @override
-  String get mcpUnavailable => 'Unavailable';
-
-  @override
   String get mcpResetTokenTitle => 'Reset token';
-
-  @override
-  String get mcpResetTokenSubtitle =>
-      'Immediately invalidates the previous token.';
 
   @override
   String get mcpAiInstallTitle => 'Give this to an AI';
@@ -4549,4 +4546,284 @@ class AppLocalizationsEn extends AppLocalizations {
   String mcpCopyFailed(Object label, Object error) {
     return 'Failed to copy $label: $error';
   }
+
+  @override
+  String get externalMcpAddServerTitle => 'Add external MCP server';
+
+  @override
+  String get externalMcpEditServerTitle => 'Edit external MCP server';
+
+  @override
+  String get externalMcpNameLabel => 'Name';
+
+  @override
+  String get externalMcpUrlLabel => 'URL';
+
+  @override
+  String get externalMcpTransportLabel => 'Transport';
+
+  @override
+  String get externalMcpTransportStreamableHttp => 'Streamable HTTP';
+
+  @override
+  String get externalMcpTransportSse => 'SSE';
+
+  @override
+  String get externalMcpHeadersJsonLabel => 'Headers JSON';
+
+  @override
+  String get externalMcpHeadersJsonHint => 'Authorization: Bearer ...';
+
+  @override
+  String get externalMcpEnabledLabel => 'Enabled';
+
+  @override
+  String get externalMcpServersTitle => 'External MCP servers';
+
+  @override
+  String get externalMcpImportJsonTooltip => 'Import JSON';
+
+  @override
+  String get externalMcpAddServerTooltip => 'Add server from JSON';
+
+  @override
+  String get externalMcpEmptyTitle => 'No external MCP servers';
+
+  @override
+  String get externalMcpSyncAction => 'Sync';
+
+  @override
+  String get settingsSkillsTitle => 'Skills';
+
+  @override
+  String get settingsSkillsAddTitle => 'Add skill';
+
+  @override
+  String get settingsSkillsSkillMdLabel => 'SKILL.md';
+
+  @override
+  String get settingsSkillsSkillMdHint =>
+      '---\nname: my-skill\ndescription: \"...\"\n---\n\nInstructions...';
+
+  @override
+  String get settingsSkillsImportAction => 'Import';
+
+  @override
+  String get settingsSkillsDeleteTitle => 'Delete skill?';
+
+  @override
+  String settingsSkillsDeleteMessage(Object name) {
+    return 'This removes $name and all files in its skill folder.';
+  }
+
+  @override
+  String settingsSkillsSavedToast(Object name) {
+    return 'Skill saved: $name';
+  }
+
+  @override
+  String settingsSkillsSaveFailed(Object error) {
+    return 'Failed to save skill: $error';
+  }
+
+  @override
+  String get settingsSkillsDeletedToast => 'Skill deleted.';
+
+  @override
+  String get settingsSkillsNotFoundToast => 'Skill not found.';
+
+  @override
+  String settingsSkillsDeleteFailed(Object error) {
+    return 'Failed to delete skill: $error';
+  }
+
+  @override
+  String get settingsSkillsEnabledToast => 'Skill enabled.';
+
+  @override
+  String get settingsSkillsDisabledToast => 'Skill disabled.';
+
+  @override
+  String settingsSkillsUpdateFailed(Object error) {
+    return 'Failed to update skill: $error';
+  }
+
+  @override
+  String get settingsSkillsAddTooltip => 'Add skill';
+
+  @override
+  String get settingsSkillsEmptyTitle => 'No skills installed';
+
+  @override
+  String settingsSkillsFileCount(Object count) {
+    return '$count files';
+  }
+
+  @override
+  String get settingsSkillsNewFileTitle => 'New skill file';
+
+  @override
+  String get settingsSkillsRelativePathLabel => 'Relative path';
+
+  @override
+  String get settingsSkillsRelativePathHint => 'examples/basic.md';
+
+  @override
+  String get settingsSkillsContentLabel => 'Content';
+
+  @override
+  String get settingsSkillsFileSavedToast => 'File saved.';
+
+  @override
+  String settingsSkillsFileSaveFailed(Object error) {
+    return 'Failed to save file: $error';
+  }
+
+  @override
+  String get settingsSkillsDeleteFileTitle => 'Delete file?';
+
+  @override
+  String settingsSkillsDeleteFileMessage(Object path, Object name) {
+    return 'This removes $path from $name.';
+  }
+
+  @override
+  String get settingsSkillsFileDeletedToast => 'File deleted.';
+
+  @override
+  String settingsSkillsFileDeleteFailed(Object error) {
+    return 'Failed to delete file: $error';
+  }
+
+  @override
+  String get settingsSkillsFileCopiedToast => 'File copied.';
+
+  @override
+  String get settingsSkillsNewFileAction => 'New file';
+
+  @override
+  String get settingsSkillsCopyFileTooltip => 'Copy';
+
+  @override
+  String get settingsSkillsEditFileTooltip => 'Edit';
+
+  @override
+  String get settingsSkillsDeleteFileTooltip => 'Delete';
+
+  @override
+  String settingsSkillsLoadFailed(Object error) {
+    return 'Failed to load skills: $error';
+  }
+
+  @override
+  String externalMcpLoadServersFailed(Object error) {
+    return 'Failed to load external MCP servers: $error';
+  }
+
+  @override
+  String get externalMcpSelectedFileUnavailable =>
+      'Selected file is unavailable.';
+
+  @override
+  String get externalMcpImportConfirmTitle => 'Import external MCP servers?';
+
+  @override
+  String externalMcpImportConfirmMessage(Object count) {
+    return 'Found $count server(s). They will be saved enabled, then you can sync and enable individual tools.';
+  }
+
+  @override
+  String get externalMcpConfigImportedToast => 'MCP config imported.';
+
+  @override
+  String externalMcpImportFailed(Object error) {
+    return 'Import failed: $error';
+  }
+
+  @override
+  String externalMcpImportConfigFailed(Object error) {
+    return 'Failed to import MCP config: $error';
+  }
+
+  @override
+  String get externalMcpHeadersJsonObjectError =>
+      'Headers JSON must be an object.';
+
+  @override
+  String get externalMcpServerSavedToast => 'MCP server saved.';
+
+  @override
+  String externalMcpSaveFailed(Object error) {
+    return 'Save failed: $error';
+  }
+
+  @override
+  String externalMcpSaveServerFailed(Object error) {
+    return 'Failed to save MCP server: $error';
+  }
+
+  @override
+  String externalMcpUpdateFailed(Object error) {
+    return 'Update failed: $error';
+  }
+
+  @override
+  String get externalMcpServerUpdatedToast => 'MCP server updated.';
+
+  @override
+  String externalMcpUpdateServerFailed(Object error) {
+    return 'Failed to update MCP server: $error';
+  }
+
+  @override
+  String externalMcpSyncedToast(Object count) {
+    return 'Synced $count tool(s).';
+  }
+
+  @override
+  String externalMcpSyncFailed(Object error) {
+    return 'Sync failed: $error';
+  }
+
+  @override
+  String externalMcpSyncServerFailed(Object error) {
+    return 'Failed to sync MCP server: $error';
+  }
+
+  @override
+  String get externalMcpDeleteServerTitle => 'Delete external MCP server?';
+
+  @override
+  String externalMcpDeleteServerMessage(Object name) {
+    return 'This removes $name and all synced tool settings.';
+  }
+
+  @override
+  String externalMcpDeleteFailed(Object error) {
+    return 'Delete failed: $error';
+  }
+
+  @override
+  String get externalMcpServerDeletedToast => 'MCP server deleted.';
+
+  @override
+  String externalMcpDeleteServerFailed(Object error) {
+    return 'Failed to delete MCP server: $error';
+  }
+
+  @override
+  String externalMcpToolUpdateFailed(Object error) {
+    return 'Tool update failed: $error';
+  }
+
+  @override
+  String externalMcpUpdateToolFailed(Object error) {
+    return 'Failed to update MCP tool: $error';
+  }
+
+  @override
+  String get externalMcpNoToolsSynced => 'No tools synced yet.';
+
+  @override
+  String get externalMcpConfigJsonLabel => 'MCP config JSON';
 }

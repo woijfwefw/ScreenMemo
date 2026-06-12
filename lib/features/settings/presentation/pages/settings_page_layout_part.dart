@@ -21,6 +21,8 @@ extension _SettingsLayoutPart on _SettingsPageState {
       title = 'App 运行状态';
     } else if (_subPage == _SettingsSubPage.mcpService) {
       title = l10n.mcpServiceTitle;
+    } else if (_subPage == _SettingsSubPage.skills) {
+      title = AppLocalizations.of(context).settingsSkillsTitle;
     } else if (_subPage == _SettingsSubPage.dataBackup) {
       title = l10n.dataBackupSectionTitle;
     } else if (_subPage == _SettingsSubPage.logManagement) {
@@ -90,6 +92,12 @@ extension _SettingsLayoutPart on _SettingsPageState {
                 : _loadMcpPageData,
             tooltip: l10n.actionRefresh,
           ),
+        if (_subPage == _SettingsSubPage.skills)
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _skillsLoading ? null : _loadSkills,
+            tooltip: l10n.actionRefresh,
+          ),
         if (_subPage == _SettingsSubPage.logManagement)
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -110,6 +118,7 @@ extension _SettingsLayoutPart on _SettingsPageState {
         if (_subPage != _SettingsSubPage.permissions &&
             _subPage != _SettingsSubPage.appHealth &&
             _subPage != _SettingsSubPage.mcpService &&
+            _subPage != _SettingsSubPage.skills &&
             _subPage != _SettingsSubPage.logManagement)
           const SizedBox(width: kToolbarHeight),
       ],
@@ -182,6 +191,14 @@ extension _SettingsLayoutPart on _SettingsPageState {
                   showBottomBorder: true,
                   isRootPageItem: true,
                   onTap: () => _switchSubPage(_SettingsSubPage.mcpService),
+                ),
+                _buildNavItem(
+                  context: context,
+                  icon: Icons.extension_outlined,
+                  title: AppLocalizations.of(context).settingsSkillsTitle,
+                  showBottomBorder: true,
+                  isRootPageItem: true,
+                  onTap: () => _switchSubPage(_SettingsSubPage.skills),
                 ),
                 _buildNavItem(
                   context: context,
@@ -313,6 +330,8 @@ extension _SettingsLayoutPart on _SettingsPageState {
         return _buildAppHealthPage(context);
       case _SettingsSubPage.mcpService:
         return _buildMcpServicePage(context);
+      case _SettingsSubPage.skills:
+        return _buildSkillsPage(context);
       case _SettingsSubPage.dataBackup:
         return ListView(
           padding: _settingsListPadding(),

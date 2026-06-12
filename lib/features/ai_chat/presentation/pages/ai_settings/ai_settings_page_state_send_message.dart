@@ -1177,7 +1177,7 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
               // Persist the tail at service-level so background completion (after
               // conversation/page switch) still lands in the original CID.
               persistHistoryTail: true,
-              tools: AIChatService.defaultChatTools(),
+              tools: await AIChatService.defaultChatToolsAsync(),
               toolChoice: 'auto',
               conversationCid: requestCid,
               uiUserCreatedAtMs: userCreatedAt.millisecondsSinceEpoch,
@@ -1814,7 +1814,7 @@ extension _AISettingsPageStateSendMessageExt on _AISettingsPageState {
             includeHistory: true,
             // Persist tail at service-level so leaving/switching won't lose the result.
             persistHistoryTail: true,
-            tools: AIChatService.defaultChatTools(),
+            tools: await AIChatService.defaultChatToolsAsync(),
             toolChoice: 'auto',
             conversationCid: requestCid,
             uiUserCreatedAtMs: userCreatedAt.millisecondsSinceEpoch,

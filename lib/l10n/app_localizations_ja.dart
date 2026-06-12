@@ -825,6 +825,19 @@ class AppLocalizationsJa extends AppLocalizations {
       '新しくインストールされた非システムアプリをキャプチャ一覧へ自動追加します。';
 
   @override
+  String get windowScreenshotApiTitle => '対象ウィンドウのみ撮影';
+
+  @override
+  String get windowScreenshotApiDesc =>
+      '有効にすると対象アプリのウィンドウだけを保存します。Android 14 以降ではウィンドウ API を優先し、それ以外はウィンドウ範囲で切り抜きます。';
+
+  @override
+  String get windowScreenshotApiEnabledToast => '対象ウィンドウのみ撮影を有効にしました';
+
+  @override
+  String get windowScreenshotApiDisabledToast => '対象ウィンドウのみ撮影を無効にしました';
+
+  @override
   String get screenshotDedupeModeTitle => '画面重複除外の強度';
 
   @override
@@ -4364,25 +4377,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get mcpLastErrorTitle => '前回のエラー';
 
   @override
-  String get mcpEndpointLabel => 'エンドポイント';
-
-  @override
   String get mcpNoLanIpDetected => 'LAN IP が検出されていません';
 
   @override
-  String get mcpBearerTokenLabel => 'Bearer トークン';
-
-  @override
-  String get mcpTokenCopyLabel => 'トークン';
-
-  @override
-  String get mcpUnavailable => '利用不可';
-
-  @override
   String get mcpResetTokenTitle => 'トークンをリセット';
-
-  @override
-  String get mcpResetTokenSubtitle => '以前のトークンは直ちに無効になります。';
 
   @override
   String get mcpAiInstallTitle => 'AI に渡して設定';
@@ -4446,4 +4444,283 @@ class AppLocalizationsJa extends AppLocalizations {
   String mcpCopyFailed(Object label, Object error) {
     return '$label のコピーに失敗しました：$error';
   }
+
+  @override
+  String get externalMcpAddServerTitle => '外部 MCP サーバーを追加';
+
+  @override
+  String get externalMcpEditServerTitle => '外部 MCP サーバーを編集';
+
+  @override
+  String get externalMcpNameLabel => '名前';
+
+  @override
+  String get externalMcpUrlLabel => 'URL';
+
+  @override
+  String get externalMcpTransportLabel => 'トランスポート';
+
+  @override
+  String get externalMcpTransportStreamableHttp => 'Streamable HTTP';
+
+  @override
+  String get externalMcpTransportSse => 'SSE';
+
+  @override
+  String get externalMcpHeadersJsonLabel => 'ヘッダー JSON';
+
+  @override
+  String get externalMcpHeadersJsonHint => 'Authorization: Bearer ...';
+
+  @override
+  String get externalMcpEnabledLabel => '有効';
+
+  @override
+  String get externalMcpServersTitle => '外部 MCP サーバー';
+
+  @override
+  String get externalMcpImportJsonTooltip => 'JSON をインポート';
+
+  @override
+  String get externalMcpAddServerTooltip => 'JSON からサーバーを追加';
+
+  @override
+  String get externalMcpEmptyTitle => '外部 MCP サーバーはありません';
+
+  @override
+  String get externalMcpSyncAction => '同期';
+
+  @override
+  String get settingsSkillsTitle => 'Skills';
+
+  @override
+  String get settingsSkillsAddTitle => 'Skill を追加';
+
+  @override
+  String get settingsSkillsSkillMdLabel => 'SKILL.md';
+
+  @override
+  String get settingsSkillsSkillMdHint =>
+      '---\nname: my-skill\ndescription: \"...\"\n---\n\nInstructions...';
+
+  @override
+  String get settingsSkillsImportAction => 'インポート';
+
+  @override
+  String get settingsSkillsDeleteTitle => 'Skill を削除しますか？';
+
+  @override
+  String settingsSkillsDeleteMessage(Object name) {
+    return '$name と skill フォルダー内のすべてのファイルを削除します。';
+  }
+
+  @override
+  String settingsSkillsSavedToast(Object name) {
+    return 'Skill を保存しました：$name';
+  }
+
+  @override
+  String settingsSkillsSaveFailed(Object error) {
+    return 'Skill の保存に失敗しました：$error';
+  }
+
+  @override
+  String get settingsSkillsDeletedToast => 'Skill を削除しました。';
+
+  @override
+  String get settingsSkillsNotFoundToast => 'Skill が見つかりません。';
+
+  @override
+  String settingsSkillsDeleteFailed(Object error) {
+    return 'Skill の削除に失敗しました：$error';
+  }
+
+  @override
+  String get settingsSkillsEnabledToast => 'Skill を有効にしました。';
+
+  @override
+  String get settingsSkillsDisabledToast => 'Skill を無効にしました。';
+
+  @override
+  String settingsSkillsUpdateFailed(Object error) {
+    return 'Skill の更新に失敗しました：$error';
+  }
+
+  @override
+  String get settingsSkillsAddTooltip => 'Skill を追加';
+
+  @override
+  String get settingsSkillsEmptyTitle => 'インストール済みの Skill はありません';
+
+  @override
+  String settingsSkillsFileCount(Object count) {
+    return '$count 個のファイル';
+  }
+
+  @override
+  String get settingsSkillsNewFileTitle => '新しい Skill ファイル';
+
+  @override
+  String get settingsSkillsRelativePathLabel => '相対パス';
+
+  @override
+  String get settingsSkillsRelativePathHint => 'examples/basic.md';
+
+  @override
+  String get settingsSkillsContentLabel => '内容';
+
+  @override
+  String get settingsSkillsFileSavedToast => 'ファイルを保存しました。';
+
+  @override
+  String settingsSkillsFileSaveFailed(Object error) {
+    return 'ファイルの保存に失敗しました：$error';
+  }
+
+  @override
+  String get settingsSkillsDeleteFileTitle => 'ファイルを削除しますか？';
+
+  @override
+  String settingsSkillsDeleteFileMessage(Object path, Object name) {
+    return '$name から $path を削除します。';
+  }
+
+  @override
+  String get settingsSkillsFileDeletedToast => 'ファイルを削除しました。';
+
+  @override
+  String settingsSkillsFileDeleteFailed(Object error) {
+    return 'ファイルの削除に失敗しました：$error';
+  }
+
+  @override
+  String get settingsSkillsFileCopiedToast => 'ファイルをコピーしました。';
+
+  @override
+  String get settingsSkillsNewFileAction => '新規ファイル';
+
+  @override
+  String get settingsSkillsCopyFileTooltip => 'コピー';
+
+  @override
+  String get settingsSkillsEditFileTooltip => '編集';
+
+  @override
+  String get settingsSkillsDeleteFileTooltip => '削除';
+
+  @override
+  String settingsSkillsLoadFailed(Object error) {
+    return 'Skills の読み込みに失敗しました：$error';
+  }
+
+  @override
+  String externalMcpLoadServersFailed(Object error) {
+    return '外部 MCP サーバーの読み込みに失敗しました：$error';
+  }
+
+  @override
+  String get externalMcpSelectedFileUnavailable => '選択したファイルは利用できません。';
+
+  @override
+  String get externalMcpImportConfirmTitle => '外部 MCP サーバーをインポートしますか？';
+
+  @override
+  String externalMcpImportConfirmMessage(Object count) {
+    return '$count 個のサーバーが見つかりました。有効な状態で保存され、後で同期して個別のツールを有効化できます。';
+  }
+
+  @override
+  String get externalMcpConfigImportedToast => 'MCP 設定をインポートしました。';
+
+  @override
+  String externalMcpImportFailed(Object error) {
+    return 'インポートに失敗しました：$error';
+  }
+
+  @override
+  String externalMcpImportConfigFailed(Object error) {
+    return 'MCP 設定のインポートに失敗しました：$error';
+  }
+
+  @override
+  String get externalMcpHeadersJsonObjectError =>
+      'ヘッダー JSON はオブジェクトである必要があります。';
+
+  @override
+  String get externalMcpServerSavedToast => 'MCP サーバーを保存しました。';
+
+  @override
+  String externalMcpSaveFailed(Object error) {
+    return '保存に失敗しました：$error';
+  }
+
+  @override
+  String externalMcpSaveServerFailed(Object error) {
+    return 'MCP サーバーの保存に失敗しました：$error';
+  }
+
+  @override
+  String externalMcpUpdateFailed(Object error) {
+    return '更新に失敗しました：$error';
+  }
+
+  @override
+  String get externalMcpServerUpdatedToast => 'MCP サーバーを更新しました。';
+
+  @override
+  String externalMcpUpdateServerFailed(Object error) {
+    return 'MCP サーバーの更新に失敗しました：$error';
+  }
+
+  @override
+  String externalMcpSyncedToast(Object count) {
+    return '$count 個のツールを同期しました。';
+  }
+
+  @override
+  String externalMcpSyncFailed(Object error) {
+    return '同期に失敗しました：$error';
+  }
+
+  @override
+  String externalMcpSyncServerFailed(Object error) {
+    return 'MCP サーバーの同期に失敗しました：$error';
+  }
+
+  @override
+  String get externalMcpDeleteServerTitle => '外部 MCP サーバーを削除しますか？';
+
+  @override
+  String externalMcpDeleteServerMessage(Object name) {
+    return '$name と同期済みのすべてのツール設定を削除します。';
+  }
+
+  @override
+  String externalMcpDeleteFailed(Object error) {
+    return '削除に失敗しました：$error';
+  }
+
+  @override
+  String get externalMcpServerDeletedToast => 'MCP サーバーを削除しました。';
+
+  @override
+  String externalMcpDeleteServerFailed(Object error) {
+    return 'MCP サーバーの削除に失敗しました：$error';
+  }
+
+  @override
+  String externalMcpToolUpdateFailed(Object error) {
+    return 'ツールの更新に失敗しました：$error';
+  }
+
+  @override
+  String externalMcpUpdateToolFailed(Object error) {
+    return 'MCP ツールの更新に失敗しました：$error';
+  }
+
+  @override
+  String get externalMcpNoToolsSynced => 'まだツールは同期されていません。';
+
+  @override
+  String get externalMcpConfigJsonLabel => 'MCP 設定 JSON';
 }

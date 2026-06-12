@@ -909,7 +909,7 @@ extension AIChatServiceSendExt on AIChatService {
     final int userTokens = msgTokens('user', userMessage);
     parts['user_message'] = userTokens;
 
-    final int toolsSchemaTokens = _approxToolSchemaTokens(tools);
+    int toolsSchemaTokens = _approxToolSchemaTokens(tools);
     if (toolsSchemaTokens > 0) parts['tool_schema'] = toolsSchemaTokens;
 
     final int total = parts.values.fold(0, (a, b) => a + b);
@@ -2145,7 +2145,7 @@ extension AIChatServiceSendExt on AIChatService {
       effectivePromptCapTokens: effectivePromptCapTokens,
     );
 
-    final int toolsSchemaTokens = _approxToolSchemaTokens(tools);
+    int toolsSchemaTokens = _approxToolSchemaTokens(tools);
     final int reservedTokens = _approxReservedPromptTokens(
       systemPrompt: systemPrompt,
       extraSystemMessages: effectiveExtras,
@@ -2382,11 +2382,41 @@ extension AIChatServiceSendExt on AIChatService {
       throw StateError('Request was superseded by retry.');
     }
     final List<AIMessage> rawTurnTranscript = <AIMessage>[];
-    final Set<String> toolNames = _extractToolNames(tools);
-    final bool hasRetrievalTools =
+    Set<String> toolNames = _extractToolNames(tools);
+    bool hasRetrievalTools =
         toolNames.contains('search_segments') ||
         toolNames.contains('search_screenshots_ocr') ||
         toolNames.contains('search_ai_image_meta');
+    Future<void> refreshActiveToolsAfterMcpChange(
+      List<AIMessage> workingMessages,
+    ) async {
+      tools = await AIChatService.defaultChatToolsAsync();
+      toolsSchemaTokens = _approxToolSchemaTokens(tools);
+      toolNames = _extractToolNames(tools);
+      hasRetrievalTools =
+          toolNames.contains('search_segments') ||
+          toolNames.contains('search_screenshots_ocr') ||
+          toolNames.contains('search_ai_image_meta');
+      final String refreshedInstruction = _buildToolUsageInstruction(tools);
+      if (refreshedInstruction.trim().isNotEmpty) {
+        workingMessages.add(
+          AIMessage(
+            role: 'system',
+            content: _loc(
+              'MCP 工具清单已刷新，本轮后续可立即调用新启用的 MCP 工具。\n$refreshedInstruction',
+              'MCP tool inventory has been refreshed. Newly enabled MCP tools are available for the rest of this turn.\n$refreshedInstruction',
+            ),
+          ),
+        );
+      }
+      _emitProgress(
+        emitEvent,
+        _loc(
+          'MCP 工具清单已刷新：tools=${tools.length}',
+          'MCP tools refreshed: tools=${tools.length}',
+        ),
+      );
+    }
 
     Future<AIGatewayResult> callModel({
       required List<AIMessage> messages,
@@ -2703,6 +2733,7 @@ extension AIChatServiceSendExt on AIChatService {
       int batchRetrievalHits = 0;
       final List<AIMessage> batchToolProtocolMessages = <AIMessage>[];
       final List<AIMessage> batchFollowUpMessages = <AIMessage>[];
+      bool mcpToolsChangedInBatch = false;
       for (final AIToolCall call in result.toolCalls) {
         idxInBatch += 1;
         totalToolCalls += 1;
@@ -2801,6 +2832,9 @@ extension AIChatServiceSendExt on AIChatService {
               shouldFinishAfterGenerateImage = true;
               hadAnyRetrievalHit = true;
             }
+          }
+          if (rawToolPayload['tools_changed'] == true) {
+            mcpToolsChangedInBatch = true;
           }
         }
         final List<AIMessage> toolMsgs = _compactToolMessagesForPrompt(
@@ -2926,6 +2960,10 @@ extension AIChatServiceSendExt on AIChatService {
       working.addAll(batchFollowUpMessages);
       rawTurnTranscript.addAll(batchToolProtocolMessages);
       rawTurnTranscript.addAll(batchFollowUpMessages);
+
+      if (mcpToolsChangedInBatch) {
+        await refreshActiveToolsAfterMcpChange(working);
+      }
 
       if (shouldFinishAfterGenerateImage) {
         final List<String> markers =

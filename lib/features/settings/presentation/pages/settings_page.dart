@@ -36,6 +36,7 @@ import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
 import 'package:screen_memo/features/app_health/application/app_health_service.dart';
 import 'package:screen_memo/features/mcp/application/mcp_client_service.dart';
 import 'package:screen_memo/features/mcp/application/mcp_service.dart';
+import 'package:screen_memo/features/skills/application/skill_service.dart';
 import 'package:screen_memo/features/updater/presentation/update_prompt_coordinator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -51,6 +52,7 @@ part 'settings_page_daily_notify_part.dart';
 part 'settings_page_app_health_part.dart';
 part 'settings_page_logs_part.dart';
 part 'settings_page_mcp_part.dart';
+part 'settings_page_skills_part.dart';
 part 'settings_page_support_part.dart';
 
 enum _ImportMode { overwrite, merge }
@@ -64,6 +66,7 @@ enum _SettingsSubPage {
   dailyReminder,
   appHealth,
   mcpService,
+  skills,
   dataBackup,
   logManagement,
   advanced,
@@ -201,6 +204,8 @@ class _SettingsPageState extends State<SettingsPage>
   final Set<String> _externalMcpSyncingIds = <String>{};
   final Set<String> _externalMcpServerBusyIds = <String>{};
   final Set<String> _externalMcpToolBusyNames = <String>{};
+  bool _skillsLoading = false;
+  List<SkillMetadata> _skills = <SkillMetadata>[];
 
   // NSFW 设置 - 域名清单管理
   final TextEditingController _nsfwDomainController = TextEditingController();
@@ -309,6 +314,9 @@ class _SettingsPageState extends State<SettingsPage>
         break;
       case _SettingsSubPage.mcpService:
         unawaited(_loadMcpPageData());
+        break;
+      case _SettingsSubPage.skills:
+        unawaited(_loadSkills());
         break;
       case _SettingsSubPage.dataBackup:
         break;

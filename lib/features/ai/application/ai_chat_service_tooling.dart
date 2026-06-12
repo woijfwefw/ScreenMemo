@@ -168,6 +168,7 @@ extension AIChatServiceToolingExt on AIChatService {
   defaultChatTools() => <Map<String, dynamic>>[
     AIChatServiceAgentStatusExt.buildUpdateTodosToolSchema(),
     AIChatServiceSubagentsExt.buildDelegateSubagentsToolSchema(),
+    ...McpClientService.managementToolSchemas(),
     <String, dynamic>{
       'type': 'function',
       'function': <String, dynamic>{
@@ -593,9 +594,67 @@ extension AIChatServiceToolingExt on AIChatService {
     },
   ];
 
+  static Future<List<Map<String, dynamic>>> defaultChatToolsAsync() async {
+    final List<Map<String, dynamic>> tools = <Map<String, dynamic>>[
+      ...defaultChatTools(),
+    ];
+    try {
+      tools.addAll(await McpClientService.instance.buildEnabledToolSchemas());
+    } catch (e) {
+      unawaited(
+        FlutterLogger.nativeWarn('MCP_CLIENT', 'load dynamic tools failed: $e'),
+      );
+    }
+    try {
+      final skills = await SkillService.instance.listEnabledSkills();
+      if (skills.isNotEmpty) {
+        tools.insert(2, <String, dynamic>{
+          'type': 'function',
+          'function': <String, dynamic>{
+            'name': 'use_skill',
+            'description':
+                'Load and apply an enabled ScreenMemo skill. Call this when the user request matches a skill. Available skills: ${skills.map((skill) => '${skill.name}: ${skill.description}').join('; ')}',
+            'parameters': <String, dynamic>{
+              'type': 'object',
+              'properties': <String, dynamic>{
+                'name': <String, dynamic>{
+                  'type': 'string',
+                  'enum': skills.map((skill) => skill.name).toList(),
+                  'description': 'Installed skill name.',
+                },
+                'path': <String, dynamic>{
+                  'type': 'string',
+                  'description':
+                      'Optional relative file path inside the skill directory. Only use paths found in the loaded SKILL.md content or the skill file list. Do not guess paths.',
+                },
+              },
+              'required': <String>['name'],
+            },
+          },
+        });
+      }
+    } catch (e) {
+      unawaited(FlutterLogger.nativeWarn('SKILL', 'load skills failed: $e'));
+    }
+    return tools;
+  }
+
   static List<Map<String, dynamic>> defaultSubagentTools() {
     const Set<String> blocked = <String>{'update_todos', 'delegate_subagents'};
     return defaultChatTools()
+        .where((Map<String, dynamic> tool) {
+          final Object? fn = tool['function'];
+          if (fn is! Map) return true;
+          final String name = (fn['name'] ?? '').toString().trim();
+          return !blocked.contains(name);
+        })
+        .toList(growable: false);
+  }
+
+  static Future<List<Map<String, dynamic>>> defaultSubagentToolsAsync() async {
+    const Set<String> blocked = <String>{'update_todos', 'delegate_subagents'};
+    final List<Map<String, dynamic>> tools = await defaultChatToolsAsync();
+    return tools
         .where((Map<String, dynamic> tool) {
           final Object? fn = tool['function'];
           if (fn is! Map) return true;
@@ -714,7 +773,7 @@ extension AIChatServiceToolingExt on AIChatService {
     if (maxChars <= 0) return '';
     final String t = text.trim();
     if (t.isEmpty) return '';
-    return t.length <= maxChars ? t : (t.substring(0, maxChars) + '…');
+    return t.length <= maxChars ? t : '${t.substring(0, maxChars)}…';
   }
 
   String _extractSegmentSummary(
@@ -726,7 +785,7 @@ extension AIChatServiceToolingExt on AIChatService {
       try {
         final dynamic v = jsonDecode(sj);
         if (v is Map) {
-          final Map<String, dynamic> m = Map<String, dynamic>.from(v as Map);
+          final Map<String, dynamic> m = Map<String, dynamic>.from(v);
           final String s1 = (m['overall_summary'] as String?)?.trim() ?? '';
           if (s1.isNotEmpty) return _clipText(s1, maxChars);
           final String s2 = (m['summary'] as String?)?.trim() ?? '';
@@ -748,14 +807,14 @@ extension AIChatServiceToolingExt on AIChatService {
     if (t.isEmpty) return <String, dynamic>{};
     try {
       final dynamic v = jsonDecode(t);
-      if (v is Map) return Map<String, dynamic>.from(v as Map);
+      if (v is Map) return Map<String, dynamic>.from(v);
     } catch (_) {}
     return <String, dynamic>{};
   }
 
   Object? _sortJsonForSignature(Object? v) {
     if (v is Map) {
-      final Map<dynamic, dynamic> raw = Map<dynamic, dynamic>.from(v as Map);
+      final Map<dynamic, dynamic> raw = Map<dynamic, dynamic>.from(v);
       final List<String> keys = raw.keys.map((k) => k.toString()).toList()
         ..sort();
       final Map<String, Object?> out = <String, Object?>{};

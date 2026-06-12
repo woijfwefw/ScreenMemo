@@ -809,6 +809,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get autoAddNewAppsToCaptureDesc => '开启后，新安装的非系统应用会自动加入截屏列表。';
 
   @override
+  String get windowScreenshotApiTitle => '仅截目标窗口';
+
+  @override
+  String get windowScreenshotApiDesc =>
+      '开启后只保存目标应用窗口画面；Android 14+ 优先使用窗口 API，其他情况按窗口范围裁剪。';
+
+  @override
+  String get windowScreenshotApiEnabledToast => '已开启仅截目标窗口';
+
+  @override
+  String get windowScreenshotApiDisabledToast => '已关闭仅截目标窗口';
+
+  @override
   String get screenshotDedupeModeTitle => '画面去重强度';
 
   @override
@@ -4318,25 +4331,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpLastErrorTitle => '上次错误';
 
   @override
-  String get mcpEndpointLabel => '端点地址';
-
-  @override
   String get mcpNoLanIpDetected => '未检测到局域网 IP';
 
   @override
-  String get mcpBearerTokenLabel => 'Bearer 令牌';
-
-  @override
-  String get mcpTokenCopyLabel => '令牌';
-
-  @override
-  String get mcpUnavailable => '不可用';
-
-  @override
   String get mcpResetTokenTitle => '重置令牌';
-
-  @override
-  String get mcpResetTokenSubtitle => '会立即让旧令牌失效。';
 
   @override
   String get mcpAiInstallTitle => '交给 AI 安装';
@@ -4398,4 +4396,282 @@ class AppLocalizationsZh extends AppLocalizations {
   String mcpCopyFailed(Object label, Object error) {
     return '复制$label失败：$error';
   }
+
+  @override
+  String get externalMcpAddServerTitle => '添加外部 MCP 服务';
+
+  @override
+  String get externalMcpEditServerTitle => '编辑外部 MCP 服务';
+
+  @override
+  String get externalMcpNameLabel => '名称';
+
+  @override
+  String get externalMcpUrlLabel => 'URL';
+
+  @override
+  String get externalMcpTransportLabel => '传输协议';
+
+  @override
+  String get externalMcpTransportStreamableHttp => 'Streamable HTTP';
+
+  @override
+  String get externalMcpTransportSse => 'SSE';
+
+  @override
+  String get externalMcpHeadersJsonLabel => '请求头 JSON';
+
+  @override
+  String get externalMcpHeadersJsonHint => 'Authorization: Bearer ...';
+
+  @override
+  String get externalMcpEnabledLabel => '启用';
+
+  @override
+  String get externalMcpServersTitle => '外部 MCP 服务';
+
+  @override
+  String get externalMcpImportJsonTooltip => '导入 JSON';
+
+  @override
+  String get externalMcpAddServerTooltip => '用 JSON 添加服务';
+
+  @override
+  String get externalMcpEmptyTitle => '暂无外部 MCP 服务';
+
+  @override
+  String get externalMcpSyncAction => '同步';
+
+  @override
+  String get settingsSkillsTitle => 'Skills';
+
+  @override
+  String get settingsSkillsAddTitle => '添加 Skill';
+
+  @override
+  String get settingsSkillsSkillMdLabel => 'SKILL.md';
+
+  @override
+  String get settingsSkillsSkillMdHint =>
+      '---\nname: my-skill\ndescription: \"...\"\n---\n\nInstructions...';
+
+  @override
+  String get settingsSkillsImportAction => '导入';
+
+  @override
+  String get settingsSkillsDeleteTitle => '删除 Skill？';
+
+  @override
+  String settingsSkillsDeleteMessage(Object name) {
+    return '这会删除 $name 及其 skill 文件夹中的所有文件。';
+  }
+
+  @override
+  String settingsSkillsSavedToast(Object name) {
+    return 'Skill 已保存：$name';
+  }
+
+  @override
+  String settingsSkillsSaveFailed(Object error) {
+    return '保存 Skill 失败：$error';
+  }
+
+  @override
+  String get settingsSkillsDeletedToast => 'Skill 已删除。';
+
+  @override
+  String get settingsSkillsNotFoundToast => '未找到 Skill。';
+
+  @override
+  String settingsSkillsDeleteFailed(Object error) {
+    return '删除 Skill 失败：$error';
+  }
+
+  @override
+  String get settingsSkillsEnabledToast => 'Skill 已启用。';
+
+  @override
+  String get settingsSkillsDisabledToast => 'Skill 已禁用。';
+
+  @override
+  String settingsSkillsUpdateFailed(Object error) {
+    return '更新 Skill 失败：$error';
+  }
+
+  @override
+  String get settingsSkillsAddTooltip => '添加 Skill';
+
+  @override
+  String get settingsSkillsEmptyTitle => '尚未安装 Skill';
+
+  @override
+  String settingsSkillsFileCount(Object count) {
+    return '$count 个文件';
+  }
+
+  @override
+  String get settingsSkillsNewFileTitle => '新建 Skill 文件';
+
+  @override
+  String get settingsSkillsRelativePathLabel => '相对路径';
+
+  @override
+  String get settingsSkillsRelativePathHint => 'examples/basic.md';
+
+  @override
+  String get settingsSkillsContentLabel => '内容';
+
+  @override
+  String get settingsSkillsFileSavedToast => '文件已保存。';
+
+  @override
+  String settingsSkillsFileSaveFailed(Object error) {
+    return '保存文件失败：$error';
+  }
+
+  @override
+  String get settingsSkillsDeleteFileTitle => '删除文件？';
+
+  @override
+  String settingsSkillsDeleteFileMessage(Object path, Object name) {
+    return '这会从 $name 中删除 $path。';
+  }
+
+  @override
+  String get settingsSkillsFileDeletedToast => '文件已删除。';
+
+  @override
+  String settingsSkillsFileDeleteFailed(Object error) {
+    return '删除文件失败：$error';
+  }
+
+  @override
+  String get settingsSkillsFileCopiedToast => '文件已复制。';
+
+  @override
+  String get settingsSkillsNewFileAction => '新建文件';
+
+  @override
+  String get settingsSkillsCopyFileTooltip => '复制';
+
+  @override
+  String get settingsSkillsEditFileTooltip => '编辑';
+
+  @override
+  String get settingsSkillsDeleteFileTooltip => '删除';
+
+  @override
+  String settingsSkillsLoadFailed(Object error) {
+    return '加载 Skills 失败：$error';
+  }
+
+  @override
+  String externalMcpLoadServersFailed(Object error) {
+    return '加载外部 MCP 服务失败：$error';
+  }
+
+  @override
+  String get externalMcpSelectedFileUnavailable => '所选文件不可用。';
+
+  @override
+  String get externalMcpImportConfirmTitle => '导入外部 MCP 服务？';
+
+  @override
+  String externalMcpImportConfirmMessage(Object count) {
+    return '找到 $count 个服务。它们将以启用状态保存，之后你可以同步并单独启用工具。';
+  }
+
+  @override
+  String get externalMcpConfigImportedToast => 'MCP 配置已导入。';
+
+  @override
+  String externalMcpImportFailed(Object error) {
+    return '导入失败：$error';
+  }
+
+  @override
+  String externalMcpImportConfigFailed(Object error) {
+    return '导入 MCP 配置失败：$error';
+  }
+
+  @override
+  String get externalMcpHeadersJsonObjectError => '请求头 JSON 必须是对象。';
+
+  @override
+  String get externalMcpServerSavedToast => 'MCP 服务已保存。';
+
+  @override
+  String externalMcpSaveFailed(Object error) {
+    return '保存失败：$error';
+  }
+
+  @override
+  String externalMcpSaveServerFailed(Object error) {
+    return '保存 MCP 服务失败：$error';
+  }
+
+  @override
+  String externalMcpUpdateFailed(Object error) {
+    return '更新失败：$error';
+  }
+
+  @override
+  String get externalMcpServerUpdatedToast => 'MCP 服务已更新。';
+
+  @override
+  String externalMcpUpdateServerFailed(Object error) {
+    return '更新 MCP 服务失败：$error';
+  }
+
+  @override
+  String externalMcpSyncedToast(Object count) {
+    return '已同步 $count 个工具。';
+  }
+
+  @override
+  String externalMcpSyncFailed(Object error) {
+    return '同步失败：$error';
+  }
+
+  @override
+  String externalMcpSyncServerFailed(Object error) {
+    return '同步 MCP 服务失败：$error';
+  }
+
+  @override
+  String get externalMcpDeleteServerTitle => '删除外部 MCP 服务？';
+
+  @override
+  String externalMcpDeleteServerMessage(Object name) {
+    return '这会删除 $name 及其所有已同步的工具设置。';
+  }
+
+  @override
+  String externalMcpDeleteFailed(Object error) {
+    return '删除失败：$error';
+  }
+
+  @override
+  String get externalMcpServerDeletedToast => 'MCP 服务已删除。';
+
+  @override
+  String externalMcpDeleteServerFailed(Object error) {
+    return '删除 MCP 服务失败：$error';
+  }
+
+  @override
+  String externalMcpToolUpdateFailed(Object error) {
+    return '更新工具失败：$error';
+  }
+
+  @override
+  String externalMcpUpdateToolFailed(Object error) {
+    return '更新 MCP 工具失败：$error';
+  }
+
+  @override
+  String get externalMcpNoToolsSynced => '尚未同步工具。';
+
+  @override
+  String get externalMcpConfigJsonLabel => 'MCP 配置 JSON';
 }

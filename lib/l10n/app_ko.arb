@@ -355,6 +355,10 @@
   },
   "autoAddNewAppsToCaptureTitle": "새 앱 자동 추가",
   "autoAddNewAppsToCaptureDesc": "새로 설치된 비시스템 앱을 캡처 목록에 자동으로 추가합니다.",
+  "windowScreenshotApiTitle": "대상 창만 캡처",
+  "windowScreenshotApiDesc": "켜면 대상 앱 창 화면만 저장합니다. Android 14 이상에서는 창 API를 먼저 사용하고, 그 외에는 창 범위로 잘라냅니다.",
+  "windowScreenshotApiEnabledToast": "대상 창만 캡처를 켰습니다",
+  "windowScreenshotApiDisabledToast": "대상 창만 캡처를 껐습니다",
   "screenshotDedupeModeTitle": "화면 중복 제거 강도",
   "screenshotDedupeModeCurrent": "현재: {mode}",
   "@screenshotDedupeModeCurrent": {
@@ -2329,13 +2333,8 @@
   },
   "mcpStopped": "중지됨",
   "mcpLastErrorTitle": "마지막 오류",
-  "mcpEndpointLabel": "엔드포인트",
   "mcpNoLanIpDetected": "LAN IP를 감지하지 못했습니다",
-  "mcpBearerTokenLabel": "Bearer 토큰",
-  "mcpTokenCopyLabel": "토큰",
-  "mcpUnavailable": "사용할 수 없음",
   "mcpResetTokenTitle": "토큰 재설정",
-  "mcpResetTokenSubtitle": "이전 토큰이 즉시 무효화됩니다.",
   "mcpAiInstallTitle": "AI에게 설정 맡기기",
   "mcpAiInstallCopyLabel": "설정 안내 복사",
   "mcpConnectionUnavailableHint": "서비스를 시작하고 LAN IP가 감지되면 복사 가능한 설정 안내가 여기에 표시됩니다.",
@@ -2392,5 +2391,211 @@
       "label": {},
       "error": {}
     }
-  }
+  },
+  "externalMcpAddServerTitle": "외부 MCP 서버 추가",
+  "externalMcpEditServerTitle": "외부 MCP 서버 편집",
+  "externalMcpNameLabel": "이름",
+  "externalMcpUrlLabel": "URL",
+  "externalMcpTransportLabel": "전송 방식",
+  "externalMcpTransportStreamableHttp": "Streamable HTTP",
+  "externalMcpTransportSse": "SSE",
+  "externalMcpHeadersJsonLabel": "헤더 JSON",
+  "externalMcpHeadersJsonHint": "Authorization: Bearer ...",
+  "externalMcpEnabledLabel": "사용",
+  "externalMcpServersTitle": "외부 MCP 서버",
+  "externalMcpImportJsonTooltip": "JSON 가져오기",
+  "externalMcpAddServerTooltip": "JSON으로 서버 추가",
+  "externalMcpEmptyTitle": "외부 MCP 서버 없음",
+  "externalMcpSyncAction": "동기화",
+  "settingsSkillsTitle": "Skills",
+  "settingsSkillsAddTitle": "Skill 추가",
+  "settingsSkillsSkillMdLabel": "SKILL.md",
+  "settingsSkillsSkillMdHint": "---\nname: my-skill\ndescription: \"...\"\n---\n\nInstructions...",
+  "settingsSkillsImportAction": "가져오기",
+  "settingsSkillsDeleteTitle": "Skill을 삭제할까요?",
+  "settingsSkillsDeleteMessage": "{name}와 skill 폴더의 모든 파일을 삭제합니다.",
+  "settingsSkillsSavedToast": "Skill 저장됨: {name}",
+  "settingsSkillsSaveFailed": "Skill 저장 실패: {error}",
+  "settingsSkillsDeletedToast": "Skill이 삭제되었습니다.",
+  "settingsSkillsNotFoundToast": "Skill을 찾을 수 없습니다.",
+  "settingsSkillsDeleteFailed": "Skill 삭제 실패: {error}",
+  "settingsSkillsEnabledToast": "Skill이 사용되었습니다.",
+  "settingsSkillsDisabledToast": "Skill이 사용 중지되었습니다.",
+  "settingsSkillsUpdateFailed": "Skill 업데이트 실패: {error}",
+  "settingsSkillsAddTooltip": "Skill 추가",
+  "settingsSkillsEmptyTitle": "설치된 Skill 없음",
+  "settingsSkillsFileCount": "{count}개 파일",
+  "settingsSkillsNewFileTitle": "새 Skill 파일",
+  "settingsSkillsRelativePathLabel": "상대 경로",
+  "settingsSkillsRelativePathHint": "examples/basic.md",
+  "settingsSkillsContentLabel": "내용",
+  "settingsSkillsFileSavedToast": "파일이 저장되었습니다.",
+  "settingsSkillsFileSaveFailed": "파일 저장 실패: {error}",
+  "settingsSkillsDeleteFileTitle": "파일을 삭제할까요?",
+  "settingsSkillsDeleteFileMessage": "{name}에서 {path}을(를) 삭제합니다.",
+  "settingsSkillsFileDeletedToast": "파일이 삭제되었습니다.",
+  "settingsSkillsFileDeleteFailed": "파일 삭제 실패: {error}",
+  "settingsSkillsFileCopiedToast": "파일이 복사되었습니다.",
+  "settingsSkillsNewFileAction": "새 파일",
+  "settingsSkillsCopyFileTooltip": "복사",
+  "settingsSkillsEditFileTooltip": "편집",
+  "settingsSkillsDeleteFileTooltip": "삭제",
+  "settingsSkillsLoadFailed": "Skills 로드 실패: {error}",
+  "@settingsSkillsDeleteMessage": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "@settingsSkillsSavedToast": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "@settingsSkillsSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@settingsSkillsDeleteFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@settingsSkillsUpdateFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@settingsSkillsFileCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "@settingsSkillsFileSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@settingsSkillsDeleteFileMessage": {
+    "placeholders": {
+      "path": {},
+      "name": {}
+    }
+  },
+  "@settingsSkillsFileDeleteFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@settingsSkillsLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "externalMcpLoadServersFailed": "외부 MCP 서버 로드 실패: {error}",
+  "externalMcpSelectedFileUnavailable": "선택한 파일을 사용할 수 없습니다.",
+  "externalMcpImportConfirmTitle": "외부 MCP 서버를 가져올까요?",
+  "externalMcpImportConfirmMessage": "{count}개 서버를 찾았습니다. 사용 상태로 저장되며, 이후 동기화하고 개별 도구를 사용할 수 있습니다.",
+  "externalMcpConfigImportedToast": "MCP 설정을 가져왔습니다.",
+  "externalMcpImportFailed": "가져오기 실패: {error}",
+  "externalMcpImportConfigFailed": "MCP 설정 가져오기 실패: {error}",
+  "externalMcpHeadersJsonObjectError": "헤더 JSON은 객체여야 합니다.",
+  "externalMcpServerSavedToast": "MCP 서버가 저장되었습니다.",
+  "externalMcpSaveFailed": "저장 실패: {error}",
+  "externalMcpSaveServerFailed": "MCP 서버 저장 실패: {error}",
+  "externalMcpUpdateFailed": "업데이트 실패: {error}",
+  "externalMcpServerUpdatedToast": "MCP 서버가 업데이트되었습니다.",
+  "externalMcpUpdateServerFailed": "MCP 서버 업데이트 실패: {error}",
+  "externalMcpSyncedToast": "{count}개 도구를 동기화했습니다.",
+  "externalMcpSyncFailed": "동기화 실패: {error}",
+  "externalMcpSyncServerFailed": "MCP 서버 동기화 실패: {error}",
+  "externalMcpDeleteServerTitle": "외부 MCP 서버를 삭제할까요?",
+  "externalMcpDeleteServerMessage": "{name}와 동기화된 모든 도구 설정을 삭제합니다.",
+  "externalMcpDeleteFailed": "삭제 실패: {error}",
+  "externalMcpServerDeletedToast": "MCP 서버가 삭제되었습니다.",
+  "externalMcpDeleteServerFailed": "MCP 서버 삭제 실패: {error}",
+  "externalMcpToolUpdateFailed": "도구 업데이트 실패: {error}",
+  "externalMcpUpdateToolFailed": "MCP 도구 업데이트 실패: {error}",
+  "externalMcpNoToolsSynced": "아직 동기화된 도구가 없습니다.",
+  "@externalMcpLoadServersFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpImportConfirmMessage": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "@externalMcpImportFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpImportConfigFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpSaveServerFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpUpdateFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpUpdateServerFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpSyncedToast": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "@externalMcpSyncFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpSyncServerFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpDeleteServerMessage": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "@externalMcpDeleteFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpDeleteServerFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpToolUpdateFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@externalMcpUpdateToolFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "externalMcpConfigJsonLabel": "MCP 설정 JSON"
 }

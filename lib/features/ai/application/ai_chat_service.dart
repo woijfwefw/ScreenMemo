@@ -23,6 +23,8 @@ import 'package:screen_memo/features/ai/application/prompt_budget.dart';
 import 'package:screen_memo/data/database/screenshot_database.dart';
 import 'package:screen_memo/data/settings/user_settings_service.dart';
 import 'package:screen_memo/features/ai/application/ui_thinking_json_patcher.dart';
+import 'package:screen_memo/features/mcp/application/mcp_client_service.dart';
+import 'package:screen_memo/features/skills/application/skill_service.dart';
 
 export 'package:screen_memo/features/ai/application/ai_request_gateway.dart'
     show InvalidResponseStartException, InvalidEndpointConfigurationException;
@@ -66,8 +68,14 @@ class AIChatService {
   static List<Map<String, dynamic>> defaultChatTools() =>
       AIChatServiceToolingExt.defaultChatTools();
 
+  static Future<List<Map<String, dynamic>>> defaultChatToolsAsync() =>
+      AIChatServiceToolingExt.defaultChatToolsAsync();
+
   static List<Map<String, dynamic>> defaultSubagentTools() =>
       AIChatServiceToolingExt.defaultSubagentTools();
+
+  static Future<List<Map<String, dynamic>>> defaultSubagentToolsAsync() =>
+      AIChatServiceToolingExt.defaultSubagentToolsAsync();
 
   // Keep chat history bounded by an approximate token budget (Codex-style).
   // This is in addition to the DB tail limit, and prevents a few very long

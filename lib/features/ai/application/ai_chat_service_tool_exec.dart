@@ -13,10 +13,7 @@ extension AIChatServiceToolExecExt on AIChatService {
     out[name] = filePath;
   }
 
-  void _recordLocalEvidencePathFromPath(
-    Map<String, String>? out,
-    String path,
-  ) {
+  void _recordLocalEvidencePathFromPath(Map<String, String>? out, String path) {
     final String filePath = path.trim();
     if (filePath.isEmpty) return;
     _recordLocalEvidencePath(out, _basename(filePath), filePath);
@@ -30,10 +27,12 @@ extension AIChatServiceToolExecExt on AIChatService {
   }) async {
     try {
       final Map<String, dynamic> args = _safeJsonObject(call.argumentsJson);
-      final AIImageGenerationParams params =
-          AIImageGenerationParams.fromJson(args);
-      final AIImageGenerationResult result =
-          await AIImageGenerationService.instance.generate(
+      final AIImageGenerationParams params = AIImageGenerationParams.fromJson(
+        args,
+      );
+      final AIImageGenerationResult result = await AIImageGenerationService
+          .instance
+          .generate(
             params: params,
             conversationId: conversationCid,
             assistantCreatedAtMs: assistantCreatedAtMs,
@@ -1547,9 +1546,7 @@ extension AIChatServiceToolExecExt on AIChatService {
           totalCount = parts.fold<int>(0, (a, b) => a + b);
         }
       }
-      if (totalCount != null) {
-        hasMore = (offset + results.length) < totalCount;
-      }
+      hasMore = (offset + results.length) < totalCount;
     } catch (_) {
       // Best-effort: total_count is optional; do not fail the tool if counting fails.
     }
@@ -1821,6 +1818,127 @@ extension AIChatServiceToolExecExt on AIChatService {
     int? assistantCreatedAtMs,
     Map<String, String>? localEvidencePaths,
   }) async {
+    if (McpClientService.isMcpManagementTool(call.name)) {
+      Map<String, dynamic> result;
+      try {
+        final Map<String, dynamic> args = _safeJsonObject(call.argumentsJson);
+        result = await McpClientService.instance.executeManagementTool(
+          call.name,
+          args,
+        );
+      } catch (e, st) {
+        unawaited(
+          FlutterLogger.nativeWarn(
+            'AI_TOOL',
+            'MCP management tool failed name=${call.name}: $e\n$st',
+          ),
+        );
+        result = <String, dynamic>{
+          'tool': call.name,
+          'ok': false,
+          'error': e.toString(),
+        };
+      }
+      return <AIMessage>[
+        AIMessage(
+          role: 'tool',
+          content: jsonEncode(result),
+          toolCallId: call.id,
+        ),
+      ];
+    }
+    if (McpClientService.isExternalMcpToolName(call.name)) {
+      Map<String, dynamic> result;
+      try {
+        final Map<String, dynamic> args = _safeJsonObject(call.argumentsJson);
+        result = await McpClientService.instance.callExternalTool(
+          call.name,
+          args,
+        );
+      } catch (e, st) {
+        unawaited(
+          FlutterLogger.nativeWarn(
+            'AI_TOOL',
+            'External MCP tool failed name=${call.name}: $e\n$st',
+          ),
+        );
+        result = <String, dynamic>{
+          'tool': call.name,
+          'ok': false,
+          'error': e.toString(),
+        };
+      }
+      return <AIMessage>[
+        AIMessage(
+          role: 'tool',
+          content: jsonEncode(result),
+          toolCallId: call.id,
+        ),
+      ];
+    }
+    if (call.name == 'use_skill') {
+      Map<String, dynamic> result;
+      try {
+        final Map<String, dynamic> args = _safeJsonObject(call.argumentsJson);
+        final String name = (args['name'] ?? '').toString().trim();
+        final String path = (args['path'] ?? '').toString().trim();
+        final SkillMetadata? skill = await SkillService.instance.getSkill(name);
+        if (skill == null) {
+          result = <String, dynamic>{
+            'tool': 'use_skill',
+            'ok': false,
+            'error': 'skill_not_found',
+            'name': name,
+          };
+        } else if (!skill.enabled) {
+          result = <String, dynamic>{
+            'tool': 'use_skill',
+            'ok': false,
+            'error': 'skill_disabled',
+            'name': name,
+          };
+        } else {
+          final String? content = path.isEmpty
+              ? await SkillService.instance.readSkillBody(name)
+              : await SkillService.instance.readSkillFile(name, path);
+          final List<SkillFileMetadata> files = path.isEmpty
+              ? await SkillService.instance.listSkillFiles(name)
+              : const <SkillFileMetadata>[];
+          result = <String, dynamic>{
+            'tool': 'use_skill',
+            'ok': content != null,
+            'name': skill.name,
+            'description': skill.description,
+            if (path.isNotEmpty) 'path': path,
+            if (content != null) 'content': _clipLine(content, maxLen: 20000),
+            if (path.isEmpty)
+              'files': files
+                  .map((SkillFileMetadata file) => file.relativePath)
+                  .toList(growable: false),
+            if (content == null) 'error': 'skill_file_not_found',
+          };
+        }
+      } catch (e, st) {
+        unawaited(
+          FlutterLogger.nativeWarn(
+            'AI_TOOL',
+            'use_skill failed name=${call.name}: $e\n$st',
+          ),
+        );
+        result = <String, dynamic>{
+          'tool': 'use_skill',
+          'ok': false,
+          'error': e.toString(),
+        };
+      }
+      return <AIMessage>[
+        AIMessage(
+          role: 'tool',
+          content: jsonEncode(result),
+          toolCallId: call.id,
+        ),
+      ];
+    }
     switch (call.name) {
       case 'generate_image':
         return _executeGenerateImageTool(
@@ -1877,6 +1995,7 @@ extension AIChatServiceToolExecExt on AIChatService {
         ];
     }
   }
+
 }
 
 class _AIImageSendPayload {

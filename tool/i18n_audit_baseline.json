@@ -1,12 +1,5 @@
 {
   "version": 1,
-  "generatedAt": "2026-04-29T09:22:52.648821Z",
-  "uiStringLiterals": {
-    "lib/pages/provider_edit_page.dart": {
-      "OpenAI": 1,
-      "Azure OpenAI": 1,
-      "Claude": 1,
-      "Gemini": 1
-    }
-  }
+  "generatedAt": "2026-06-10T16:56:25.473746Z",
+  "uiStringLiterals": {}
 }

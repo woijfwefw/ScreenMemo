@@ -823,6 +823,19 @@ class AppLocalizationsKo extends AppLocalizations {
   String get autoAddNewAppsToCaptureDesc => '새로 설치된 비시스템 앱을 캡처 목록에 자동으로 추가합니다.';
 
   @override
+  String get windowScreenshotApiTitle => '대상 창만 캡처';
+
+  @override
+  String get windowScreenshotApiDesc =>
+      '켜면 대상 앱 창 화면만 저장합니다. Android 14 이상에서는 창 API를 먼저 사용하고, 그 외에는 창 범위로 잘라냅니다.';
+
+  @override
+  String get windowScreenshotApiEnabledToast => '대상 창만 캡처를 켰습니다';
+
+  @override
+  String get windowScreenshotApiDisabledToast => '대상 창만 캡처를 껐습니다';
+
+  @override
   String get screenshotDedupeModeTitle => '화면 중복 제거 강도';
 
   @override
@@ -4365,25 +4378,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get mcpLastErrorTitle => '마지막 오류';
 
   @override
-  String get mcpEndpointLabel => '엔드포인트';
-
-  @override
   String get mcpNoLanIpDetected => 'LAN IP를 감지하지 못했습니다';
 
   @override
-  String get mcpBearerTokenLabel => 'Bearer 토큰';
-
-  @override
-  String get mcpTokenCopyLabel => '토큰';
-
-  @override
-  String get mcpUnavailable => '사용할 수 없음';
-
-  @override
   String get mcpResetTokenTitle => '토큰 재설정';
-
-  @override
-  String get mcpResetTokenSubtitle => '이전 토큰이 즉시 무효화됩니다.';
 
   @override
   String get mcpAiInstallTitle => 'AI에게 설정 맡기기';
@@ -4446,4 +4444,282 @@ class AppLocalizationsKo extends AppLocalizations {
   String mcpCopyFailed(Object label, Object error) {
     return '$label 복사 실패: $error';
   }
+
+  @override
+  String get externalMcpAddServerTitle => '외부 MCP 서버 추가';
+
+  @override
+  String get externalMcpEditServerTitle => '외부 MCP 서버 편집';
+
+  @override
+  String get externalMcpNameLabel => '이름';
+
+  @override
+  String get externalMcpUrlLabel => 'URL';
+
+  @override
+  String get externalMcpTransportLabel => '전송 방식';
+
+  @override
+  String get externalMcpTransportStreamableHttp => 'Streamable HTTP';
+
+  @override
+  String get externalMcpTransportSse => 'SSE';
+
+  @override
+  String get externalMcpHeadersJsonLabel => '헤더 JSON';
+
+  @override
+  String get externalMcpHeadersJsonHint => 'Authorization: Bearer ...';
+
+  @override
+  String get externalMcpEnabledLabel => '사용';
+
+  @override
+  String get externalMcpServersTitle => '외부 MCP 서버';
+
+  @override
+  String get externalMcpImportJsonTooltip => 'JSON 가져오기';
+
+  @override
+  String get externalMcpAddServerTooltip => 'JSON으로 서버 추가';
+
+  @override
+  String get externalMcpEmptyTitle => '외부 MCP 서버 없음';
+
+  @override
+  String get externalMcpSyncAction => '동기화';
+
+  @override
+  String get settingsSkillsTitle => 'Skills';
+
+  @override
+  String get settingsSkillsAddTitle => 'Skill 추가';
+
+  @override
+  String get settingsSkillsSkillMdLabel => 'SKILL.md';
+
+  @override
+  String get settingsSkillsSkillMdHint =>
+      '---\nname: my-skill\ndescription: \"...\"\n---\n\nInstructions...';
+
+  @override
+  String get settingsSkillsImportAction => '가져오기';
+
+  @override
+  String get settingsSkillsDeleteTitle => 'Skill을 삭제할까요?';
+
+  @override
+  String settingsSkillsDeleteMessage(Object name) {
+    return '$name와 skill 폴더의 모든 파일을 삭제합니다.';
+  }
+
+  @override
+  String settingsSkillsSavedToast(Object name) {
+    return 'Skill 저장됨: $name';
+  }
+
+  @override
+  String settingsSkillsSaveFailed(Object error) {
+    return 'Skill 저장 실패: $error';
+  }
+
+  @override
+  String get settingsSkillsDeletedToast => 'Skill이 삭제되었습니다.';
+
+  @override
+  String get settingsSkillsNotFoundToast => 'Skill을 찾을 수 없습니다.';
+
+  @override
+  String settingsSkillsDeleteFailed(Object error) {
+    return 'Skill 삭제 실패: $error';
+  }
+
+  @override
+  String get settingsSkillsEnabledToast => 'Skill이 사용되었습니다.';
+
+  @override
+  String get settingsSkillsDisabledToast => 'Skill이 사용 중지되었습니다.';
+
+  @override
+  String settingsSkillsUpdateFailed(Object error) {
+    return 'Skill 업데이트 실패: $error';
+  }
+
+  @override
+  String get settingsSkillsAddTooltip => 'Skill 추가';
+
+  @override
+  String get settingsSkillsEmptyTitle => '설치된 Skill 없음';
+
+  @override
+  String settingsSkillsFileCount(Object count) {
+    return '$count개 파일';
+  }
+
+  @override
+  String get settingsSkillsNewFileTitle => '새 Skill 파일';
+
+  @override
+  String get settingsSkillsRelativePathLabel => '상대 경로';
+
+  @override
+  String get settingsSkillsRelativePathHint => 'examples/basic.md';
+
+  @override
+  String get settingsSkillsContentLabel => '내용';
+
+  @override
+  String get settingsSkillsFileSavedToast => '파일이 저장되었습니다.';
+
+  @override
+  String settingsSkillsFileSaveFailed(Object error) {
+    return '파일 저장 실패: $error';
+  }
+
+  @override
+  String get settingsSkillsDeleteFileTitle => '파일을 삭제할까요?';
+
+  @override
+  String settingsSkillsDeleteFileMessage(Object path, Object name) {
+    return '$name에서 $path을(를) 삭제합니다.';
+  }
+
+  @override
+  String get settingsSkillsFileDeletedToast => '파일이 삭제되었습니다.';
+
+  @override
+  String settingsSkillsFileDeleteFailed(Object error) {
+    return '파일 삭제 실패: $error';
+  }
+
+  @override
+  String get settingsSkillsFileCopiedToast => '파일이 복사되었습니다.';
+
+  @override
+  String get settingsSkillsNewFileAction => '새 파일';
+
+  @override
+  String get settingsSkillsCopyFileTooltip => '복사';
+
+  @override
+  String get settingsSkillsEditFileTooltip => '편집';
+
+  @override
+  String get settingsSkillsDeleteFileTooltip => '삭제';
+
+  @override
+  String settingsSkillsLoadFailed(Object error) {
+    return 'Skills 로드 실패: $error';
+  }
+
+  @override
+  String externalMcpLoadServersFailed(Object error) {
+    return '외부 MCP 서버 로드 실패: $error';
+  }
+
+  @override
+  String get externalMcpSelectedFileUnavailable => '선택한 파일을 사용할 수 없습니다.';
+
+  @override
+  String get externalMcpImportConfirmTitle => '외부 MCP 서버를 가져올까요?';
+
+  @override
+  String externalMcpImportConfirmMessage(Object count) {
+    return '$count개 서버를 찾았습니다. 사용 상태로 저장되며, 이후 동기화하고 개별 도구를 사용할 수 있습니다.';
+  }
+
+  @override
+  String get externalMcpConfigImportedToast => 'MCP 설정을 가져왔습니다.';
+
+  @override
+  String externalMcpImportFailed(Object error) {
+    return '가져오기 실패: $error';
+  }
+
+  @override
+  String externalMcpImportConfigFailed(Object error) {
+    return 'MCP 설정 가져오기 실패: $error';
+  }
+
+  @override
+  String get externalMcpHeadersJsonObjectError => '헤더 JSON은 객체여야 합니다.';
+
+  @override
+  String get externalMcpServerSavedToast => 'MCP 서버가 저장되었습니다.';
+
+  @override
+  String externalMcpSaveFailed(Object error) {
+    return '저장 실패: $error';
+  }
+
+  @override
+  String externalMcpSaveServerFailed(Object error) {
+    return 'MCP 서버 저장 실패: $error';
+  }
+
+  @override
+  String externalMcpUpdateFailed(Object error) {
+    return '업데이트 실패: $error';
+  }
+
+  @override
+  String get externalMcpServerUpdatedToast => 'MCP 서버가 업데이트되었습니다.';
+
+  @override
+  String externalMcpUpdateServerFailed(Object error) {
+    return 'MCP 서버 업데이트 실패: $error';
+  }
+
+  @override
+  String externalMcpSyncedToast(Object count) {
+    return '$count개 도구를 동기화했습니다.';
+  }
+
+  @override
+  String externalMcpSyncFailed(Object error) {
+    return '동기화 실패: $error';
+  }
+
+  @override
+  String externalMcpSyncServerFailed(Object error) {
+    return 'MCP 서버 동기화 실패: $error';
+  }
+
+  @override
+  String get externalMcpDeleteServerTitle => '외부 MCP 서버를 삭제할까요?';
+
+  @override
+  String externalMcpDeleteServerMessage(Object name) {
+    return '$name와 동기화된 모든 도구 설정을 삭제합니다.';
+  }
+
+  @override
+  String externalMcpDeleteFailed(Object error) {
+    return '삭제 실패: $error';
+  }
+
+  @override
+  String get externalMcpServerDeletedToast => 'MCP 서버가 삭제되었습니다.';
+
+  @override
+  String externalMcpDeleteServerFailed(Object error) {
+    return 'MCP 서버 삭제 실패: $error';
+  }
+
+  @override
+  String externalMcpToolUpdateFailed(Object error) {
+    return '도구 업데이트 실패: $error';
+  }
+
+  @override
+  String externalMcpUpdateToolFailed(Object error) {
+    return 'MCP 도구 업데이트 실패: $error';
+  }
+
+  @override
+  String get externalMcpNoToolsSynced => '아직 동기화된 도구가 없습니다.';
+
+  @override
+  String get externalMcpConfigJsonLabel => 'MCP 설정 JSON';
 }
