@@ -27,6 +27,7 @@ part 'screenshot_database_search.dart';
 part 'screenshot_database_merge.dart';
 part 'screenshot_database_query.dart';
 part 'screenshot_database_health.dart';
+part 'screenshot_database_mcp_client.dart';
 
 void _logDatabaseAiChatPerf(
   String name, {
@@ -117,7 +118,7 @@ class ScreenshotDatabase {
 
   // 分库缓存（key: "<package>|<year>")
   static final Map<String, Database> _shardDbCache = {};
-  static const int _dbVersion = 55;
+  static const int _dbVersion = 56;
   static const int _screenshotPathLookupCacheMaxEntries = 4096;
   static final Map<String, String?> _screenshotPathLookupCache =
       <String, String?>{};
@@ -1092,6 +1093,8 @@ class ScreenshotDatabase {
 
     // v2: AI 配置与会话表
     await _createAiTables(db);
+    // v56: 外部 MCP 客户端配置与工具缓存。
+    await _createMcpClientTables(db);
     // v6: 清理旧表与旧键
     await _cleanupLegacyAiArtifacts(db);
 
@@ -1145,6 +1148,9 @@ class ScreenshotDatabase {
     }
     if (oldVersion < 53) {
       await _ensureAiProviderKeySummaryColumns(db);
+    }
+    if (oldVersion < 56) {
+      await _createMcpClientTables(db);
     }
     if (oldVersion < 2) {
       await _createAiTables(db);

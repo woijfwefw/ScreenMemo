@@ -85,7 +85,9 @@ extension _SettingsLayoutPart on _SettingsPageState {
         if (_subPage == _SettingsSubPage.mcpService)
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _mcpLoading ? null : _loadMcpStatus,
+            onPressed: (_mcpLoading || _externalMcpLoading)
+                ? null
+                : _loadMcpPageData,
             tooltip: l10n.actionRefresh,
           ),
         if (_subPage == _SettingsSubPage.logManagement)

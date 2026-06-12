@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:screen_memo/l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'package:intl/intl.dart' as intl;
 import 'package:package_info_plus/package_info_plus.dart';
@@ -33,6 +34,7 @@ import 'package:screen_memo/features/diagnostics/application/log_export_service.
 import 'package:screen_memo/features/nsfw/application/nsfw_preference_service.dart';
 import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
 import 'package:screen_memo/features/app_health/application/app_health_service.dart';
+import 'package:screen_memo/features/mcp/application/mcp_client_service.dart';
 import 'package:screen_memo/features/mcp/application/mcp_service.dart';
 import 'package:screen_memo/features/updater/presentation/update_prompt_coordinator.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -194,6 +196,11 @@ class _SettingsPageState extends State<SettingsPage>
   late final Future<PackageInfo> _packageInfoFuture =
       PackageInfo.fromPlatform();
   int _aboutVersionTapCount = 0;
+  bool _externalMcpLoading = false;
+  List<McpClientServer> _externalMcpServers = <McpClientServer>[];
+  final Set<String> _externalMcpSyncingIds = <String>{};
+  final Set<String> _externalMcpServerBusyIds = <String>{};
+  final Set<String> _externalMcpToolBusyNames = <String>{};
 
   // NSFW 设置 - 域名清单管理
   final TextEditingController _nsfwDomainController = TextEditingController();
@@ -301,7 +308,7 @@ class _SettingsPageState extends State<SettingsPage>
         unawaited(_loadAppHealthStatus(refresh: true));
         break;
       case _SettingsSubPage.mcpService:
-        unawaited(_loadMcpStatus());
+        unawaited(_loadMcpPageData());
         break;
       case _SettingsSubPage.dataBackup:
         break;
