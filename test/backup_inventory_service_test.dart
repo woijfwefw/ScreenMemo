@@ -54,6 +54,18 @@ void main() {
       await File(
         '${appDatabasesDir.path}/plugin.db',
       ).create(recursive: true).then((File f) => f.writeAsString('plugin'));
+      await File(
+        '${filesDir.path}/persistent_private/ai/chat_attachments/a.jpg',
+      ).create(recursive: true).then((File f) => f.writeAsString('attachment'));
+      await File(
+        '${filesDir.path}/skills/demo/SKILL.md',
+      ).create(recursive: true).then((File f) => f.writeAsString('skill'));
+      await File(
+        '${filesDir.path}/skills/.screenmemo_skills_state.json',
+      ).create(recursive: true).then((File f) => f.writeAsString('state'));
+      await File(
+        '${filesDir.path}/.secure_keys.json',
+      ).create(recursive: true).then((File f) => f.writeAsString('keys'));
       await File('${cacheDir.path}/cache.bin')
           .create(recursive: true)
           .then((File f) => f.writeAsBytes(List<int>.filled(7, 2)));
@@ -76,7 +88,7 @@ void main() {
         ),
       );
 
-      expect(inventory.totalFiles, 10);
+      expect(inventory.totalFiles, 14);
       expect(
         inventory.categoryById(BackupCategoryIds.screenshots)?.fileCount,
         1,
@@ -109,6 +121,26 @@ void main() {
       expect(
         inventory.categoryById(BackupCategoryIds.appDatabases)?.fileCount,
         1,
+      );
+      expect(inventory.categoryById(BackupCategoryIds.appFiles)?.fileCount, 4);
+      expect(
+        inventory
+            .categoryById(BackupCategoryIds.appFiles)!
+            .files
+            .map((BackupInventoryFile file) => file.archivePath),
+        containsAll(<String>[
+          'files/persistent_private/ai/chat_attachments/a.jpg',
+          'files/skills/demo/SKILL.md',
+          'files/skills/.screenmemo_skills_state.json',
+          'files/.secure_keys.json',
+        ]),
+      );
+      expect(
+        inventory
+            .categoryById(BackupCategoryIds.appFiles)!
+            .files
+            .map((BackupInventoryFile file) => file.archivePath),
+        isNot(contains('files/output/screen/com.demo/a.png')),
       );
       expect(inventory.requiresRestartAfterImport, isTrue);
 
@@ -149,6 +181,10 @@ void main() {
           '${tempDir.path}/shared_prefs/FlutterSharedPreferences.xml',
         ).create(recursive: true);
         await sharedPrefsFile.writeAsString('<prefs />');
+        final File filesRootFile = await File(
+          '${tempDir.path}/files/persistent_private/ai/chat_attachments/a.jpg',
+        ).create(recursive: true);
+        await filesRootFile.writeAsString('attachment');
 
         final String zipPath = '${tempDir.path}/backup.zip';
         final ZipFileEncoder encoder = ZipFileEncoder();
@@ -159,6 +195,10 @@ void main() {
           sharedPrefsFile,
           'shared_prefs/FlutterSharedPreferences.xml',
         );
+        encoder.addFile(
+          filesRootFile,
+          'files/persistent_private/ai/chat_attachments/a.jpg',
+        );
         encoder.close();
 
         final BackupArchiveInspection inspection =
@@ -167,6 +207,7 @@ void main() {
         expect(inspection.hasManifest, isTrue);
         expect(inspection.rootEntries, contains('output'));
         expect(inspection.rootEntries, contains('shared_prefs'));
+        expect(inspection.rootEntries, contains('files'));
         expect(inspection.manifestRequiresRestart, isTrue);
       } finally {
         await tempDir.delete(recursive: true);

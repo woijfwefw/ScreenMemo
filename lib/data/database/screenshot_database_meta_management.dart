@@ -1,4 +1,4 @@
-﻿part of 'screenshot_database.dart';
+part of 'screenshot_database.dart';
 
 extension ScreenshotDatabaseMetaManagement on ScreenshotDatabase {
   Future<int> getScreenshotCountByAppBetween(
@@ -1468,6 +1468,10 @@ extension ScreenshotDatabaseMetaManagement on ScreenshotDatabase {
       if (path == null || path.isEmpty) {
         continue;
       }
+      if (root == 'files') {
+        await _clearFilesRootForImport(roots);
+        continue;
+      }
       if (_isUnsafeImportDeleteTarget(roots, path)) {
         await FlutterLogger.nativeWarn(
           'IMPORT',
@@ -1489,6 +1493,41 @@ extension ScreenshotDatabaseMetaManagement on ScreenshotDatabase {
       _normalizeImportDeleteGuardPath(roots.filesDirPath),
     };
     return protectedRoots.contains(target);
+  }
+
+  Future<void> _clearFilesRootForImport(BackupRootPaths roots) async {
+    final Directory dir = Directory(roots.filesDirPath);
+    if (!await dir.exists()) {
+      return;
+    }
+    try {
+      final List<FileSystemEntity> entries = await dir
+          .list(followLinks: false)
+          .toList();
+      for (final FileSystemEntity entity in entries) {
+        final String name = basename(entity.path).toLowerCase();
+        if (name == 'output') {
+          continue;
+        }
+        try {
+          await entity.delete(recursive: entity is Directory);
+        } catch (e) {
+          await FlutterLogger.nativeWarn(
+            'IMPORT',
+            '删除 files 导入目标失败：${entity.path} -> $e',
+          );
+        }
+      }
+      await FlutterLogger.nativeInfo(
+        'IMPORT',
+        '覆盖导入前已清理 files 非 output 内容：${roots.filesDirPath}',
+      );
+    } catch (e) {
+      await FlutterLogger.nativeWarn(
+        'IMPORT',
+        '清理 files 导入目标失败：${roots.filesDirPath} -> $e',
+      );
+    }
   }
 
   String _normalizeImportDeleteGuardPath(String path) {

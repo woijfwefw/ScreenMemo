@@ -1978,6 +1978,8 @@ class _ExportBackupPageState extends State<ExportBackupPage> {
         return isZh ? 'no_backup 目录' : 'no_backup';
       case BackupCategoryIds.appDatabases:
         return isZh ? '应用级数据库目录' : 'App databases';
+      case BackupCategoryIds.appFiles:
+        return isZh ? '应用 files 持久化目录' : 'App files';
       default:
         return id;
     }
@@ -2020,6 +2022,8 @@ class _ExportBackupPageState extends State<ExportBackupPage> {
         return const Color(0xFFEF4444);
       case BackupCategoryIds.appDatabases:
         return const Color(0xFF14B8A6);
+      case BackupCategoryIds.appFiles:
+        return const Color(0xFF8B5CF6);
       default:
         return Theme.of(context).colorScheme.primary;
     }
@@ -2097,6 +2101,8 @@ class _BackupSegmentedProgressBar extends StatelessWidget {
         return const Color(0xFFEF4444);
       case BackupCategoryIds.appDatabases:
         return const Color(0xFF14B8A6);
+      case BackupCategoryIds.appFiles:
+        return const Color(0xFF8B5CF6);
       default:
         return Theme.of(context).colorScheme.primary;
     }

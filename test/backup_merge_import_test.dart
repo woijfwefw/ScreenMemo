@@ -132,4 +132,120 @@ void main() {
       }
     }
   });
+
+  test('覆盖导入 files 根时恢复持久文件且保留 output', () async {
+    final Directory tmp = await Directory.systemTemp.createTemp(
+      'screen_memo_import_files_root_',
+    );
+    try {
+      final String targetPath = p.join(tmp.path, 'target');
+      await ScreenshotDatabase.instance.initializeForDesktop(targetPath);
+
+      final File keptOutput = File(
+        p.join(targetPath, 'output', 'screen', 'demo', 'kept.png'),
+      );
+      await keptOutput.create(recursive: true);
+      await keptOutput.writeAsString('kept');
+
+      final File oldSkill = File(
+        p.join(targetPath, 'skills', 'old', 'SKILL.md'),
+      );
+      await oldSkill.create(recursive: true);
+      await oldSkill.writeAsString('old');
+
+      final Directory source = Directory(p.join(tmp.path, 'source'));
+      final File manifest = File(p.join(source.path, backupManifestFileName));
+      await manifest.create(recursive: true);
+      await manifest.writeAsString('{"version":2}');
+
+      final File attachment = File(
+        p.join(
+          source.path,
+          'files',
+          'persistent_private',
+          'ai',
+          'chat_attachments',
+          'a.jpg',
+        ),
+      );
+      await attachment.create(recursive: true);
+      await attachment.writeAsString('attachment');
+
+      final File skill = File(
+        p.join(source.path, 'files', 'skills', 'demo', 'SKILL.md'),
+      );
+      await skill.create(recursive: true);
+      await skill.writeAsString('skill');
+
+      final File secureKeys = File(
+        p.join(source.path, 'files', '.secure_keys.json'),
+      );
+      await secureKeys.create(recursive: true);
+      await secureKeys.writeAsString('keys');
+
+      final File duplicatedOutput = File(
+        p.join(source.path, 'files', 'output', 'should_not_restore.txt'),
+      );
+      await duplicatedOutput.create(recursive: true);
+      await duplicatedOutput.writeAsString('skip');
+
+      final String zipPath = p.join(tmp.path, 'files_root_backup.zip');
+      final ZipFileEncoder encoder = ZipFileEncoder();
+      encoder.create(zipPath, level: 0);
+      await encoder.addFile(manifest, backupManifestFileName);
+      await encoder.addFile(
+        attachment,
+        'files/persistent_private/ai/chat_attachments/a.jpg',
+      );
+      await encoder.addFile(skill, 'files/skills/demo/SKILL.md');
+      await encoder.addFile(secureKeys, 'files/.secure_keys.json');
+      await encoder.addFile(
+        duplicatedOutput,
+        'files/output/should_not_restore.txt',
+      );
+      encoder.close();
+
+      final Map<String, dynamic>? result = await ScreenshotDatabase.instance
+          .importDataFromZipStreaming(zipPath: zipPath, overwrite: true)
+          .timeout(const Duration(seconds: 5));
+
+      expect(result, isNotNull);
+      expect(result!['restoredRoots'], contains('files'));
+      expect(await keptOutput.exists(), isTrue);
+      expect(await oldSkill.exists(), isFalse);
+      expect(
+        await File(
+          p.join(
+            targetPath,
+            'persistent_private',
+            'ai',
+            'chat_attachments',
+            'a.jpg',
+          ),
+        ).exists(),
+        isTrue,
+      );
+      expect(
+        await File(p.join(targetPath, 'skills', 'demo', 'SKILL.md')).exists(),
+        isTrue,
+      );
+      expect(
+        await File(p.join(targetPath, '.secure_keys.json')).exists(),
+        isTrue,
+      );
+      expect(
+        await File(
+          p.join(targetPath, 'output', 'should_not_restore.txt'),
+        ).exists(),
+        isFalse,
+      );
+    } finally {
+      try {
+        await ScreenshotDatabase.instance.disposeDesktop();
+      } catch (_) {}
+      if (await tmp.exists()) {
+        await tmp.delete(recursive: true);
+      }
+    }
+  });
 }

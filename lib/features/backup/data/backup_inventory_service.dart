@@ -20,6 +20,7 @@ class BackupCategoryIds {
   static const String appFlutter = 'app_flutter';
   static const String noBackup = 'no_backup';
   static const String appDatabases = 'app_databases';
+  static const String appFiles = 'app_files';
 
   static const List<String> ordered = <String>[
     screenshots,
@@ -31,6 +32,7 @@ class BackupCategoryIds {
     appFlutter,
     noBackup,
     appDatabases,
+    appFiles,
   ];
 
   static const Set<String> databaseOnly = <String>{
@@ -70,6 +72,7 @@ class BackupRootPaths {
   Map<String, String> toImportTargetMap() {
     final Map<String, String> map = <String, String>{
       'output': outputDirPath,
+      'files': filesDirPath,
       'databases': appDatabasesDirPath,
     };
     if (sharedPrefsDirPath != null) {
@@ -168,7 +171,8 @@ class BackupInventory {
         category.id == BackupCategoryIds.sharedPrefs ||
         category.id == BackupCategoryIds.appFlutter ||
         category.id == BackupCategoryIds.noBackup ||
-        category.id == BackupCategoryIds.appDatabases,
+        category.id == BackupCategoryIds.appDatabases ||
+        category.id == BackupCategoryIds.appFiles,
   );
 
   BackupInventoryCategory? categoryById(String id) {
@@ -277,6 +281,8 @@ class BackupInventoryService {
     'code_cache',
   };
 
+  static const Set<String> _ignoredFilesDirNames = <String>{'output'};
+
   static Future<BackupRootPaths?> resolveDefaultRoots() async {
     final Directory? filesDir = await PathService.getInternalAppDir(null);
     if (filesDir == null) {
@@ -337,6 +343,20 @@ class BackupInventoryService {
       warnings: warnings,
       excludedBytes: excludedBytes,
       ignoreTopLevelDirectories: _ignoredOutputDirNames,
+      categoryForArchivePath: _categorizeArchivePath,
+    );
+
+    await _scanArchiveRoot(
+      absoluteRootPath: resolvedRoots.filesDirPath,
+      archiveRoot: 'files',
+      onProgress: onProgress,
+      scopeId: BackupCategoryIds.appFiles,
+      filesByCategory: filesByCategory,
+      seenSourcePaths: seenSourcePaths,
+      warnings: warnings,
+      excludedBytes: excludedBytes,
+      ignoreTopLevelDirectories: _ignoredFilesDirNames,
+      countIgnoredTopLevelBytes: false,
       categoryForArchivePath: _categorizeArchivePath,
     );
 
@@ -465,6 +485,7 @@ class BackupInventoryService {
         head == 'shared_prefs' ||
         head == 'app_flutter' ||
         head == 'no_backup' ||
+        head == 'files' ||
         head == 'databases') {
       return head;
     }
@@ -480,6 +501,9 @@ class BackupInventoryService {
       return false;
     }
     if (lower.endsWith('.db-journal')) {
+      return true;
+    }
+    if (rootEntry == 'files' && lower.split('/').first == 'output') {
       return true;
     }
     if (rootEntry != 'output') {
@@ -612,6 +636,7 @@ class BackupInventoryService {
     required Map<String, int> excludedBytes,
     required String Function(String archivePath) categoryForArchivePath,
     Set<String> ignoreTopLevelDirectories = const <String>{},
+    bool countIgnoredTopLevelBytes = true,
   }) async {
     if (absoluteRootPath == null || absoluteRootPath.isEmpty) {
       return;
@@ -650,9 +675,11 @@ class BackupInventoryService {
 
         if (entity is Directory) {
           if (ignoreTopLevelDirectories.contains(headLower)) {
-            excludedBytes[BackupExcludedIds.outputTemp] =
-                (excludedBytes[BackupExcludedIds.outputTemp] ?? 0) +
-                await _measureDirectorySafe(entity.path);
+            if (countIgnoredTopLevelBytes) {
+              excludedBytes[BackupExcludedIds.outputTemp] =
+                  (excludedBytes[BackupExcludedIds.outputTemp] ?? 0) +
+                  await _measureDirectorySafe(entity.path);
+            }
             continue;
           }
           if (_ignoredTopLevelDirNames.contains(headLower) &&
@@ -768,6 +795,9 @@ class BackupInventoryService {
     }
     if (lower.startsWith('databases/')) {
       return BackupCategoryIds.appDatabases;
+    }
+    if (lower.startsWith('files/')) {
+      return BackupCategoryIds.appFiles;
     }
     return BackupCategoryIds.otherOutput;
   }

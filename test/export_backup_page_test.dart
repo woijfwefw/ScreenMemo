@@ -61,6 +61,33 @@ void main() {
     );
   }
 
+  BackupInventory inventoryWithAppFilesFixture() {
+    final BackupInventory base = inventoryFixture();
+    return BackupInventory(
+      roots: base.roots,
+      categories: <BackupInventoryCategory>[
+        ...base.categories,
+        const BackupInventoryCategory(
+          id: BackupCategoryIds.appFiles,
+          files: <BackupInventoryFile>[
+            BackupInventoryFile(
+              sourcePath: '/data/files/skills/demo/SKILL.md',
+              archivePath: 'files/skills/demo/SKILL.md',
+              bytes: 25,
+              categoryId: BackupCategoryIds.appFiles,
+            ),
+          ],
+          totalBytes: 25,
+          fileCount: 1,
+        ),
+      ],
+      excludedItems: base.excludedItems,
+      totalBytes: base.totalBytes + 25,
+      totalFiles: base.totalFiles + 1,
+      warnings: base.warnings,
+    );
+  }
+
   Widget buildHarness(Widget child, {List<NavigatorObserver>? observers}) {
     return MaterialApp(
       locale: const Locale('zh'),
@@ -390,7 +417,7 @@ void main() {
   testWidgets('database-only scope updates preview and executor scope', (
     WidgetTester tester,
   ) async {
-    final BackupInventory inventory = inventoryFixture();
+    final BackupInventory inventory = inventoryWithAppFilesFixture();
     BackupExportScope? receivedScope;
 
     await tester.pumpWidget(
@@ -417,12 +444,14 @@ void main() {
 
     expect(find.text('截图文件'), findsOneWidget);
     expect(find.text('主数据库'), findsOneWidget);
+    expect(find.text('应用 files 持久化目录'), findsOneWidget);
 
     await tester.tap(find.text('仅导出数据库'));
     await tester.pumpAndSettle();
 
     expect(find.text('截图文件'), findsNothing);
     expect(find.text('主数据库'), findsOneWidget);
+    expect(find.text('应用 files 持久化目录'), findsNothing);
     await expectVisibleText(tester, '开始导出数据库');
 
     await tapVisibleText(tester, '开始导出数据库');
