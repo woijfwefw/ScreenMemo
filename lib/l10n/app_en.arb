@@ -2597,5 +2597,116 @@
       "error": {}
     }
   },
+  "cloudBackupEntryTitle": "Baidu Netdisk backup",
+  "cloudBackupEntrySubtitle": "Automatically upload full ZIP backups to /apps/ScreenMemo.",
+  "cloudBackupTitle": "Baidu Netdisk backup",
+  "cloudBackupEnableTitle": "Enable automatic cloud backup",
+  "cloudBackupEnableSubtitle": "Backup type is full ZIP, off by default.",
+  "cloudBackupAllowMobileDataTitle": "Allow mobile data",
+  "cloudBackupAllowMobileDataSubtitle": "When off, background backup waits for Wi-Fi or an unmetered network.",
+  "cloudBackupFrequencyLabel": "Backup frequency (days)",
+  "cloudBackupFrequencyHelper": "Minimum 1 day. Default is 30 days.",
+  "cloudBackupKeepLatestLabel": "Keep latest backups",
+  "cloudBackupKeepLatestHelper": "Default is 3 full backups.",
+  "cloudBackupBaiduPlatformSection": "Baidu Netdisk Open Platform",
+  "cloudBackupKeyGuide": "Create an app in the Baidu Netdisk Open Platform, then copy AppKey and SecretKey from the app details. Set the app directory to ScreenMemo.",
+  "cloudBackupOpenDeveloperDocs": "Get AppKey/SecretKey",
+  "cloudBackupOpenDeveloperDocsShort": "Get Key",
+  "cloudBackupAppKeyLabel": "AppKey",
+  "cloudBackupSecretKeyLabel": "SecretKey",
+  "cloudBackupAuthorizationCodeLabel": "Authorization code",
+  "cloudBackupAuthorizationCodeHelper": "Open the authorization page, approve access, then paste the oob code here.",
+  "cloudBackupOpenAuthPage": "Open authorization page",
+  "cloudBackupExchangeCode": "Exchange code",
+  "cloudBackupTestConnection": "Test connection",
+  "cloudBackupDeviceId": "Device ID",
+  "cloudBackupLastAttempt": "Last attempt",
+  "cloudBackupLastSuccess": "Last success",
+  "cloudBackupLastStatus": "Latest status",
+  "cloudBackupSave": "Save settings",
+  "cloudBackupRunNow": "Back up now",
+  "cloudBackupNotAvailable": "Not available",
+  "cloudBackupNever": "Never",
+  "cloudBackupFrequencyInvalid": "Backup frequency must be at least 1 day.",
+  "cloudBackupKeepLatestInvalid": "Keep latest backups must be at least 1.",
+  "cloudBackupSettingsSaved": "Cloud backup settings saved.",
+  "cloudBackupAppKeyRequired": "Please enter AppKey first.",
+  "cloudBackupAppSecretRequired": "Please enter AppKey and SecretKey first.",
+  "cloudBackupAuthCodeRequired": "Please enter the authorization code first.",
+  "cloudBackupDeveloperDocsOpenFailed": "Unable to open the Baidu Netdisk Open Platform docs.",
+  "cloudBackupAuthPageOpenFailed": "Unable to open the authorization page.",
+  "cloudBackupAuthorizationComplete": "Authorization complete.",
+  "cloudBackupAuthorizationFailed": "Authorization failed.",
+  "cloudBackupAuthorizationFailedWithError": "Authorization failed: {error}",
+  "@cloudBackupAuthorizationFailedWithError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cloudBackupAuthorizationRequired": "Please complete authorization first.",
+  "cloudBackupConnectionSuccessful": "Connection successful.",
+  "cloudBackupConnectionFailed": "Connection failed.",
+  "cloudBackupConnectionFailedWithError": "Connection failed: {error}",
+  "@cloudBackupConnectionFailedWithError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cloudBackupBackupStarted": "Backup task started.",
+  "cloudBackupStartFailed": "Unable to start the backup task.",
+  "cloudBackupStartFailedWithError": "Unable to start the backup task: {error}",
+  "@cloudBackupStartFailedWithError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cloudBackupStatusRunning": "Running",
+  "cloudBackupStatusSkippedNotDue": "Skipped because it is not due yet",
+  "cloudBackupStatusAuthorizationRequired": "Reauthorization required",
+  "cloudBackupStatusSuccess": "Success: {detail}",
+  "@cloudBackupStatusSuccess": {
+    "placeholders": {
+      "detail": {}
+    }
+  },
+  "cloudBackupStatusFailed": "Failed: {detail}",
+  "@cloudBackupStatusFailed": {
+    "placeholders": {
+      "detail": {}
+    }
+  },
+  "cloudBackupStatusUnknown": "Unknown status: {detail}",
+  "@cloudBackupStatusUnknown": {
+    "placeholders": {
+      "detail": {}
+    }
+  },
+  "cloudBackupProgressTitle": "Backup progress",
+  "cloudBackupProgressPercent": "{percent}%",
+  "@cloudBackupProgressPercent": {
+    "placeholders": {
+      "percent": {}
+    }
+  },
+  "cloudBackupProgressBytes": "{done} / {total}",
+  "@cloudBackupProgressBytes": {
+    "placeholders": {
+      "done": {},
+      "total": {}
+    }
+  },
+  "cloudBackupProgressQueued": "Waiting for background task",
+  "cloudBackupProgressChecking": "Checking backup conditions",
+  "cloudBackupProgressPreparing": "Preparing backup",
+  "cloudBackupProgressZipping": "Packing ZIP",
+  "cloudBackupProgressRemoteFolder": "Preparing cloud folder",
+  "cloudBackupProgressPreparingUpload": "Preparing upload",
+  "cloudBackupProgressPrecreate": "Creating upload session",
+  "cloudBackupProgressUploading": "Uploading",
+  "cloudBackupProgressCreatingRemoteFile": "Creating cloud file",
+  "cloudBackupProgressCleanup": "Cleaning old backups",
+  "cloudBackupProgressFinished": "Backup complete",
+  "cloudBackupProgressFailed": "Backup failed",
+  "cloudBackupProgressDisabled": "Automatic cloud backup is off",
   "externalMcpConfigJsonLabel": "MCP config JSON"
 }

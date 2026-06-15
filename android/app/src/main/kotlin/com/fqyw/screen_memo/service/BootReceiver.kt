@@ -2,6 +2,7 @@ package com.fqyw.screen_memo.service
 
 import com.fqyw.screen_memo.capture.AccessibilityStateMonitor
 import com.fqyw.screen_memo.capture.ScreenCaptureService
+import com.fqyw.screen_memo.backup.CloudBackupScheduler
 import com.fqyw.screen_memo.daily.DailySummaryScheduler
 import com.fqyw.screen_memo.health.AppHealthNativeRecorder
 import com.fqyw.screen_memo.health.AppHealthScheduler
@@ -73,6 +74,13 @@ class BootReceiver : BroadcastReceiver() {
                     FileLogger.d(TAG, "App 运行状态调度已恢复")
                 } catch (e: Exception) {
                     FileLogger.e(TAG, "恢复 App 运行状态调度失败", e)
+                }
+
+                try {
+                    CloudBackupScheduler.reschedule(context)
+                    FileLogger.d(TAG, "自动云备份调度已恢复")
+                } catch (e: Exception) {
+                    FileLogger.e(TAG, "恢复自动云备份调度失败", e)
                 }
 
                 try {

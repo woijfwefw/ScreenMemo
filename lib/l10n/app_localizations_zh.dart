@@ -4673,5 +4673,233 @@ class AppLocalizationsZh extends AppLocalizations {
   String get externalMcpNoToolsSynced => '尚未同步工具。';
 
   @override
+  String get cloudBackupEntryTitle => '百度网盘备份';
+
+  @override
+  String get cloudBackupEntrySubtitle => '自动上传完整 ZIP 备份到 /apps/ScreenMemo。';
+
+  @override
+  String get cloudBackupTitle => '百度网盘备份';
+
+  @override
+  String get cloudBackupEnableTitle => '启用自动云备份';
+
+  @override
+  String get cloudBackupEnableSubtitle => '备份类型为完整 ZIP，默认关闭。';
+
+  @override
+  String get cloudBackupAllowMobileDataTitle => '允许使用移动流量';
+
+  @override
+  String get cloudBackupAllowMobileDataSubtitle => '关闭后，后台备份会等待 Wi-Fi 或非计费网络。';
+
+  @override
+  String get cloudBackupFrequencyLabel => '备份频率（天）';
+
+  @override
+  String get cloudBackupFrequencyHelper => '最小 1 天，默认 30 天。';
+
+  @override
+  String get cloudBackupKeepLatestLabel => '保留最近备份数';
+
+  @override
+  String get cloudBackupKeepLatestHelper => '默认保留 3 个完整备份。';
+
+  @override
+  String get cloudBackupBaiduPlatformSection => '百度网盘开放平台';
+
+  @override
+  String get cloudBackupKeyGuide =>
+      '请在百度网盘开放平台创建应用，然后从应用详情复制 AppKey 与 SecretKey。应用目录需要配置为 ScreenMemo。';
+
+  @override
+  String get cloudBackupOpenDeveloperDocs => '获取 AppKey/SecretKey';
+
+  @override
+  String get cloudBackupOpenDeveloperDocsShort => '获取 Key';
+
+  @override
+  String get cloudBackupAppKeyLabel => 'AppKey';
+
+  @override
+  String get cloudBackupSecretKeyLabel => 'SecretKey';
+
+  @override
+  String get cloudBackupAuthorizationCodeLabel => '授权码';
+
+  @override
+  String get cloudBackupAuthorizationCodeHelper =>
+      '打开授权页并同意授权后，将 oob code 粘贴到这里。';
+
+  @override
+  String get cloudBackupOpenAuthPage => '打开授权页';
+
+  @override
+  String get cloudBackupExchangeCode => '换取授权';
+
+  @override
+  String get cloudBackupTestConnection => '测试连接';
+
+  @override
+  String get cloudBackupDeviceId => '设备 ID';
+
+  @override
+  String get cloudBackupLastAttempt => '上次尝试';
+
+  @override
+  String get cloudBackupLastSuccess => '上次成功';
+
+  @override
+  String get cloudBackupLastStatus => '最近状态';
+
+  @override
+  String get cloudBackupSave => '保存设置';
+
+  @override
+  String get cloudBackupRunNow => '立即备份';
+
+  @override
+  String get cloudBackupNotAvailable => '暂无';
+
+  @override
+  String get cloudBackupNever => '从未';
+
+  @override
+  String get cloudBackupFrequencyInvalid => '备份频率至少为 1 天。';
+
+  @override
+  String get cloudBackupKeepLatestInvalid => '保留备份数至少为 1。';
+
+  @override
+  String get cloudBackupSettingsSaved => '云备份设置已保存。';
+
+  @override
+  String get cloudBackupAppKeyRequired => '请先填写 AppKey。';
+
+  @override
+  String get cloudBackupAppSecretRequired => '请先填写 AppKey 和 SecretKey。';
+
+  @override
+  String get cloudBackupAuthCodeRequired => '请先填写授权码。';
+
+  @override
+  String get cloudBackupDeveloperDocsOpenFailed => '无法打开百度网盘开放平台文档。';
+
+  @override
+  String get cloudBackupAuthPageOpenFailed => '无法打开授权页。';
+
+  @override
+  String get cloudBackupAuthorizationComplete => '授权已完成。';
+
+  @override
+  String get cloudBackupAuthorizationFailed => '授权失败。';
+
+  @override
+  String cloudBackupAuthorizationFailedWithError(Object error) {
+    return '授权失败：$error';
+  }
+
+  @override
+  String get cloudBackupAuthorizationRequired => '请先完成授权。';
+
+  @override
+  String get cloudBackupConnectionSuccessful => '连接成功。';
+
+  @override
+  String get cloudBackupConnectionFailed => '连接失败。';
+
+  @override
+  String cloudBackupConnectionFailedWithError(Object error) {
+    return '连接失败：$error';
+  }
+
+  @override
+  String get cloudBackupBackupStarted => '备份任务已启动。';
+
+  @override
+  String get cloudBackupStartFailed => '无法启动备份任务。';
+
+  @override
+  String cloudBackupStartFailedWithError(Object error) {
+    return '无法启动备份任务：$error';
+  }
+
+  @override
+  String get cloudBackupStatusRunning => '正在运行';
+
+  @override
+  String get cloudBackupStatusSkippedNotDue => '未到备份时间，已跳过';
+
+  @override
+  String get cloudBackupStatusAuthorizationRequired => '需要重新授权';
+
+  @override
+  String cloudBackupStatusSuccess(Object detail) {
+    return '成功：$detail';
+  }
+
+  @override
+  String cloudBackupStatusFailed(Object detail) {
+    return '失败：$detail';
+  }
+
+  @override
+  String cloudBackupStatusUnknown(Object detail) {
+    return '未知状态：$detail';
+  }
+
+  @override
+  String get cloudBackupProgressTitle => '备份进度';
+
+  @override
+  String cloudBackupProgressPercent(Object percent) {
+    return '$percent%';
+  }
+
+  @override
+  String cloudBackupProgressBytes(Object done, Object total) {
+    return '$done / $total';
+  }
+
+  @override
+  String get cloudBackupProgressQueued => '等待后台任务';
+
+  @override
+  String get cloudBackupProgressChecking => '检查备份条件';
+
+  @override
+  String get cloudBackupProgressPreparing => '准备备份';
+
+  @override
+  String get cloudBackupProgressZipping => '正在打包 ZIP';
+
+  @override
+  String get cloudBackupProgressRemoteFolder => '正在准备云端目录';
+
+  @override
+  String get cloudBackupProgressPreparingUpload => '正在准备上传';
+
+  @override
+  String get cloudBackupProgressPrecreate => '正在创建上传会话';
+
+  @override
+  String get cloudBackupProgressUploading => '正在上传';
+
+  @override
+  String get cloudBackupProgressCreatingRemoteFile => '正在创建云端文件';
+
+  @override
+  String get cloudBackupProgressCleanup => '正在清理旧备份';
+
+  @override
+  String get cloudBackupProgressFinished => '备份完成';
+
+  @override
+  String get cloudBackupProgressFailed => '备份失败';
+
+  @override
+  String get cloudBackupProgressDisabled => '自动云备份已关闭';
+
+  @override
   String get externalMcpConfigJsonLabel => 'MCP 配置 JSON';
 }

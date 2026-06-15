@@ -28,6 +28,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:screen_memo/features/settings/presentation/pages/nsfw_settings_page.dart';
 import 'package:screen_memo/features/storage_analysis/presentation/pages/storage_analysis_page.dart';
 import 'package:screen_memo/features/backup/presentation/pages/import_diagnostics_page.dart';
+import 'package:screen_memo/features/backup/presentation/pages/cloud_backup_settings_page.dart';
 import 'package:screen_memo/features/backup/presentation/pages/export_backup_page.dart';
 import 'package:screen_memo/features/daily_summary/application/daily_summary_service.dart';
 import 'package:screen_memo/features/diagnostics/application/log_export_service.dart';

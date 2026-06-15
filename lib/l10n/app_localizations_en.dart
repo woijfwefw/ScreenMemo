@@ -4825,5 +4825,245 @@ class AppLocalizationsEn extends AppLocalizations {
   String get externalMcpNoToolsSynced => 'No tools synced yet.';
 
   @override
+  String get cloudBackupEntryTitle => 'Baidu Netdisk backup';
+
+  @override
+  String get cloudBackupEntrySubtitle =>
+      'Automatically upload full ZIP backups to /apps/ScreenMemo.';
+
+  @override
+  String get cloudBackupTitle => 'Baidu Netdisk backup';
+
+  @override
+  String get cloudBackupEnableTitle => 'Enable automatic cloud backup';
+
+  @override
+  String get cloudBackupEnableSubtitle =>
+      'Backup type is full ZIP, off by default.';
+
+  @override
+  String get cloudBackupAllowMobileDataTitle => 'Allow mobile data';
+
+  @override
+  String get cloudBackupAllowMobileDataSubtitle =>
+      'When off, background backup waits for Wi-Fi or an unmetered network.';
+
+  @override
+  String get cloudBackupFrequencyLabel => 'Backup frequency (days)';
+
+  @override
+  String get cloudBackupFrequencyHelper => 'Minimum 1 day. Default is 30 days.';
+
+  @override
+  String get cloudBackupKeepLatestLabel => 'Keep latest backups';
+
+  @override
+  String get cloudBackupKeepLatestHelper => 'Default is 3 full backups.';
+
+  @override
+  String get cloudBackupBaiduPlatformSection => 'Baidu Netdisk Open Platform';
+
+  @override
+  String get cloudBackupKeyGuide =>
+      'Create an app in the Baidu Netdisk Open Platform, then copy AppKey and SecretKey from the app details. Set the app directory to ScreenMemo.';
+
+  @override
+  String get cloudBackupOpenDeveloperDocs => 'Get AppKey/SecretKey';
+
+  @override
+  String get cloudBackupOpenDeveloperDocsShort => 'Get Key';
+
+  @override
+  String get cloudBackupAppKeyLabel => 'AppKey';
+
+  @override
+  String get cloudBackupSecretKeyLabel => 'SecretKey';
+
+  @override
+  String get cloudBackupAuthorizationCodeLabel => 'Authorization code';
+
+  @override
+  String get cloudBackupAuthorizationCodeHelper =>
+      'Open the authorization page, approve access, then paste the oob code here.';
+
+  @override
+  String get cloudBackupOpenAuthPage => 'Open authorization page';
+
+  @override
+  String get cloudBackupExchangeCode => 'Exchange code';
+
+  @override
+  String get cloudBackupTestConnection => 'Test connection';
+
+  @override
+  String get cloudBackupDeviceId => 'Device ID';
+
+  @override
+  String get cloudBackupLastAttempt => 'Last attempt';
+
+  @override
+  String get cloudBackupLastSuccess => 'Last success';
+
+  @override
+  String get cloudBackupLastStatus => 'Latest status';
+
+  @override
+  String get cloudBackupSave => 'Save settings';
+
+  @override
+  String get cloudBackupRunNow => 'Back up now';
+
+  @override
+  String get cloudBackupNotAvailable => 'Not available';
+
+  @override
+  String get cloudBackupNever => 'Never';
+
+  @override
+  String get cloudBackupFrequencyInvalid =>
+      'Backup frequency must be at least 1 day.';
+
+  @override
+  String get cloudBackupKeepLatestInvalid =>
+      'Keep latest backups must be at least 1.';
+
+  @override
+  String get cloudBackupSettingsSaved => 'Cloud backup settings saved.';
+
+  @override
+  String get cloudBackupAppKeyRequired => 'Please enter AppKey first.';
+
+  @override
+  String get cloudBackupAppSecretRequired =>
+      'Please enter AppKey and SecretKey first.';
+
+  @override
+  String get cloudBackupAuthCodeRequired =>
+      'Please enter the authorization code first.';
+
+  @override
+  String get cloudBackupDeveloperDocsOpenFailed =>
+      'Unable to open the Baidu Netdisk Open Platform docs.';
+
+  @override
+  String get cloudBackupAuthPageOpenFailed =>
+      'Unable to open the authorization page.';
+
+  @override
+  String get cloudBackupAuthorizationComplete => 'Authorization complete.';
+
+  @override
+  String get cloudBackupAuthorizationFailed => 'Authorization failed.';
+
+  @override
+  String cloudBackupAuthorizationFailedWithError(Object error) {
+    return 'Authorization failed: $error';
+  }
+
+  @override
+  String get cloudBackupAuthorizationRequired =>
+      'Please complete authorization first.';
+
+  @override
+  String get cloudBackupConnectionSuccessful => 'Connection successful.';
+
+  @override
+  String get cloudBackupConnectionFailed => 'Connection failed.';
+
+  @override
+  String cloudBackupConnectionFailedWithError(Object error) {
+    return 'Connection failed: $error';
+  }
+
+  @override
+  String get cloudBackupBackupStarted => 'Backup task started.';
+
+  @override
+  String get cloudBackupStartFailed => 'Unable to start the backup task.';
+
+  @override
+  String cloudBackupStartFailedWithError(Object error) {
+    return 'Unable to start the backup task: $error';
+  }
+
+  @override
+  String get cloudBackupStatusRunning => 'Running';
+
+  @override
+  String get cloudBackupStatusSkippedNotDue =>
+      'Skipped because it is not due yet';
+
+  @override
+  String get cloudBackupStatusAuthorizationRequired =>
+      'Reauthorization required';
+
+  @override
+  String cloudBackupStatusSuccess(Object detail) {
+    return 'Success: $detail';
+  }
+
+  @override
+  String cloudBackupStatusFailed(Object detail) {
+    return 'Failed: $detail';
+  }
+
+  @override
+  String cloudBackupStatusUnknown(Object detail) {
+    return 'Unknown status: $detail';
+  }
+
+  @override
+  String get cloudBackupProgressTitle => 'Backup progress';
+
+  @override
+  String cloudBackupProgressPercent(Object percent) {
+    return '$percent%';
+  }
+
+  @override
+  String cloudBackupProgressBytes(Object done, Object total) {
+    return '$done / $total';
+  }
+
+  @override
+  String get cloudBackupProgressQueued => 'Waiting for background task';
+
+  @override
+  String get cloudBackupProgressChecking => 'Checking backup conditions';
+
+  @override
+  String get cloudBackupProgressPreparing => 'Preparing backup';
+
+  @override
+  String get cloudBackupProgressZipping => 'Packing ZIP';
+
+  @override
+  String get cloudBackupProgressRemoteFolder => 'Preparing cloud folder';
+
+  @override
+  String get cloudBackupProgressPreparingUpload => 'Preparing upload';
+
+  @override
+  String get cloudBackupProgressPrecreate => 'Creating upload session';
+
+  @override
+  String get cloudBackupProgressUploading => 'Uploading';
+
+  @override
+  String get cloudBackupProgressCreatingRemoteFile => 'Creating cloud file';
+
+  @override
+  String get cloudBackupProgressCleanup => 'Cleaning old backups';
+
+  @override
+  String get cloudBackupProgressFinished => 'Backup complete';
+
+  @override
+  String get cloudBackupProgressFailed => 'Backup failed';
+
+  @override
+  String get cloudBackupProgressDisabled => 'Automatic cloud backup is off';
+
+  @override
   String get externalMcpConfigJsonLabel => 'MCP config JSON';
 }

@@ -4722,5 +4722,236 @@ class AppLocalizationsJa extends AppLocalizations {
   String get externalMcpNoToolsSynced => 'まだツールは同期されていません。';
 
   @override
+  String get cloudBackupEntryTitle => 'Baidu Netdisk バックアップ';
+
+  @override
+  String get cloudBackupEntrySubtitle =>
+      '完全 ZIP バックアップを /apps/ScreenMemo へ自動アップロードします。';
+
+  @override
+  String get cloudBackupTitle => 'Baidu Netdisk バックアップ';
+
+  @override
+  String get cloudBackupEnableTitle => '自動クラウドバックアップを有効化';
+
+  @override
+  String get cloudBackupEnableSubtitle => 'バックアップ形式は完全 ZIP です。既定ではオフです。';
+
+  @override
+  String get cloudBackupAllowMobileDataTitle => 'モバイルデータ通信を許可';
+
+  @override
+  String get cloudBackupAllowMobileDataSubtitle =>
+      'オフの場合、バックグラウンドバックアップは Wi-Fi または従量課金でないネットワークを待ちます。';
+
+  @override
+  String get cloudBackupFrequencyLabel => 'バックアップ頻度（日）';
+
+  @override
+  String get cloudBackupFrequencyHelper => '最小 1 日。既定は 30 日です。';
+
+  @override
+  String get cloudBackupKeepLatestLabel => '保持する最新バックアップ数';
+
+  @override
+  String get cloudBackupKeepLatestHelper => '既定では完全バックアップを 3 個保持します。';
+
+  @override
+  String get cloudBackupBaiduPlatformSection => 'Baidu Netdisk Open Platform';
+
+  @override
+  String get cloudBackupKeyGuide =>
+      'Baidu Netdisk Open Platform でアプリを作成し、アプリ詳細から AppKey と SecretKey をコピーしてください。アプリディレクトリは ScreenMemo に設定してください。';
+
+  @override
+  String get cloudBackupOpenDeveloperDocs => 'AppKey/SecretKey を取得';
+
+  @override
+  String get cloudBackupOpenDeveloperDocsShort => 'Key を取得';
+
+  @override
+  String get cloudBackupAppKeyLabel => 'AppKey';
+
+  @override
+  String get cloudBackupSecretKeyLabel => 'SecretKey';
+
+  @override
+  String get cloudBackupAuthorizationCodeLabel => '認可コード';
+
+  @override
+  String get cloudBackupAuthorizationCodeHelper =>
+      '認可ページを開いて許可した後、oob code をここに貼り付けてください。';
+
+  @override
+  String get cloudBackupOpenAuthPage => '認可ページを開く';
+
+  @override
+  String get cloudBackupExchangeCode => 'コードを交換';
+
+  @override
+  String get cloudBackupTestConnection => '接続をテスト';
+
+  @override
+  String get cloudBackupDeviceId => 'デバイス ID';
+
+  @override
+  String get cloudBackupLastAttempt => '前回の試行';
+
+  @override
+  String get cloudBackupLastSuccess => '前回の成功';
+
+  @override
+  String get cloudBackupLastStatus => '最新ステータス';
+
+  @override
+  String get cloudBackupSave => '設定を保存';
+
+  @override
+  String get cloudBackupRunNow => '今すぐバックアップ';
+
+  @override
+  String get cloudBackupNotAvailable => '利用不可';
+
+  @override
+  String get cloudBackupNever => '未実行';
+
+  @override
+  String get cloudBackupFrequencyInvalid => 'バックアップ頻度は 1 日以上にしてください。';
+
+  @override
+  String get cloudBackupKeepLatestInvalid => '保持するバックアップ数は 1 以上にしてください。';
+
+  @override
+  String get cloudBackupSettingsSaved => 'クラウドバックアップ設定を保存しました。';
+
+  @override
+  String get cloudBackupAppKeyRequired => '先に AppKey を入力してください。';
+
+  @override
+  String get cloudBackupAppSecretRequired => '先に AppKey と SecretKey を入力してください。';
+
+  @override
+  String get cloudBackupAuthCodeRequired => '先に認可コードを入力してください。';
+
+  @override
+  String get cloudBackupDeveloperDocsOpenFailed =>
+      'Baidu Netdisk Open Platform のドキュメントを開けませんでした。';
+
+  @override
+  String get cloudBackupAuthPageOpenFailed => '認可ページを開けませんでした。';
+
+  @override
+  String get cloudBackupAuthorizationComplete => '認可が完了しました。';
+
+  @override
+  String get cloudBackupAuthorizationFailed => '認可に失敗しました。';
+
+  @override
+  String cloudBackupAuthorizationFailedWithError(Object error) {
+    return '認可に失敗しました：$error';
+  }
+
+  @override
+  String get cloudBackupAuthorizationRequired => '先に認可を完了してください。';
+
+  @override
+  String get cloudBackupConnectionSuccessful => '接続に成功しました。';
+
+  @override
+  String get cloudBackupConnectionFailed => '接続に失敗しました。';
+
+  @override
+  String cloudBackupConnectionFailedWithError(Object error) {
+    return '接続に失敗しました：$error';
+  }
+
+  @override
+  String get cloudBackupBackupStarted => 'バックアップタスクを開始しました。';
+
+  @override
+  String get cloudBackupStartFailed => 'バックアップタスクを開始できませんでした。';
+
+  @override
+  String cloudBackupStartFailedWithError(Object error) {
+    return 'バックアップタスクを開始できませんでした：$error';
+  }
+
+  @override
+  String get cloudBackupStatusRunning => '実行中';
+
+  @override
+  String get cloudBackupStatusSkippedNotDue => 'まだ予定時刻ではないためスキップしました';
+
+  @override
+  String get cloudBackupStatusAuthorizationRequired => '再認可が必要です';
+
+  @override
+  String cloudBackupStatusSuccess(Object detail) {
+    return '成功：$detail';
+  }
+
+  @override
+  String cloudBackupStatusFailed(Object detail) {
+    return '失敗：$detail';
+  }
+
+  @override
+  String cloudBackupStatusUnknown(Object detail) {
+    return '不明なステータス：$detail';
+  }
+
+  @override
+  String get cloudBackupProgressTitle => 'バックアップ進捗';
+
+  @override
+  String cloudBackupProgressPercent(Object percent) {
+    return '$percent%';
+  }
+
+  @override
+  String cloudBackupProgressBytes(Object done, Object total) {
+    return '$done / $total';
+  }
+
+  @override
+  String get cloudBackupProgressQueued => 'バックグラウンドタスクを待機中';
+
+  @override
+  String get cloudBackupProgressChecking => 'バックアップ条件を確認中';
+
+  @override
+  String get cloudBackupProgressPreparing => 'バックアップを準備中';
+
+  @override
+  String get cloudBackupProgressZipping => 'ZIP を作成中';
+
+  @override
+  String get cloudBackupProgressRemoteFolder => 'クラウドフォルダーを準備中';
+
+  @override
+  String get cloudBackupProgressPreparingUpload => 'アップロードを準備中';
+
+  @override
+  String get cloudBackupProgressPrecreate => 'アップロードセッションを作成中';
+
+  @override
+  String get cloudBackupProgressUploading => 'アップロード中';
+
+  @override
+  String get cloudBackupProgressCreatingRemoteFile => 'クラウドファイルを作成中';
+
+  @override
+  String get cloudBackupProgressCleanup => '古いバックアップをクリーンアップ中';
+
+  @override
+  String get cloudBackupProgressFinished => 'バックアップ完了';
+
+  @override
+  String get cloudBackupProgressFailed => 'バックアップに失敗しました';
+
+  @override
+  String get cloudBackupProgressDisabled => '自動クラウドバックアップはオフです';
+
+  @override
   String get externalMcpConfigJsonLabel => 'MCP 設定 JSON';
 }

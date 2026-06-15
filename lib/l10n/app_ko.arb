@@ -2597,5 +2597,116 @@
       "error": {}
     }
   },
+  "cloudBackupEntryTitle": "Baidu Netdisk 백업",
+  "cloudBackupEntrySubtitle": "전체 ZIP 백업을 /apps/ScreenMemo에 자동 업로드합니다.",
+  "cloudBackupTitle": "Baidu Netdisk 백업",
+  "cloudBackupEnableTitle": "자동 클라우드 백업 사용",
+  "cloudBackupEnableSubtitle": "백업 형식은 전체 ZIP이며 기본값은 꺼짐입니다.",
+  "cloudBackupAllowMobileDataTitle": "모바일 데이터 허용",
+  "cloudBackupAllowMobileDataSubtitle": "끄면 백그라운드 백업은 Wi-Fi 또는 비종량제 네트워크를 기다립니다.",
+  "cloudBackupFrequencyLabel": "백업 주기(일)",
+  "cloudBackupFrequencyHelper": "최소 1일, 기본값은 30일입니다.",
+  "cloudBackupKeepLatestLabel": "최근 백업 보관 수",
+  "cloudBackupKeepLatestHelper": "기본적으로 전체 백업 3개를 보관합니다.",
+  "cloudBackupBaiduPlatformSection": "Baidu Netdisk Open Platform",
+  "cloudBackupKeyGuide": "Baidu Netdisk Open Platform에서 앱을 만든 뒤 앱 상세 정보에서 AppKey와 SecretKey를 복사하세요. 앱 디렉터리는 ScreenMemo로 설정해야 합니다.",
+  "cloudBackupOpenDeveloperDocs": "AppKey/SecretKey 받기",
+  "cloudBackupOpenDeveloperDocsShort": "Key 받기",
+  "cloudBackupAppKeyLabel": "AppKey",
+  "cloudBackupSecretKeyLabel": "SecretKey",
+  "cloudBackupAuthorizationCodeLabel": "인증 코드",
+  "cloudBackupAuthorizationCodeHelper": "인증 페이지를 열고 권한을 허용한 뒤 oob code를 여기에 붙여 넣으세요.",
+  "cloudBackupOpenAuthPage": "인증 페이지 열기",
+  "cloudBackupExchangeCode": "코드 교환",
+  "cloudBackupTestConnection": "연결 테스트",
+  "cloudBackupDeviceId": "기기 ID",
+  "cloudBackupLastAttempt": "마지막 시도",
+  "cloudBackupLastSuccess": "마지막 성공",
+  "cloudBackupLastStatus": "최근 상태",
+  "cloudBackupSave": "설정 저장",
+  "cloudBackupRunNow": "지금 백업",
+  "cloudBackupNotAvailable": "없음",
+  "cloudBackupNever": "없음",
+  "cloudBackupFrequencyInvalid": "백업 주기는 최소 1일이어야 합니다.",
+  "cloudBackupKeepLatestInvalid": "보관할 백업 수는 최소 1개여야 합니다.",
+  "cloudBackupSettingsSaved": "클라우드 백업 설정을 저장했습니다.",
+  "cloudBackupAppKeyRequired": "먼저 AppKey를 입력하세요.",
+  "cloudBackupAppSecretRequired": "먼저 AppKey와 SecretKey를 입력하세요.",
+  "cloudBackupAuthCodeRequired": "먼저 인증 코드를 입력하세요.",
+  "cloudBackupDeveloperDocsOpenFailed": "Baidu Netdisk Open Platform 문서를 열 수 없습니다.",
+  "cloudBackupAuthPageOpenFailed": "인증 페이지를 열 수 없습니다.",
+  "cloudBackupAuthorizationComplete": "인증이 완료되었습니다.",
+  "cloudBackupAuthorizationFailed": "인증에 실패했습니다.",
+  "cloudBackupAuthorizationFailedWithError": "인증 실패: {error}",
+  "@cloudBackupAuthorizationFailedWithError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cloudBackupAuthorizationRequired": "먼저 인증을 완료하세요.",
+  "cloudBackupConnectionSuccessful": "연결에 성공했습니다.",
+  "cloudBackupConnectionFailed": "연결에 실패했습니다.",
+  "cloudBackupConnectionFailedWithError": "연결 실패: {error}",
+  "@cloudBackupConnectionFailedWithError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cloudBackupBackupStarted": "백업 작업을 시작했습니다.",
+  "cloudBackupStartFailed": "백업 작업을 시작할 수 없습니다.",
+  "cloudBackupStartFailedWithError": "백업 작업 시작 실패: {error}",
+  "@cloudBackupStartFailedWithError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cloudBackupStatusRunning": "실행 중",
+  "cloudBackupStatusSkippedNotDue": "아직 백업 시간이 아니어서 건너뜀",
+  "cloudBackupStatusAuthorizationRequired": "재인증 필요",
+  "cloudBackupStatusSuccess": "성공: {detail}",
+  "@cloudBackupStatusSuccess": {
+    "placeholders": {
+      "detail": {}
+    }
+  },
+  "cloudBackupStatusFailed": "실패: {detail}",
+  "@cloudBackupStatusFailed": {
+    "placeholders": {
+      "detail": {}
+    }
+  },
+  "cloudBackupStatusUnknown": "알 수 없는 상태: {detail}",
+  "@cloudBackupStatusUnknown": {
+    "placeholders": {
+      "detail": {}
+    }
+  },
+  "cloudBackupProgressTitle": "백업 진행률",
+  "cloudBackupProgressPercent": "{percent}%",
+  "@cloudBackupProgressPercent": {
+    "placeholders": {
+      "percent": {}
+    }
+  },
+  "cloudBackupProgressBytes": "{done} / {total}",
+  "@cloudBackupProgressBytes": {
+    "placeholders": {
+      "done": {},
+      "total": {}
+    }
+  },
+  "cloudBackupProgressQueued": "백그라운드 작업 대기 중",
+  "cloudBackupProgressChecking": "백업 조건 확인 중",
+  "cloudBackupProgressPreparing": "백업 준비 중",
+  "cloudBackupProgressZipping": "ZIP 생성 중",
+  "cloudBackupProgressRemoteFolder": "클라우드 폴더 준비 중",
+  "cloudBackupProgressPreparingUpload": "업로드 준비 중",
+  "cloudBackupProgressPrecreate": "업로드 세션 생성 중",
+  "cloudBackupProgressUploading": "업로드 중",
+  "cloudBackupProgressCreatingRemoteFile": "클라우드 파일 생성 중",
+  "cloudBackupProgressCleanup": "오래된 백업 정리 중",
+  "cloudBackupProgressFinished": "백업 완료",
+  "cloudBackupProgressFailed": "백업 실패",
+  "cloudBackupProgressDisabled": "자동 클라우드 백업이 꺼져 있습니다",
   "externalMcpConfigJsonLabel": "MCP 설정 JSON"
 }

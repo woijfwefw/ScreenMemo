@@ -8399,6 +8399,426 @@ abstract class AppLocalizations {
   /// **'No tools synced yet.'**
   String get externalMcpNoToolsSynced;
 
+  /// No description provided for @cloudBackupEntryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Baidu Netdisk backup'**
+  String get cloudBackupEntryTitle;
+
+  /// No description provided for @cloudBackupEntrySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically upload full ZIP backups to /apps/ScreenMemo.'**
+  String get cloudBackupEntrySubtitle;
+
+  /// No description provided for @cloudBackupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Baidu Netdisk backup'**
+  String get cloudBackupTitle;
+
+  /// No description provided for @cloudBackupEnableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable automatic cloud backup'**
+  String get cloudBackupEnableTitle;
+
+  /// No description provided for @cloudBackupEnableSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup type is full ZIP, off by default.'**
+  String get cloudBackupEnableSubtitle;
+
+  /// No description provided for @cloudBackupAllowMobileDataTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow mobile data'**
+  String get cloudBackupAllowMobileDataTitle;
+
+  /// No description provided for @cloudBackupAllowMobileDataSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When off, background backup waits for Wi-Fi or an unmetered network.'**
+  String get cloudBackupAllowMobileDataSubtitle;
+
+  /// No description provided for @cloudBackupFrequencyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup frequency (days)'**
+  String get cloudBackupFrequencyLabel;
+
+  /// No description provided for @cloudBackupFrequencyHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum 1 day. Default is 30 days.'**
+  String get cloudBackupFrequencyHelper;
+
+  /// No description provided for @cloudBackupKeepLatestLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep latest backups'**
+  String get cloudBackupKeepLatestLabel;
+
+  /// No description provided for @cloudBackupKeepLatestHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Default is 3 full backups.'**
+  String get cloudBackupKeepLatestHelper;
+
+  /// No description provided for @cloudBackupBaiduPlatformSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Baidu Netdisk Open Platform'**
+  String get cloudBackupBaiduPlatformSection;
+
+  /// No description provided for @cloudBackupKeyGuide.
+  ///
+  /// In en, this message translates to:
+  /// **'Create an app in the Baidu Netdisk Open Platform, then copy AppKey and SecretKey from the app details. Set the app directory to ScreenMemo.'**
+  String get cloudBackupKeyGuide;
+
+  /// No description provided for @cloudBackupOpenDeveloperDocs.
+  ///
+  /// In en, this message translates to:
+  /// **'Get AppKey/SecretKey'**
+  String get cloudBackupOpenDeveloperDocs;
+
+  /// No description provided for @cloudBackupOpenDeveloperDocsShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Get Key'**
+  String get cloudBackupOpenDeveloperDocsShort;
+
+  /// No description provided for @cloudBackupAppKeyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'AppKey'**
+  String get cloudBackupAppKeyLabel;
+
+  /// No description provided for @cloudBackupSecretKeyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'SecretKey'**
+  String get cloudBackupSecretKeyLabel;
+
+  /// No description provided for @cloudBackupAuthorizationCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization code'**
+  String get cloudBackupAuthorizationCodeLabel;
+
+  /// No description provided for @cloudBackupAuthorizationCodeHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the authorization page, approve access, then paste the oob code here.'**
+  String get cloudBackupAuthorizationCodeHelper;
+
+  /// No description provided for @cloudBackupOpenAuthPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Open authorization page'**
+  String get cloudBackupOpenAuthPage;
+
+  /// No description provided for @cloudBackupExchangeCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Exchange code'**
+  String get cloudBackupExchangeCode;
+
+  /// No description provided for @cloudBackupTestConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Test connection'**
+  String get cloudBackupTestConnection;
+
+  /// No description provided for @cloudBackupDeviceId.
+  ///
+  /// In en, this message translates to:
+  /// **'Device ID'**
+  String get cloudBackupDeviceId;
+
+  /// No description provided for @cloudBackupLastAttempt.
+  ///
+  /// In en, this message translates to:
+  /// **'Last attempt'**
+  String get cloudBackupLastAttempt;
+
+  /// No description provided for @cloudBackupLastSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Last success'**
+  String get cloudBackupLastSuccess;
+
+  /// No description provided for @cloudBackupLastStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest status'**
+  String get cloudBackupLastStatus;
+
+  /// No description provided for @cloudBackupSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save settings'**
+  String get cloudBackupSave;
+
+  /// No description provided for @cloudBackupRunNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Back up now'**
+  String get cloudBackupRunNow;
+
+  /// No description provided for @cloudBackupNotAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Not available'**
+  String get cloudBackupNotAvailable;
+
+  /// No description provided for @cloudBackupNever.
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get cloudBackupNever;
+
+  /// No description provided for @cloudBackupFrequencyInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup frequency must be at least 1 day.'**
+  String get cloudBackupFrequencyInvalid;
+
+  /// No description provided for @cloudBackupKeepLatestInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep latest backups must be at least 1.'**
+  String get cloudBackupKeepLatestInvalid;
+
+  /// No description provided for @cloudBackupSettingsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud backup settings saved.'**
+  String get cloudBackupSettingsSaved;
+
+  /// No description provided for @cloudBackupAppKeyRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter AppKey first.'**
+  String get cloudBackupAppKeyRequired;
+
+  /// No description provided for @cloudBackupAppSecretRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter AppKey and SecretKey first.'**
+  String get cloudBackupAppSecretRequired;
+
+  /// No description provided for @cloudBackupAuthCodeRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter the authorization code first.'**
+  String get cloudBackupAuthCodeRequired;
+
+  /// No description provided for @cloudBackupDeveloperDocsOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to open the Baidu Netdisk Open Platform docs.'**
+  String get cloudBackupDeveloperDocsOpenFailed;
+
+  /// No description provided for @cloudBackupAuthPageOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to open the authorization page.'**
+  String get cloudBackupAuthPageOpenFailed;
+
+  /// No description provided for @cloudBackupAuthorizationComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization complete.'**
+  String get cloudBackupAuthorizationComplete;
+
+  /// No description provided for @cloudBackupAuthorizationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization failed.'**
+  String get cloudBackupAuthorizationFailed;
+
+  /// No description provided for @cloudBackupAuthorizationFailedWithError.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization failed: {error}'**
+  String cloudBackupAuthorizationFailedWithError(Object error);
+
+  /// No description provided for @cloudBackupAuthorizationRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please complete authorization first.'**
+  String get cloudBackupAuthorizationRequired;
+
+  /// No description provided for @cloudBackupConnectionSuccessful.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection successful.'**
+  String get cloudBackupConnectionSuccessful;
+
+  /// No description provided for @cloudBackupConnectionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection failed.'**
+  String get cloudBackupConnectionFailed;
+
+  /// No description provided for @cloudBackupConnectionFailedWithError.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection failed: {error}'**
+  String cloudBackupConnectionFailedWithError(Object error);
+
+  /// No description provided for @cloudBackupBackupStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup task started.'**
+  String get cloudBackupBackupStarted;
+
+  /// No description provided for @cloudBackupStartFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to start the backup task.'**
+  String get cloudBackupStartFailed;
+
+  /// No description provided for @cloudBackupStartFailedWithError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to start the backup task: {error}'**
+  String cloudBackupStartFailedWithError(Object error);
+
+  /// No description provided for @cloudBackupStatusRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Running'**
+  String get cloudBackupStatusRunning;
+
+  /// No description provided for @cloudBackupStatusSkippedNotDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped because it is not due yet'**
+  String get cloudBackupStatusSkippedNotDue;
+
+  /// No description provided for @cloudBackupStatusAuthorizationRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Reauthorization required'**
+  String get cloudBackupStatusAuthorizationRequired;
+
+  /// No description provided for @cloudBackupStatusSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Success: {detail}'**
+  String cloudBackupStatusSuccess(Object detail);
+
+  /// No description provided for @cloudBackupStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed: {detail}'**
+  String cloudBackupStatusFailed(Object detail);
+
+  /// No description provided for @cloudBackupStatusUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown status: {detail}'**
+  String cloudBackupStatusUnknown(Object detail);
+
+  /// No description provided for @cloudBackupProgressTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup progress'**
+  String get cloudBackupProgressTitle;
+
+  /// No description provided for @cloudBackupProgressPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}%'**
+  String cloudBackupProgressPercent(Object percent);
+
+  /// No description provided for @cloudBackupProgressBytes.
+  ///
+  /// In en, this message translates to:
+  /// **'{done} / {total}'**
+  String cloudBackupProgressBytes(Object done, Object total);
+
+  /// No description provided for @cloudBackupProgressQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for background task'**
+  String get cloudBackupProgressQueued;
+
+  /// No description provided for @cloudBackupProgressChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking backup conditions'**
+  String get cloudBackupProgressChecking;
+
+  /// No description provided for @cloudBackupProgressPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing backup'**
+  String get cloudBackupProgressPreparing;
+
+  /// No description provided for @cloudBackupProgressZipping.
+  ///
+  /// In en, this message translates to:
+  /// **'Packing ZIP'**
+  String get cloudBackupProgressZipping;
+
+  /// No description provided for @cloudBackupProgressRemoteFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing cloud folder'**
+  String get cloudBackupProgressRemoteFolder;
+
+  /// No description provided for @cloudBackupProgressPreparingUpload.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing upload'**
+  String get cloudBackupProgressPreparingUpload;
+
+  /// No description provided for @cloudBackupProgressPrecreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating upload session'**
+  String get cloudBackupProgressPrecreate;
+
+  /// No description provided for @cloudBackupProgressUploading.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading'**
+  String get cloudBackupProgressUploading;
+
+  /// No description provided for @cloudBackupProgressCreatingRemoteFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating cloud file'**
+  String get cloudBackupProgressCreatingRemoteFile;
+
+  /// No description provided for @cloudBackupProgressCleanup.
+  ///
+  /// In en, this message translates to:
+  /// **'Cleaning old backups'**
+  String get cloudBackupProgressCleanup;
+
+  /// No description provided for @cloudBackupProgressFinished.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup complete'**
+  String get cloudBackupProgressFinished;
+
+  /// No description provided for @cloudBackupProgressFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup failed'**
+  String get cloudBackupProgressFailed;
+
+  /// No description provided for @cloudBackupProgressDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic cloud backup is off'**
+  String get cloudBackupProgressDisabled;
+
   /// No description provided for @externalMcpConfigJsonLabel.
   ///
   /// In en, this message translates to:

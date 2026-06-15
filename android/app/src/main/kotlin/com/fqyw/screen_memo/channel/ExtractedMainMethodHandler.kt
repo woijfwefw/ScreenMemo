@@ -8,6 +8,9 @@ import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
 import androidx.core.content.FileProvider
 import com.fqyw.screen_memo.settings.AISettingsNative
+import com.fqyw.screen_memo.backup.BaiduNetdiskClient
+import com.fqyw.screen_memo.backup.CloudBackupProgressStore
+import com.fqyw.screen_memo.backup.CloudBackupScheduler
 import com.fqyw.screen_memo.capture.AccessibilityServiceWatchdog
 import com.fqyw.screen_memo.daily.DailySummaryNotifier
 import com.fqyw.screen_memo.daily.DailySummaryScheduler
@@ -30,6 +33,7 @@ import com.fqyw.screen_memo.storage.StorageAnalyzer
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.util.UUID
 
 class ExtractedMainMethodHandler(
     private val activity: MainActivity,
@@ -99,6 +103,11 @@ class ExtractedMainMethodHandler(
             "showSimpleNotification" -> showSimpleNotification(call, result)
             "showNotification" -> showNotification(call, result)
             "scheduleDailySummaryNotification" -> scheduleDailySummaryNotification(call, result)
+            "baiduCloudBackupExchangeCode" -> baiduCloudBackupExchangeCode(call, result)
+            "baiduCloudBackupTestConnection" -> baiduCloudBackupTestConnection(result)
+            "baiduCloudBackupRunNow" -> baiduCloudBackupRunNow(result)
+            "baiduCloudBackupReschedule" -> baiduCloudBackupReschedule(result)
+            "baiduCloudBackupGetStatus" -> baiduCloudBackupGetStatus(result)
             "openAppNotificationSettings" -> openAppNotificationSettings(result)
             "openDailySummaryNotificationSettings" -> openDailySummaryNotificationSettings(result)
             "openExactAlarmSettings" -> openExactAlarmSettings(result)
@@ -767,6 +776,103 @@ class ExtractedMainMethodHandler(
         } catch (e: Exception) {
             result.error("schedule_failed", e.message, null)
         }
+    }
+
+    private fun baiduCloudBackupExchangeCode(call: MethodCall, result: MethodChannel.Result) {
+        val code = call.argument<String>("code")?.trim().orEmpty()
+        if (code.isBlank()) {
+            result.error("invalid_args", "Authorization code is required.", null)
+            return
+        }
+        Thread {
+            try {
+                val token = BaiduNetdiskClient(activity.applicationContext).exchangeCode(code)
+                val map = mapOf(
+                    "ok" to true,
+                    "expiresAt" to token.expiresAtMillis,
+                )
+                activity.runOnUiThread { result.success(map) }
+            } catch (e: Exception) {
+                FileLogger.e(tag, "百度网盘授权码换 token 失败", e)
+                activity.runOnUiThread {
+                    result.success(mapOf("ok" to false, "error" to (e.message ?: "Authorization failed.")))
+                }
+            }
+        }.start()
+    }
+
+    private fun baiduCloudBackupTestConnection(result: MethodChannel.Result) {
+        Thread {
+            try {
+                val deviceId = ensureCloudBackupDeviceId()
+                val map = BaiduNetdiskClient(activity.applicationContext).testConnection(deviceId)
+                activity.runOnUiThread { result.success(map) }
+            } catch (e: Exception) {
+                FileLogger.e(tag, "百度网盘连接测试失败", e)
+                activity.runOnUiThread {
+                    result.success(mapOf("ok" to false, "error" to (e.message ?: "Connection failed.")))
+                }
+            }
+        }.start()
+    }
+
+    private fun baiduCloudBackupRunNow(result: MethodChannel.Result) {
+        try {
+            val map = CloudBackupScheduler.enqueueRunNow(activity.applicationContext)
+            result.success(map)
+        } catch (e: Exception) {
+            FileLogger.e(tag, "立即云备份入队失败", e)
+            result.success(mapOf("ok" to false, "error" to (e.message ?: "Failed to start backup.")))
+        }
+    }
+
+    private fun baiduCloudBackupReschedule(result: MethodChannel.Result) {
+        try {
+            val map = CloudBackupScheduler.reschedule(activity.applicationContext)
+            result.success(map)
+        } catch (e: Exception) {
+            FileLogger.e(tag, "重新调度云备份失败", e)
+            result.success(mapOf("ok" to false, "error" to (e.message ?: "Failed to reschedule backup.")))
+        }
+    }
+
+    private fun baiduCloudBackupGetStatus(result: MethodChannel.Result) {
+        try {
+            val ctx = activity.applicationContext
+            val map = mapOf(
+                "ok" to true,
+                "enabled" to UserSettingsStorage.getBoolean(ctx, UserSettingsKeysNative.CLOUD_BACKUP_ENABLED, false),
+                "frequencyDays" to UserSettingsStorage.getInt(ctx, UserSettingsKeysNative.CLOUD_BACKUP_FREQUENCY_DAYS, 30).coerceAtLeast(1),
+                "allowMobileData" to UserSettingsStorage.getBoolean(ctx, UserSettingsKeysNative.CLOUD_BACKUP_ALLOW_MOBILE_DATA, false),
+                "keepLatestCount" to UserSettingsStorage.getInt(ctx, UserSettingsKeysNative.CLOUD_BACKUP_KEEP_LATEST_COUNT, 3).coerceAtLeast(1),
+                "lastAttemptAt" to (UserSettingsStorage.getString(ctx, UserSettingsKeysNative.CLOUD_BACKUP_LAST_ATTEMPT_AT, "0")?.toLongOrNull() ?: 0L),
+                "lastSuccessAt" to (UserSettingsStorage.getString(ctx, UserSettingsKeysNative.CLOUD_BACKUP_LAST_SUCCESS_AT, "0")?.toLongOrNull() ?: 0L),
+                "lastStatus" to UserSettingsStorage.getString(ctx, UserSettingsKeysNative.CLOUD_BACKUP_LAST_STATUS, ""),
+                "deviceId" to ensureCloudBackupDeviceId(),
+                "progress" to CloudBackupProgressStore.read(ctx).asMap(),
+            )
+            result.success(map)
+        } catch (e: Exception) {
+            result.success(mapOf("ok" to false, "error" to (e.message ?: "Failed to read status.")))
+        }
+    }
+
+    private fun ensureCloudBackupDeviceId(): String {
+        val ctx = activity.applicationContext
+        val existing = UserSettingsStorage.getString(
+            ctx,
+            UserSettingsKeysNative.CLOUD_BACKUP_DEVICE_ID,
+            "",
+        ).orEmpty()
+        if (existing.isNotBlank()) return existing
+        val androidId = try {
+            Settings.Secure.getString(ctx.contentResolver, Settings.Secure.ANDROID_ID)
+        } catch (_: Exception) {
+            null
+        }
+        val generated = "android_" + (androidId?.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString())
+        UserSettingsStorage.putString(ctx, UserSettingsKeysNative.CLOUD_BACKUP_DEVICE_ID, generated)
+        return generated
     }
 
     private fun openAppNotificationSettings(result: MethodChannel.Result) {

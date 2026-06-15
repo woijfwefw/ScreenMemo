@@ -341,6 +341,7 @@ extension _SettingsLayoutPart on _SettingsPageState {
               context: context,
               children: [
                 _buildStorageAnalysisItem(context),
+                _buildCloudBackupItem(context),
                 _buildExportItem(context),
                 _buildImportItem(context),
                 _buildImportDiagnosticsItem(context),

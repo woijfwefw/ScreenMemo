@@ -1,6 +1,7 @@
 package com.fqyw.screen_memo
 
 import com.fqyw.screen_memo.app.AppContextProvider
+import com.fqyw.screen_memo.backup.CloudBackupScheduler
 import com.fqyw.screen_memo.daily.DailySummaryScheduler
 import com.fqyw.screen_memo.diagnostics.RuntimeDiagnostics
 import com.fqyw.screen_memo.dynamic.DynamicRebuildService
@@ -73,6 +74,13 @@ class ScreenMemoApplication : Application() {
             AppHealthNativeRecorder.recordSnapshot(this, "application_on_create")
         } catch (e: Exception) {
             FileLogger.w(TAG, "恢复 App 运行状态调度失败：${e.message}")
+        }
+
+        try {
+            CloudBackupScheduler.reschedule(this)
+            OutputFileLogger.info(this, TAG, "应用启动时已恢复自动云备份调度")
+        } catch (e: Exception) {
+            FileLogger.w(TAG, "恢复自动云备份调度失败：${e.message}")
         }
 
     }

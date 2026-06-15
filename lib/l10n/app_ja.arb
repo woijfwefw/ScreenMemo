@@ -2597,5 +2597,116 @@
       "error": {}
     }
   },
+  "cloudBackupEntryTitle": "Baidu Netdisk バックアップ",
+  "cloudBackupEntrySubtitle": "完全 ZIP バックアップを /apps/ScreenMemo へ自動アップロードします。",
+  "cloudBackupTitle": "Baidu Netdisk バックアップ",
+  "cloudBackupEnableTitle": "自動クラウドバックアップを有効化",
+  "cloudBackupEnableSubtitle": "バックアップ形式は完全 ZIP です。既定ではオフです。",
+  "cloudBackupAllowMobileDataTitle": "モバイルデータ通信を許可",
+  "cloudBackupAllowMobileDataSubtitle": "オフの場合、バックグラウンドバックアップは Wi-Fi または従量課金でないネットワークを待ちます。",
+  "cloudBackupFrequencyLabel": "バックアップ頻度（日）",
+  "cloudBackupFrequencyHelper": "最小 1 日。既定は 30 日です。",
+  "cloudBackupKeepLatestLabel": "保持する最新バックアップ数",
+  "cloudBackupKeepLatestHelper": "既定では完全バックアップを 3 個保持します。",
+  "cloudBackupBaiduPlatformSection": "Baidu Netdisk Open Platform",
+  "cloudBackupKeyGuide": "Baidu Netdisk Open Platform でアプリを作成し、アプリ詳細から AppKey と SecretKey をコピーしてください。アプリディレクトリは ScreenMemo に設定してください。",
+  "cloudBackupOpenDeveloperDocs": "AppKey/SecretKey を取得",
+  "cloudBackupOpenDeveloperDocsShort": "Key を取得",
+  "cloudBackupAppKeyLabel": "AppKey",
+  "cloudBackupSecretKeyLabel": "SecretKey",
+  "cloudBackupAuthorizationCodeLabel": "認可コード",
+  "cloudBackupAuthorizationCodeHelper": "認可ページを開いて許可した後、oob code をここに貼り付けてください。",
+  "cloudBackupOpenAuthPage": "認可ページを開く",
+  "cloudBackupExchangeCode": "コードを交換",
+  "cloudBackupTestConnection": "接続をテスト",
+  "cloudBackupDeviceId": "デバイス ID",
+  "cloudBackupLastAttempt": "前回の試行",
+  "cloudBackupLastSuccess": "前回の成功",
+  "cloudBackupLastStatus": "最新ステータス",
+  "cloudBackupSave": "設定を保存",
+  "cloudBackupRunNow": "今すぐバックアップ",
+  "cloudBackupNotAvailable": "利用不可",
+  "cloudBackupNever": "未実行",
+  "cloudBackupFrequencyInvalid": "バックアップ頻度は 1 日以上にしてください。",
+  "cloudBackupKeepLatestInvalid": "保持するバックアップ数は 1 以上にしてください。",
+  "cloudBackupSettingsSaved": "クラウドバックアップ設定を保存しました。",
+  "cloudBackupAppKeyRequired": "先に AppKey を入力してください。",
+  "cloudBackupAppSecretRequired": "先に AppKey と SecretKey を入力してください。",
+  "cloudBackupAuthCodeRequired": "先に認可コードを入力してください。",
+  "cloudBackupDeveloperDocsOpenFailed": "Baidu Netdisk Open Platform のドキュメントを開けませんでした。",
+  "cloudBackupAuthPageOpenFailed": "認可ページを開けませんでした。",
+  "cloudBackupAuthorizationComplete": "認可が完了しました。",
+  "cloudBackupAuthorizationFailed": "認可に失敗しました。",
+  "cloudBackupAuthorizationFailedWithError": "認可に失敗しました：{error}",
+  "@cloudBackupAuthorizationFailedWithError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cloudBackupAuthorizationRequired": "先に認可を完了してください。",
+  "cloudBackupConnectionSuccessful": "接続に成功しました。",
+  "cloudBackupConnectionFailed": "接続に失敗しました。",
+  "cloudBackupConnectionFailedWithError": "接続に失敗しました：{error}",
+  "@cloudBackupConnectionFailedWithError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cloudBackupBackupStarted": "バックアップタスクを開始しました。",
+  "cloudBackupStartFailed": "バックアップタスクを開始できませんでした。",
+  "cloudBackupStartFailedWithError": "バックアップタスクを開始できませんでした：{error}",
+  "@cloudBackupStartFailedWithError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cloudBackupStatusRunning": "実行中",
+  "cloudBackupStatusSkippedNotDue": "まだ予定時刻ではないためスキップしました",
+  "cloudBackupStatusAuthorizationRequired": "再認可が必要です",
+  "cloudBackupStatusSuccess": "成功：{detail}",
+  "@cloudBackupStatusSuccess": {
+    "placeholders": {
+      "detail": {}
+    }
+  },
+  "cloudBackupStatusFailed": "失敗：{detail}",
+  "@cloudBackupStatusFailed": {
+    "placeholders": {
+      "detail": {}
+    }
+  },
+  "cloudBackupStatusUnknown": "不明なステータス：{detail}",
+  "@cloudBackupStatusUnknown": {
+    "placeholders": {
+      "detail": {}
+    }
+  },
+  "cloudBackupProgressTitle": "バックアップ進捗",
+  "cloudBackupProgressPercent": "{percent}%",
+  "@cloudBackupProgressPercent": {
+    "placeholders": {
+      "percent": {}
+    }
+  },
+  "cloudBackupProgressBytes": "{done} / {total}",
+  "@cloudBackupProgressBytes": {
+    "placeholders": {
+      "done": {},
+      "total": {}
+    }
+  },
+  "cloudBackupProgressQueued": "バックグラウンドタスクを待機中",
+  "cloudBackupProgressChecking": "バックアップ条件を確認中",
+  "cloudBackupProgressPreparing": "バックアップを準備中",
+  "cloudBackupProgressZipping": "ZIP を作成中",
+  "cloudBackupProgressRemoteFolder": "クラウドフォルダーを準備中",
+  "cloudBackupProgressPreparingUpload": "アップロードを準備中",
+  "cloudBackupProgressPrecreate": "アップロードセッションを作成中",
+  "cloudBackupProgressUploading": "アップロード中",
+  "cloudBackupProgressCreatingRemoteFile": "クラウドファイルを作成中",
+  "cloudBackupProgressCleanup": "古いバックアップをクリーンアップ中",
+  "cloudBackupProgressFinished": "バックアップ完了",
+  "cloudBackupProgressFailed": "バックアップに失敗しました",
+  "cloudBackupProgressDisabled": "自動クラウドバックアップはオフです",
   "externalMcpConfigJsonLabel": "MCP 設定 JSON"
 }

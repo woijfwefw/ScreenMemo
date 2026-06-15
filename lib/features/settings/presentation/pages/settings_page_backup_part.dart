@@ -1161,6 +1161,66 @@ extension _SettingsBackupPart on _SettingsPageState {
     );
   }
 
+  Widget _buildCloudBackupItem(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final AppLocalizations l10n = AppLocalizations.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.spacing4,
+        vertical: AppTheme.spacing3 - 2,
+      ),
+      decoration: BoxDecoration(
+        border: Border(top: _settingsDividerSide(context)),
+      ),
+      child: Row(
+        children: [
+          _buildSettingsLeadingIcon(context, Icons.cloud_upload_outlined),
+          const SizedBox(width: AppTheme.spacing3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.cloudBackupEntryTitle,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  l10n.cloudBackupEntrySubtitle,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppTheme.spacing2),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const CloudBackupSettingsPage(),
+                ),
+              );
+            },
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTheme.spacing3,
+                vertical: AppTheme.spacing1 - 1,
+              ),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              minimumSize: Size.zero,
+              visualDensity: VisualDensity.compact,
+            ),
+            child: Text(l10n.actionEnter),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildImportItem(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(

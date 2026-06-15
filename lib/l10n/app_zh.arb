@@ -2597,5 +2597,116 @@
       "error": {}
     }
   },
+  "cloudBackupEntryTitle": "百度网盘备份",
+  "cloudBackupEntrySubtitle": "自动上传完整 ZIP 备份到 /apps/ScreenMemo。",
+  "cloudBackupTitle": "百度网盘备份",
+  "cloudBackupEnableTitle": "启用自动云备份",
+  "cloudBackupEnableSubtitle": "备份类型为完整 ZIP，默认关闭。",
+  "cloudBackupAllowMobileDataTitle": "允许使用移动流量",
+  "cloudBackupAllowMobileDataSubtitle": "关闭后，后台备份会等待 Wi-Fi 或非计费网络。",
+  "cloudBackupFrequencyLabel": "备份频率（天）",
+  "cloudBackupFrequencyHelper": "最小 1 天，默认 30 天。",
+  "cloudBackupKeepLatestLabel": "保留最近备份数",
+  "cloudBackupKeepLatestHelper": "默认保留 3 个完整备份。",
+  "cloudBackupBaiduPlatformSection": "百度网盘开放平台",
+  "cloudBackupKeyGuide": "请在百度网盘开放平台创建应用，然后从应用详情复制 AppKey 与 SecretKey。应用目录需要配置为 ScreenMemo。",
+  "cloudBackupOpenDeveloperDocs": "获取 AppKey/SecretKey",
+  "cloudBackupOpenDeveloperDocsShort": "获取 Key",
+  "cloudBackupAppKeyLabel": "AppKey",
+  "cloudBackupSecretKeyLabel": "SecretKey",
+  "cloudBackupAuthorizationCodeLabel": "授权码",
+  "cloudBackupAuthorizationCodeHelper": "打开授权页并同意授权后，将 oob code 粘贴到这里。",
+  "cloudBackupOpenAuthPage": "打开授权页",
+  "cloudBackupExchangeCode": "换取授权",
+  "cloudBackupTestConnection": "测试连接",
+  "cloudBackupDeviceId": "设备 ID",
+  "cloudBackupLastAttempt": "上次尝试",
+  "cloudBackupLastSuccess": "上次成功",
+  "cloudBackupLastStatus": "最近状态",
+  "cloudBackupSave": "保存设置",
+  "cloudBackupRunNow": "立即备份",
+  "cloudBackupNotAvailable": "暂无",
+  "cloudBackupNever": "从未",
+  "cloudBackupFrequencyInvalid": "备份频率至少为 1 天。",
+  "cloudBackupKeepLatestInvalid": "保留备份数至少为 1。",
+  "cloudBackupSettingsSaved": "云备份设置已保存。",
+  "cloudBackupAppKeyRequired": "请先填写 AppKey。",
+  "cloudBackupAppSecretRequired": "请先填写 AppKey 和 SecretKey。",
+  "cloudBackupAuthCodeRequired": "请先填写授权码。",
+  "cloudBackupDeveloperDocsOpenFailed": "无法打开百度网盘开放平台文档。",
+  "cloudBackupAuthPageOpenFailed": "无法打开授权页。",
+  "cloudBackupAuthorizationComplete": "授权已完成。",
+  "cloudBackupAuthorizationFailed": "授权失败。",
+  "cloudBackupAuthorizationFailedWithError": "授权失败：{error}",
+  "@cloudBackupAuthorizationFailedWithError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cloudBackupAuthorizationRequired": "请先完成授权。",
+  "cloudBackupConnectionSuccessful": "连接成功。",
+  "cloudBackupConnectionFailed": "连接失败。",
+  "cloudBackupConnectionFailedWithError": "连接失败：{error}",
+  "@cloudBackupConnectionFailedWithError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cloudBackupBackupStarted": "备份任务已启动。",
+  "cloudBackupStartFailed": "无法启动备份任务。",
+  "cloudBackupStartFailedWithError": "无法启动备份任务：{error}",
+  "@cloudBackupStartFailedWithError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cloudBackupStatusRunning": "正在运行",
+  "cloudBackupStatusSkippedNotDue": "未到备份时间，已跳过",
+  "cloudBackupStatusAuthorizationRequired": "需要重新授权",
+  "cloudBackupStatusSuccess": "成功：{detail}",
+  "@cloudBackupStatusSuccess": {
+    "placeholders": {
+      "detail": {}
+    }
+  },
+  "cloudBackupStatusFailed": "失败：{detail}",
+  "@cloudBackupStatusFailed": {
+    "placeholders": {
+      "detail": {}
+    }
+  },
+  "cloudBackupStatusUnknown": "未知状态：{detail}",
+  "@cloudBackupStatusUnknown": {
+    "placeholders": {
+      "detail": {}
+    }
+  },
+  "cloudBackupProgressTitle": "备份进度",
+  "cloudBackupProgressPercent": "{percent}%",
+  "@cloudBackupProgressPercent": {
+    "placeholders": {
+      "percent": {}
+    }
+  },
+  "cloudBackupProgressBytes": "{done} / {total}",
+  "@cloudBackupProgressBytes": {
+    "placeholders": {
+      "done": {},
+      "total": {}
+    }
+  },
+  "cloudBackupProgressQueued": "等待后台任务",
+  "cloudBackupProgressChecking": "检查备份条件",
+  "cloudBackupProgressPreparing": "准备备份",
+  "cloudBackupProgressZipping": "正在打包 ZIP",
+  "cloudBackupProgressRemoteFolder": "正在准备云端目录",
+  "cloudBackupProgressPreparingUpload": "正在准备上传",
+  "cloudBackupProgressPrecreate": "正在创建上传会话",
+  "cloudBackupProgressUploading": "正在上传",
+  "cloudBackupProgressCreatingRemoteFile": "正在创建云端文件",
+  "cloudBackupProgressCleanup": "正在清理旧备份",
+  "cloudBackupProgressFinished": "备份完成",
+  "cloudBackupProgressFailed": "备份失败",
+  "cloudBackupProgressDisabled": "自动云备份已关闭",
   "externalMcpConfigJsonLabel": "MCP 配置 JSON"
 }

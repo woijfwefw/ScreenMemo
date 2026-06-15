@@ -11,8 +11,7 @@ class UserSettingKeys {
   // 截屏基础配置
   static const String screenshotInterval = 'screenshot_interval';
   static const String screenshotEnabled = 'screenshot_enabled';
-  static const String autoAddNewAppsToCapture =
-      'auto_add_new_apps_to_capture';
+  static const String autoAddNewAppsToCapture = 'auto_add_new_apps_to_capture';
   static const String windowScreenshotApiEnabled =
       'window_screenshot_api_enabled';
   static const String screenshotDedupeMode = 'screenshot_dedupe_mode';
@@ -48,6 +47,43 @@ class UserSettingKeys {
   // 动态页 UI
   static const String dynamicEntryLogIconEnabled =
       'dynamic_entry_log_icon_enabled';
+
+  // 日志管理
+  // 百度网盘自动云备份
+  static const String cloudBackupEnabled = 'cloud_backup_enabled';
+  static const String cloudBackupFrequencyDays = 'cloud_backup_frequency_days';
+  static const String cloudBackupAllowMobileData =
+      'cloud_backup_allow_mobile_data';
+  static const String cloudBackupKeepLatestCount =
+      'cloud_backup_keep_latest_count';
+  static const String cloudBackupBaiduAppKey = 'cloud_backup_baidu_app_key';
+  static const String cloudBackupBaiduSecretKey =
+      'cloud_backup_baidu_secret_key';
+  static const String cloudBackupBaiduAuthorizationCode =
+      'cloud_backup_baidu_authorization_code';
+  static const String cloudBackupBaiduAccessToken =
+      'cloud_backup_baidu_access_token';
+  static const String cloudBackupBaiduRefreshToken =
+      'cloud_backup_baidu_refresh_token';
+  static const String cloudBackupBaiduTokenExpiresAt =
+      'cloud_backup_baidu_token_expires_at';
+  static const String cloudBackupLastSuccessAt = 'cloud_backup_last_success_at';
+  static const String cloudBackupLastAttemptAt = 'cloud_backup_last_attempt_at';
+  static const String cloudBackupLastStatus = 'cloud_backup_last_status';
+  static const String cloudBackupDeviceId = 'cloud_backup_device_id';
+  static const String cloudBackupProgressStage = 'cloud_backup_progress_stage';
+  static const String cloudBackupProgressPercent =
+      'cloud_backup_progress_percent';
+  static const String cloudBackupProgressDetail =
+      'cloud_backup_progress_detail';
+  static const String cloudBackupProgressUpdatedAt =
+      'cloud_backup_progress_updated_at';
+  static const String cloudBackupProgressBytesDone =
+      'cloud_backup_progress_bytes_done';
+  static const String cloudBackupProgressBytesTotal =
+      'cloud_backup_progress_bytes_total';
+  static const String cloudBackupProgressActive =
+      'cloud_backup_progress_active';
 
   // 自动更新
   static const String autoUpdateEnabled = 'auto_update_enabled';
