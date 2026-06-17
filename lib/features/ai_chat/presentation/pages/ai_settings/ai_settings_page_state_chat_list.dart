@@ -182,6 +182,13 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
     );
   }
 
+  List<_SubagentStatusItem> _currentSubagentItems() {
+    return _mergeSubagentItemsWithRows(
+      _allSubagentItems(),
+      _subagentConversationRows,
+    );
+  }
+
   Widget _buildChatList() {
     if (_messages.isEmpty) {
       final l10n = AppLocalizations.of(context);
@@ -1372,9 +1379,10 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
                         icon,
                         size: 22,
                         color: onTap == null
-                            ? theme.colorScheme.onSurfaceVariant.withOpacity(
-                                0.38,
-                              )
+                            ? (color ??
+                                  theme.colorScheme.onSurfaceVariant.withValues(
+                                    alpha: 0.38,
+                                  ))
                             : (color ?? theme.colorScheme.onSurfaceVariant),
                       ),
                 ),
@@ -1522,7 +1530,7 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
   Widget _buildComposerBar() {
     final theme = Theme.of(context);
     final List<_AgentStatusItem> todoItems = _currentTodoItems();
-    final List<_SubagentStatusItem> subagents = _allSubagentItems();
+    final List<_SubagentStatusItem> subagents = _currentSubagentItems();
     String middleEllipsis(String s, int maxChars) {
       if (s.length <= maxChars) return s;
       if (maxChars <= 3) return s.substring(0, maxChars);
@@ -1545,6 +1553,7 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
         ? theme.colorScheme.primary
         : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.45);
     final l10n = AppLocalizations.of(context);
+    final bool canSend = _sending || _composerHasText;
     final String sendTooltip = _sending
         ? l10n.composerStopTooltip
         : (_imageDrawMode
@@ -1555,10 +1564,20 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
             theme.colorScheme.error.withValues(alpha: 0.12),
             theme.colorScheme.surfaceContainerHighest,
           )
-        : theme.colorScheme.primary;
+        : (canSend
+              ? theme.colorScheme.primary
+              : Color.alphaBlend(
+                  theme.colorScheme.primary.withValues(alpha: 0.18),
+                  theme.colorScheme.surfaceContainerHighest,
+                ));
     final Color sendForeground = _sending
         ? theme.colorScheme.error
-        : theme.colorScheme.onPrimary;
+        : (canSend
+              ? theme.colorScheme.onPrimary
+              : Color.alphaBlend(
+                  theme.colorScheme.primary.withValues(alpha: 0.48),
+                  theme.colorScheme.onSurfaceVariant,
+                ));
 
     if (widget.readOnly) {
       return Padding(
@@ -1688,56 +1707,50 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
                   );
                 },
               ),
-              const SizedBox(width: AppTheme.spacing1),
-              _buildComposerIconButton(
-                icon: Icons.smart_toy_outlined,
-                tooltip: _isZhLocale() ? '子代理' : 'Subagents',
-                onTap: subagents.isEmpty ? null : _showSubagentsSheet,
-                child: CircleAvatar(
-                  radius: 12,
-                  backgroundColor: subagents.isEmpty
-                      ? theme.colorScheme.surfaceContainer
-                      : theme.colorScheme.primaryContainer,
-                  child: Icon(
-                    Icons.smart_toy_outlined,
-                    size: 15,
-                    color: subagents.isEmpty
-                        ? theme.colorScheme.onSurfaceVariant.withValues(
-                            alpha: 0.38,
-                          )
-                        : theme.colorScheme.primary,
+              if (subagents.isNotEmpty) ...[
+                const SizedBox(width: AppTheme.spacing1),
+                _buildComposerIconButton(
+                  icon: Icons.smart_toy_outlined,
+                  tooltip: _isZhLocale() ? '子代理' : 'Subagents',
+                  onTap: _showSubagentsSheet,
+                  child: CircleAvatar(
+                    radius: 12,
+                    backgroundColor: theme.colorScheme.primaryContainer,
+                    child: Icon(
+                      Icons.smart_toy_outlined,
+                      size: 15,
+                      color: theme.colorScheme.primary,
+                    ),
                   ),
-                ),
-                overlay: subagents.isEmpty
-                    ? null
-                    : Positioned(
-                        right: -1,
-                        bottom: -1,
-                        child: Container(
-                          constraints: const BoxConstraints(minWidth: 16),
-                          height: 16,
-                          padding: const EdgeInsets.symmetric(horizontal: 3),
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primary,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: theme.colorScheme.surfaceContainerHighest,
-                              width: 1,
-                            ),
-                          ),
-                          child: Text(
-                            '${subagents.length}',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.onPrimary,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              height: 1,
-                            ),
-                          ),
+                  overlay: Positioned(
+                    right: -1,
+                    bottom: -1,
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 16),
+                      height: 16,
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          width: 1,
                         ),
                       ),
-              ),
+                      child: Text(
+                        '${subagents.length}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onPrimary,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(width: AppTheme.spacing2),
               Expanded(
                 child: Align(
@@ -1756,7 +1769,9 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
                 tooltip: sendTooltip,
                 color: sendForeground,
                 background: sendBackground,
-                onTap: _sending ? _cancelRequest : _sendMessage,
+                onTap: _sending
+                    ? _cancelRequest
+                    : (canSend ? _sendMessage : null),
                 circular: true,
               ),
             ],
@@ -1948,7 +1963,7 @@ extension _AISettingsPageStateChatListExt on _AISettingsPageState {
 
   Future<void> _showSubagentsSheet() async {
     final String parentCid = (_activeConversationCid ?? '').trim();
-    final List<_SubagentStatusItem> initialSubagents = _allSubagentItems();
+    final List<_SubagentStatusItem> initialSubagents = _currentSubagentItems();
     if (initialSubagents.isEmpty && parentCid.isEmpty) return;
     await showModalBottomSheet<void>(
       context: context,

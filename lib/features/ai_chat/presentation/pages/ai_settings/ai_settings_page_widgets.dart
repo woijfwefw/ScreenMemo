@@ -185,6 +185,26 @@ String _toolProcessSummaryForDisplay(
   return summary.toDisplayText(context, loading: loading);
 }
 
+String _toolCallCountSummaryForDisplay(
+  BuildContext context,
+  List<_ThinkingToolChip> tools,
+) {
+  final int totalCalls = _ToolProcessSummary.fromTools(tools).totalCalls;
+  if (totalCalls <= 0) return '';
+  return _isZhLocaleUi(context)
+      ? '调用了 $totalCalls 个工具'
+      : 'Called $totalCalls tools';
+}
+
+String _thinkingStatusTitleForDisplay(
+  BuildContext context, {
+  required bool loading,
+}) {
+  final bool zh = _isZhLocaleUi(context);
+  if (loading) return zh ? '思考中' : 'Thinking';
+  return zh ? '思考完成' : 'Thinking complete';
+}
+
 class _ToolProcessSummary {
   const _ToolProcessSummary({
     required this.totalCalls,
@@ -1462,17 +1482,16 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context);
     final Color titleColor = _thinkingTextColor;
     final Color subtle = _thinkingTextColor;
     final Color panelBg = _thinkingPanelColor(theme);
-    final String titleText = widget.isLoading
-        ? l10n.thinkingInProgress
-        : l10n.deepThinkingLabel;
-    final String toolSummary = _toolProcessSummaryForDisplay(
+    final String titleText = _thinkingStatusTitleForDisplay(
+      context,
+      loading: widget.isLoading,
+    );
+    final String toolSummary = _toolCallCountSummaryForDisplay(
       context,
       _allToolChips(),
-      loading: widget.isLoading,
     );
     final String titleLine = toolSummary.isEmpty
         ? titleText

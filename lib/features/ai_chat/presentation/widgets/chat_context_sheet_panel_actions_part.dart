@@ -140,15 +140,8 @@ extension _ChatContextPanelActionsPart on _ChatContextPanelState {
         events.length > _ChatContextPanelState._trimEventsMaxLimit
         ? events.sublist(0, _ChatContextPanelState._trimEventsMaxLimit)
         : events;
-    return Container(
+    return Padding(
       padding: const EdgeInsets.all(AppTheme.spacing3),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.4),
-        ),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

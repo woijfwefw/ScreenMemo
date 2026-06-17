@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
-import 'package:screen_memo/core/widgets/model_logo.dart';
-import 'package:screen_memo/core/widgets/search_styles.dart';
 import 'package:screen_memo/core/widgets/ui_action_menu.dart';
 import 'package:screen_memo/core/widgets/ui_components.dart';
 import 'package:screen_memo/features/ai/application/ai_providers_service.dart';
 import 'package:screen_memo/features/ai/application/ai_settings_service.dart';
+import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_provider_model_picker.dart';
 import 'package:screen_memo/l10n/app_localizations.dart';
 
 class AIImageGenerationMenuButton extends StatefulWidget {
@@ -223,140 +222,33 @@ class _AIImageGenerationMenuButtonState
     final AIProvidersService svc = AIProvidersService.instance;
     final List<AIProvider> list = await svc.listProviders();
     if (!mounted) return;
-    await showModalBottomSheet<void>(
+    await showAIProviderPickerSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        final int currentId = currentProvider?.id ?? -1;
-        final TextEditingController queryCtrl = TextEditingController(
-          text: _providerQueryText,
+      providers: list,
+      currentProviderId: currentProvider?.id ?? -1,
+      queryText: _providerQueryText,
+      onQueryChanged: (value) => _providerQueryText = value,
+      initialChildSize: 0.88,
+      onSelected: (sheetContext, provider) async {
+        final String model = resolveModelForProvider(provider, currentModel);
+        if (model.isEmpty) {
+          UINotifier.error(
+            context,
+            AppLocalizations.of(context).noModelsForProviderHint,
+          );
+          return;
+        }
+        await _settings.setAIContextSelection(
+          context: 'image_generation',
+          providerId: provider.id!,
+          model: model,
         );
-        return StatefulBuilder(
-          builder: (c, setModalState) {
-            final String q = queryCtrl.text.trim().toLowerCase();
-            final List<AIProvider> items = q.isEmpty
-                ? List<AIProvider>.from(list)
-                : list.where((p) {
-                    final String name = p.name.toLowerCase();
-                    final String type = p.type.toLowerCase();
-                    final String base = (p.baseUrl ?? '').toLowerCase();
-                    return name.contains(q) ||
-                        type.contains(q) ||
-                        base.contains(q);
-                  }).toList();
-            final int selectedIndex = items.indexWhere(
-              (p) => p.id == currentId,
-            );
-            if (selectedIndex > 0) {
-              final AIProvider selected = items.removeAt(selectedIndex);
-              items.insert(0, selected);
-            }
-            return FractionallySizedBox(
-              heightFactor: 0.88,
-              child: UISheetSurface(
-                child: Column(
-                  children: [
-                    const SizedBox(height: AppTheme.spacing3),
-                    const UISheetHandle(),
-                    const SizedBox(height: AppTheme.spacing3),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                      child: SearchTextField(
-                        controller: queryCtrl,
-                        hintText: AppLocalizations.of(
-                          context,
-                        ).searchProviderPlaceholder,
-                        autofocus: true,
-                        onChanged: (value) {
-                          _providerQueryText = value;
-                          setModalState(() {});
-                        },
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView.separated(
-                        itemCount: items.length,
-                        separatorBuilder: (c, i) => Container(
-                          height: 1,
-                          color: Theme.of(
-                            c,
-                          ).colorScheme.outline.withValues(alpha: 0.6),
-                        ),
-                        itemBuilder: (c, i) {
-                          final AIProvider provider = items[i];
-                          final bool selected = provider.id == currentId;
-                          return ListTile(
-                            leading: ProviderLogo(
-                              providerType: provider.type,
-                              providerName: provider.name,
-                              baseUrl: provider.baseUrl,
-                              size: 20,
-                            ),
-                            title: Text(
-                              provider.name,
-                              style: Theme.of(c).textTheme.bodyMedium,
-                            ),
-                            subtitle: Text(
-                              provider.baseUrl ?? '',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            trailing: selected
-                                ? Icon(
-                                    Icons.check_circle,
-                                    color: Theme.of(c).colorScheme.onSurface,
-                                  )
-                                : null,
-                            onTap: () async {
-                              String model = (currentModel ?? '').trim();
-                              final List<String> available = provider.models;
-                              if (model.isEmpty ||
-                                  (available.isNotEmpty &&
-                                      !available.contains(model))) {
-                                model =
-                                    (provider.extra['active_model']
-                                                as String? ??
-                                            provider.defaultModel)
-                                        .toString()
-                                        .trim();
-                                if (model.isEmpty && available.isNotEmpty) {
-                                  model = available.first;
-                                }
-                              }
-                              if (model.isEmpty) {
-                                UINotifier.error(
-                                  context,
-                                  AppLocalizations.of(
-                                    context,
-                                  ).noModelsForProviderHint,
-                                );
-                                return;
-                              }
-                              await _settings.setAIContextSelection(
-                                context: 'image_generation',
-                                providerId: provider.id!,
-                                model: model,
-                              );
-                              if (!mounted || !ctx.mounted) return;
-                              onSelected(provider, model);
-                              Navigator.of(ctx).pop();
-                              UINotifier.success(
-                                context,
-                                AppLocalizations.of(
-                                  context,
-                                ).aiGeneratedImageProviderSaved,
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+        if (!mounted || !sheetContext.mounted) return;
+        onSelected(provider, model);
+        Navigator.of(sheetContext).pop();
+        UINotifier.success(
+          context,
+          AppLocalizations.of(context).aiGeneratedImageProviderSaved,
         );
       },
     );
@@ -384,96 +276,25 @@ class _AIImageGenerationMenuButtonState
       return;
     }
     if (!mounted) return;
-    await showModalBottomSheet<void>(
+    await showAIModelPickerSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        final String active = (activeModel ?? '').trim();
-        final TextEditingController queryCtrl = TextEditingController(
-          text: _modelQueryText,
+      models: models,
+      activeModel: (activeModel ?? '').trim(),
+      queryText: _modelQueryText,
+      onQueryChanged: (value) => _modelQueryText = value,
+      initialChildSize: 0.88,
+      onSelected: (sheetContext, model) async {
+        await _settings.setAIContextSelection(
+          context: 'image_generation',
+          providerId: p.id!,
+          model: model,
         );
-        return StatefulBuilder(
-          builder: (c, setModalState) {
-            final String q = queryCtrl.text.trim().toLowerCase();
-            final List<String> items = q.isEmpty
-                ? List<String>.from(models)
-                : models.where((m) => m.toLowerCase().contains(q)).toList();
-            if (active.isNotEmpty && items.contains(active)) {
-              items.remove(active);
-              items.insert(0, active);
-            }
-            return FractionallySizedBox(
-              heightFactor: 0.88,
-              child: UISheetSurface(
-                child: Column(
-                  children: [
-                    const SizedBox(height: AppTheme.spacing3),
-                    const UISheetHandle(),
-                    const SizedBox(height: AppTheme.spacing3),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                      child: SearchTextField(
-                        controller: queryCtrl,
-                        hintText: AppLocalizations.of(
-                          context,
-                        ).searchModelPlaceholder,
-                        autofocus: true,
-                        onChanged: (value) {
-                          _modelQueryText = value;
-                          setModalState(() {});
-                        },
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView.separated(
-                        itemCount: items.length,
-                        separatorBuilder: (c, i) => Container(
-                          height: 1,
-                          color: Theme.of(
-                            c,
-                          ).colorScheme.outline.withValues(alpha: 0.6),
-                        ),
-                        itemBuilder: (c, i) {
-                          final String model = items[i];
-                          final bool selected = model == active;
-                          return ListTile(
-                            leading: ModelLogo(modelId: model, size: 20),
-                            title: Text(
-                              model,
-                              style: Theme.of(c).textTheme.bodyMedium,
-                            ),
-                            trailing: selected
-                                ? Icon(
-                                    Icons.check_circle,
-                                    color: Theme.of(c).colorScheme.onSurface,
-                                  )
-                                : null,
-                            onTap: () async {
-                              await _settings.setAIContextSelection(
-                                context: 'image_generation',
-                                providerId: p.id!,
-                                model: model,
-                              );
-                              if (!mounted || !ctx.mounted) return;
-                              onSelected(model);
-                              Navigator.of(ctx).pop();
-                              UINotifier.success(
-                                context,
-                                AppLocalizations.of(
-                                  context,
-                                ).aiGeneratedImageModelSaved,
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+        if (!mounted || !sheetContext.mounted) return;
+        onSelected(model);
+        Navigator.of(sheetContext).pop();
+        UINotifier.success(
+          context,
+          AppLocalizations.of(context).aiGeneratedImageModelSaved,
         );
       },
     );

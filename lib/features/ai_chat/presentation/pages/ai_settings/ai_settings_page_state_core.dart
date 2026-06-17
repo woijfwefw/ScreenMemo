@@ -187,6 +187,13 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
           limit: _AISettingsPageState._fullHistoryPageSize,
         ),
       );
+      final Future<List<Map<String, dynamic>>> fSubagentRows = fChatCid.then(
+        (cid) => cid.trim().isEmpty
+            ? Future<List<Map<String, dynamic>>>.value(
+                const <Map<String, dynamic>>[],
+              )
+            : _settings.listSubagentConversations(cid),
+      );
       final Future<bool> fStreamEnabled = _settings.getStreamEnabled();
       final Future<String?> fSegPrompt = _settings.getPromptSegment();
       final Future<String?> fMergePrompt = _settings.getPromptMerge();
@@ -468,6 +475,7 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
         full: firstPage.messages,
         tail: tailHistory,
       );
+      final List<Map<String, dynamic>> subagentRows = await fSubagentRows;
       final bool streamEnabled = await fStreamEnabled;
       final bool renderImgs = await fRenderImagesDuringStreaming;
       final AIReasoningLevel reasoningLevel = await fReasoningLevel;
@@ -556,6 +564,9 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
         _thinkingBlocksByIndex
           ..clear()
           ..addAll(tb);
+        _subagentConversationRows = List<Map<String, dynamic>>.from(
+          subagentRows,
+        );
         _contentSegmentsByIndex.clear();
         _reasoningByIndex
           ..clear()
@@ -1286,6 +1297,7 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
         _reasoningByIndex.clear();
         _reasoningDurationByIndex.clear();
         _thinkingBlocksByIndex.clear();
+        _subagentConversationRows = const <Map<String, dynamic>>[];
         _contentSegmentsByIndex.clear();
         _currentAssistantIndex = null;
         _inStreaming = false;

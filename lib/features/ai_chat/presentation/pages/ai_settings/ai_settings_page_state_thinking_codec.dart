@@ -919,214 +919,64 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
     final svc = AIProvidersService.instance;
     final list = await svc.listProviders();
     if (!mounted) return;
-    await showModalBottomSheet<void>(
+    await showAIProviderPickerSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        final currentId = _ctxChatProvider?.id ?? -1;
-        // 控制器与文本持久化，避免键盘折叠时内容丢失
-        final TextEditingController queryCtrl = TextEditingController(
-          text: _providerQueryText,
-        );
-        return StatefulBuilder(
-          builder: (c, setModalState) {
-            final String q = queryCtrl.text.trim().toLowerCase();
-            final List<AIProvider> items = q.isEmpty
-                ? list
-                : list.where((p) {
-                    final name = p.name.toLowerCase();
-                    final type = p.type.toLowerCase();
-                    final base = (p.baseUrl ?? '').toString().toLowerCase();
-                    return name.contains(q) ||
-                        type.contains(q) ||
-                        base.contains(q);
-                  }).toList();
-            // 选中的提供商置顶展示
-            final selIdx = items.indexWhere((e) => e.id == currentId);
-            if (selIdx > 0) {
-              final sel = items.removeAt(selIdx);
-              items.insert(0, sel);
-            }
-            return FractionallySizedBox(
-              heightFactor: 0.9,
-              child: UISheetSurface(
-                child: Column(
-                  children: [
-                    const SizedBox(height: AppTheme.spacing3),
-                    const UISheetHandle(),
-                    const SizedBox(height: AppTheme.spacing3),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                      child: SearchTextField(
-                        controller: queryCtrl,
-                        hintText: AppLocalizations.of(
-                          context,
-                        ).searchProviderPlaceholder,
-                        autofocus: true,
-                        onChanged: (_) {
-                          _providerQueryText = queryCtrl.text;
-                          setModalState(() {});
-                        },
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView.separated(
-                        itemCount: items.length,
-                        separatorBuilder: (c, i) => Container(
-                          height: 1,
-                          color: Theme.of(
-                            c,
-                          ).colorScheme.outline.withOpacity(0.6),
-                        ),
-                        itemBuilder: (c, i) {
-                          final p = items[i];
-                          final selected = p.id == currentId;
-                          return ListTile(
-                            leading: ProviderLogo(
-                              providerType: p.type,
-                              providerName: p.name,
-                              baseUrl: p.baseUrl,
-                              size: 20,
-                            ),
-                            title: Text(
-                              p.name,
-                              style: Theme.of(c).textTheme.bodyMedium,
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (selected)
-                                  Icon(
-                                    Icons.check_circle,
-                                    color: Theme.of(c).colorScheme.onSurface,
-                                  ),
-                                const SizedBox(width: 8),
-                                IconButton(
-                                  tooltip: AppLocalizations.of(
-                                    context,
-                                  ).actionDelete,
-                                  icon: Icon(
-                                    Icons.delete_outline,
-                                    color: Theme.of(c).colorScheme.error,
-                                  ),
-                                  onPressed: () async {
-                                    final t = AppLocalizations.of(context);
-                                    final confirmed =
-                                        await showUIDialog<bool>(
-                                          context: context,
-                                          title: t.deleteGroup,
-                                          message: t
-                                              .confirmDeleteProviderMessage(
-                                                p.name,
-                                              ),
-                                          actions: [
-                                            UIDialogAction<bool>(
-                                              text: t.dialogCancel,
-                                              result: false,
-                                            ),
-                                            UIDialogAction<bool>(
-                                              text: t.actionDelete,
-                                              style: UIDialogActionStyle
-                                                  .destructive,
-                                              result: true,
-                                            ),
-                                          ],
-                                        ) ??
-                                        false;
-                                    if (!confirmed) return;
-                                    final ok = await svc.deleteProvider(p.id!);
-                                    if (!ok) {
-                                      // 二次校验：若已删除则按成功处理
-                                      final still = await svc.getProvider(
-                                        p.id!,
-                                      );
-                                      if (still != null) {
-                                        UINotifier.error(
-                                          context,
-                                          t.deleteFailed,
-                                        );
-                                        return;
-                                      }
-                                    }
-                                    // 如果删除的是当前选中提供商，清空上下文并提示
-                                    if (selected) {
-                                      if (mounted) {
-                                        _setState(() {
-                                          _ctxChatProvider = null;
-                                          _ctxChatModel = null;
-                                        });
-                                      }
-                                    }
-                                    // 刷新底部列表
-                                    final refreshed = await svc.listProviders();
-                                    items
-                                      ..clear()
-                                      ..addAll(
-                                        q.isEmpty
-                                            ? refreshed
-                                            : refreshed.where((pp) {
-                                                final name = pp.name
-                                                    .toLowerCase();
-                                                final type = pp.type
-                                                    .toLowerCase();
-                                                final base = (pp.baseUrl ?? '')
-                                                    .toString()
-                                                    .toLowerCase();
-                                                return name.contains(q) ||
-                                                    type.contains(q) ||
-                                                    base.contains(q);
-                                              }),
-                                      );
-                                    setModalState(() {});
-                                    UINotifier.success(context, t.deletedToast);
-                                  },
-                                ),
-                              ],
-                            ),
-                            onTap: () async {
-                              String model = (_ctxChatModel ?? '').trim();
-                              final List<String> available = p.models;
-                              if (model.isEmpty ||
-                                  (available.isNotEmpty &&
-                                      !available.contains(model))) {
-                                String fb =
-                                    (p.extra['active_model'] as String? ??
-                                            p.defaultModel)
-                                        .toString()
-                                        .trim();
-                                if (fb.isEmpty && available.isNotEmpty)
-                                  fb = available.first;
-                                model = fb;
-                              }
-                              await _settings.setAIContextSelection(
-                                context: 'chat',
-                                providerId: p.id!,
-                                model: model,
-                              );
-                              if (mounted) {
-                                _setState(() {
-                                  _ctxChatProvider = p;
-                                  _ctxChatModel = model;
-                                });
-                                Navigator.of(ctx).pop();
-                                UINotifier.success(
-                                  context,
-                                  AppLocalizations.of(
-                                    context,
-                                  ).providerSelectedToast(p.name),
-                                );
-                              }
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ],
+      providers: list,
+      currentProviderId: _ctxChatProvider?.id ?? -1,
+      queryText: _providerQueryText,
+      onQueryChanged: (value) => _providerQueryText = value,
+      initialChildSize: 0.9,
+      onDelete: (p, selected) async {
+        final t = AppLocalizations.of(context);
+        final confirmed =
+            await showUIDialog<bool>(
+              context: context,
+              title: t.deleteGroup,
+              message: t.confirmDeleteProviderMessage(p.name),
+              actions: [
+                UIDialogAction<bool>(text: t.dialogCancel, result: false),
+                UIDialogAction<bool>(
+                  text: t.actionDelete,
+                  style: UIDialogActionStyle.destructive,
+                  result: true,
                 ),
-              ),
-            );
-          },
+              ],
+            ) ??
+            false;
+        if (!confirmed) return false;
+        final ok = await svc.deleteProvider(p.id!);
+        if (!ok) {
+          final still = await svc.getProvider(p.id!);
+          if (still != null) {
+            UINotifier.error(context, t.deleteFailed);
+            return false;
+          }
+        }
+        if (selected && mounted) {
+          _setState(() {
+            _ctxChatProvider = null;
+            _ctxChatModel = null;
+          });
+        }
+        UINotifier.success(context, t.deletedToast);
+        return true;
+      },
+      onSelected: (sheetContext, p) async {
+        final String model = resolveModelForProvider(p, _ctxChatModel);
+        await _settings.setAIContextSelection(
+          context: 'chat',
+          providerId: p.id!,
+          model: model,
+        );
+        if (!mounted || !sheetContext.mounted) return;
+        _setState(() {
+          _ctxChatProvider = p;
+          _ctxChatModel = model;
+        });
+        Navigator.of(sheetContext).pop();
+        UINotifier.success(
+          context,
+          AppLocalizations.of(context).providerSelectedToast(p.name),
         );
       },
     );
@@ -1150,98 +1000,25 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
       return;
     }
     if (!mounted) return;
-    await showModalBottomSheet<void>(
+    await showAIModelPickerSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        final active = (_ctxChatModel ?? '').trim();
-        // 控制器与文本持久化，避免键盘折叠时内容丢失
-        final TextEditingController queryCtrl = TextEditingController(
-          text: _modelQueryText,
+      models: models,
+      activeModel: (_ctxChatModel ?? '').trim(),
+      queryText: _modelQueryText,
+      onQueryChanged: (value) => _modelQueryText = value,
+      initialChildSize: 0.9,
+      onSelected: (sheetContext, m) async {
+        await _settings.setAIContextSelection(
+          context: 'chat',
+          providerId: p.id!,
+          model: m,
         );
-        return StatefulBuilder(
-          builder: (c, setModalState) {
-            final String q = queryCtrl.text.trim().toLowerCase();
-            final List<String> items = q.isEmpty
-                ? List<String>.from(models)
-                : models.where((mm) => mm.toLowerCase().contains(q)).toList();
-            if (active.isNotEmpty && items.contains(active)) {
-              items.remove(active);
-              items.insert(0, active);
-            }
-            return FractionallySizedBox(
-              heightFactor: 0.9,
-              child: UISheetSurface(
-                child: Column(
-                  children: [
-                    const SizedBox(height: AppTheme.spacing3),
-                    const UISheetHandle(),
-                    const SizedBox(height: AppTheme.spacing3),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                      child: SearchTextField(
-                        controller: queryCtrl,
-                        hintText: AppLocalizations.of(
-                          context,
-                        ).searchModelPlaceholder,
-                        autofocus: true,
-                        onChanged: (_) {
-                          _modelQueryText = queryCtrl.text;
-                          setModalState(() {});
-                        },
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView.separated(
-                        itemCount: items.length,
-                        separatorBuilder: (c, i) => Container(
-                          height: 1,
-                          color: Theme.of(
-                            c,
-                          ).colorScheme.outline.withOpacity(0.6),
-                        ),
-                        itemBuilder: (c, i) {
-                          final m = items[i];
-                          final selected = m == active;
-                          return ListTile(
-                            leading: ModelLogo(modelId: m, size: 20),
-                            title: Text(
-                              m,
-                              style: Theme.of(c).textTheme.bodyMedium,
-                            ),
-                            trailing: selected
-                                ? Icon(
-                                    Icons.check_circle,
-                                    color: Theme.of(c).colorScheme.onSurface,
-                                  )
-                                : null,
-                            onTap: () async {
-                              await _settings.setAIContextSelection(
-                                context: 'chat',
-                                providerId: p.id!,
-                                model: m,
-                              );
-                              if (mounted) {
-                                _setState(() => _ctxChatModel = m);
-                                Navigator.of(ctx).pop();
-                                UINotifier.success(
-                                  context,
-                                  AppLocalizations.of(
-                                    context,
-                                  ).modelSwitchedToast(m),
-                                );
-                              }
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+        if (!mounted || !sheetContext.mounted) return;
+        _setState(() => _ctxChatModel = m);
+        Navigator.of(sheetContext).pop();
+        UINotifier.success(
+          context,
+          AppLocalizations.of(context).modelSwitchedToast(m),
         );
       },
     );

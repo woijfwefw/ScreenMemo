@@ -21,7 +21,6 @@ import 'package:screen_memo/core/widgets/ui_dialog.dart';
 import 'package:screen_memo/core/widgets/ui_select_field.dart';
 import 'package:screen_memo/l10n/app_localizations.dart';
 import 'package:screen_memo/features/ai/application/ai_providers_service.dart';
-import 'package:screen_memo/core/widgets/model_logo.dart';
 import 'package:screen_memo/features/ai_chat/presentation/widgets/markdown_math.dart';
 import 'package:screen_memo/app/navigation/widgets/app_side_drawer.dart';
 import 'package:screen_memo/features/gallery/presentation/widgets/screenshot_image_widget.dart';
@@ -39,8 +38,8 @@ import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_request_log
 import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_request_logs_viewer.dart';
 import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_request_logs_sheet.dart';
 import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_image_generation_menu_button.dart';
+import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_provider_model_picker.dart';
 import 'package:screen_memo/core/widgets/ui_perf_overlay.dart';
-import 'package:screen_memo/core/widgets/search_styles.dart';
 
 part 'ai_settings/ai_settings_page_state_core.dart';
 part 'ai_settings/ai_settings_page_state_send_message.dart';
@@ -473,6 +472,7 @@ class _AISettingsPageState extends State<AISettingsPage>
   AIReasoningLevel _reasoningLevel = AIReasoningLevel.auto;
   bool _webSearch = false; // "联网搜索"开关（先做样式，后续可接搜索参数）
   bool _imageDrawMode = false;
+  bool _composerHasText = false;
   bool _composerTodoExpanded = false;
   bool _pickingComposerImages = false;
   bool _processingComposerImages = false;
@@ -504,6 +504,8 @@ class _AISettingsPageState extends State<AISettingsPage>
   final Map<int, List<_ThinkingBlock>> _thinkingBlocksByIndex =
       <int, List<_ThinkingBlock>>{};
   final ValueNotifier<int> _subagentListVersion = ValueNotifier<int>(0);
+  List<Map<String, dynamic>> _subagentConversationRows =
+      const <Map<String, dynamic>>[];
   // 每条助手消息的正文缓存。思考过程统一显示在正文之前，正文只保留连续文本。
   final Map<int, List<String>> _contentSegmentsByIndex = <int, List<String>>{};
   // 每条助手消息附带的证据图片（索引 -> 附件列表）
@@ -584,6 +586,18 @@ class _AISettingsPageState extends State<AISettingsPage>
   bool _trackDynamicEntryPerf = false;
 
   void _setState(VoidCallback fn) => setState(fn);
+
+  void _handleComposerInputChanged() {
+    final bool nextHasText = _inputController.text.trim().isNotEmpty;
+    if (_composerHasText == nextHasText) return;
+    if (!mounted) {
+      _composerHasText = nextHasText;
+      return;
+    }
+    _setState(() {
+      _composerHasText = nextHasText;
+    });
+  }
 
   void _logChatPerf(String name, {String? detail, Stopwatch? stopwatch}) {
     final String d0 = (detail ?? '').trim();
@@ -742,6 +756,8 @@ class _AISettingsPageState extends State<AISettingsPage>
     }
     _uiPerf.clear(restart: true);
     _uiPerf.log('page.initState');
+    _composerHasText = _inputController.text.trim().isNotEmpty;
+    _inputController.addListener(_handleComposerInputChanged);
     unawaited(_loadPerfOverlayEnabled());
     if (widget.readOnly) {
       _refreshReadOnlyConversationMetaFuture();
@@ -993,6 +1009,7 @@ class _AISettingsPageState extends State<AISettingsPage>
       _gatewayLogsByIndex.clear();
       _reasoningDurationByIndex.clear();
       _thinkingBlocksByIndex.clear();
+      _subagentConversationRows = const <Map<String, dynamic>>[];
       _contentSegmentsByIndex.clear();
       _currentAssistantIndex = null;
       _inStreaming = false;
@@ -1025,6 +1042,7 @@ class _AISettingsPageState extends State<AISettingsPage>
     _baseUrlController.dispose();
     _apiKeyController.dispose();
     _modelController.dispose();
+    _inputController.removeListener(_handleComposerInputChanged);
     _inputController.dispose();
     _promptSegmentController.dispose();
     _promptMergeController.dispose();

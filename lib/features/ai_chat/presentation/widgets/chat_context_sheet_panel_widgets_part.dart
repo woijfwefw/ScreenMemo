@@ -233,15 +233,8 @@ extension _ChatContextPanelWidgetsPart on _ChatContextPanelState {
           : 'Model: $modelText · Context: ${nf.format(lastUsage.tokensInContextWindow)}',
     );
 
-    return Container(
+    return Padding(
       padding: const EdgeInsets.all(AppTheme.spacing3),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.4),
-        ),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
