@@ -1100,6 +1100,7 @@ class UIEmptyState extends StatelessWidget {
   final String? actionLabel;
   final VoidCallback? onAction;
   final EdgeInsetsGeometry padding;
+  final bool showIconBackground;
 
   const UIEmptyState({
     super.key,
@@ -1109,6 +1110,7 @@ class UIEmptyState extends StatelessWidget {
     this.actionLabel,
     this.onAction,
     this.padding = const EdgeInsets.all(AppTheme.spacing6),
+    this.showIconBackground = true,
   });
 
   @override
@@ -1122,6 +1124,7 @@ class UIEmptyState extends StatelessWidget {
         icon: icon,
         iconColor: cs.onSurfaceVariant,
         backgroundColor: cs.surfaceContainerHigh,
+        showBackground: showIconBackground,
       ),
       title: title,
       message: message,
@@ -1249,8 +1252,17 @@ Widget _buildStateIcon(
   required IconData icon,
   required Color iconColor,
   required Color backgroundColor,
+  bool showBackground = true,
 }) {
   final cs = Theme.of(context).colorScheme;
+
+  if (!showBackground) {
+    return SizedBox(
+      width: 52,
+      height: 52,
+      child: Center(child: Icon(icon, size: 28, color: iconColor)),
+    );
+  }
 
   return Container(
     width: 52,

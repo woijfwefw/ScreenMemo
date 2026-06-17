@@ -220,11 +220,7 @@ class _OnboardingPageState extends State<OnboardingPage>
                 ),
                 child: Row(
                   children: [
-                    const Icon(
-                      Icons.info_outline,
-                      color: AppTheme.info,
-                      size: 16,
-                    ),
+                    Icon(Icons.info_outline, color: AppTheme.info, size: 16),
                     const SizedBox(width: AppTheme.spacing2),
                     Expanded(
                       child: Text(
@@ -701,7 +697,7 @@ class _OnboardingPageState extends State<OnboardingPage>
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline, size: 14, color: AppTheme.info),
+                Icon(Icons.info_outline, size: 14, color: AppTheme.info),
                 const SizedBox(width: AppTheme.spacing1),
                 Expanded(
                   child: Text(

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:screen_memo/core/lifecycle/app_lifecycle_service.dart';
 import 'package:screen_memo/core/localization/locale_service.dart';
 import 'package:screen_memo/core/performance/startup_profiler.dart';
-import 'package:screen_memo/core/theme/app_theme.dart';
 import 'package:screen_memo/core/theme/theme_service.dart';
 import 'package:screen_memo/l10n/app_localizations.dart';
 import 'package:screen_memo/features/capture/presentation/pages/app_screenshot_settings_page.dart';
@@ -98,8 +97,8 @@ class _ScreenMemoAppState extends State<ScreenMemoApp>
     StartupProfiler.mark('ScreenMemoAppState.build');
     return MaterialApp(
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
+      theme: _themeService.lightTheme,
+      darkTheme: _themeService.darkTheme,
       themeMode: _themeService.themeMode,
       locale: _localeService.locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,

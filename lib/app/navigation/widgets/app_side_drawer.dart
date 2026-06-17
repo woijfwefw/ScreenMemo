@@ -378,7 +378,7 @@ class _AppSideDrawerState extends State<AppSideDrawer> {
                 ),
               ),
             ),
-            const Icon(
+            Icon(
               Icons.chevron_right,
               color: AppTheme.mutedForeground,
               size: 20,

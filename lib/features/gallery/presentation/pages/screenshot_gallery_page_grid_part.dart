@@ -12,15 +12,11 @@ extension _ScreenshotGalleryGridPart on _ScreenshotGalleryPageState {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.error_outline,
-              size: 64,
-              color: AppTheme.destructive,
-            ),
+            Icon(Icons.error_outline, size: 64, color: AppTheme.destructive),
             const SizedBox(height: AppTheme.spacing4),
             Text(
               _error!,
-              style: const TextStyle(color: AppTheme.destructive),
+              style: TextStyle(color: AppTheme.destructive),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppTheme.spacing4),
@@ -51,7 +47,7 @@ extension _ScreenshotGalleryGridPart on _ScreenshotGalleryPageState {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.photo_library_outlined,
                     size: 64,
                     color: AppTheme.mutedForeground,
@@ -59,7 +55,7 @@ extension _ScreenshotGalleryGridPart on _ScreenshotGalleryPageState {
                   const SizedBox(height: AppTheme.spacing4),
                   Text(
                     AppLocalizations.of(context).noScreenshotsTitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w500,
                       color: AppTheme.mutedForeground,
@@ -68,7 +64,7 @@ extension _ScreenshotGalleryGridPart on _ScreenshotGalleryPageState {
                   const SizedBox(height: AppTheme.spacing2),
                   Text(
                     AppLocalizations.of(context).noScreenshotsSubtitle,
-                    style: const TextStyle(color: AppTheme.mutedForeground),
+                    style: TextStyle(color: AppTheme.mutedForeground),
                   ),
                 ],
               ),

@@ -120,13 +120,13 @@ extension _HomePagePermissionUiPart on _HomePageState {
                     color: AppTheme.success.withValues(alpha: 0.25),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.check,
                     size: 14,
                     color: AppTheme.successForeground,
                   ),
                 )
-              : const Icon(Icons.cancel, color: AppTheme.destructive, size: 20),
+              : Icon(Icons.cancel, color: AppTheme.destructive, size: 20),
           const SizedBox(width: 8),
           Text(name),
           const Spacer(),
@@ -222,7 +222,7 @@ extension _HomePagePermissionUiPart on _HomePageState {
                         color: AppTheme.destructive.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.warning_amber_rounded,
                         color: AppTheme.destructive,
                       ),
@@ -293,7 +293,7 @@ extension _HomePagePermissionUiPart on _HomePageState {
                               child: Container(
                                 width: 6,
                                 height: 6,
-                                decoration: const BoxDecoration(
+                                decoration: BoxDecoration(
                                   color: AppTheme.destructive,
                                   shape: BoxShape.circle,
                                 ),

@@ -54,19 +54,6 @@ extension _SettingsSupportPart on _SettingsPageState {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                ),
-                child: Icon(
-                  Icons.volunteer_activism_outlined,
-                  color: colorScheme.onPrimaryContainer,
-                ),
-              ),
-              const SizedBox(height: AppTheme.spacing4),
               Text(
                 l10n.supportIntroTitle,
                 style: theme.textTheme.titleLarge?.copyWith(

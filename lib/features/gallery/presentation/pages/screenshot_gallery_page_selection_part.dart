@@ -275,15 +275,11 @@ extension _ScreenshotGallerySelectionPart on _ScreenshotGalleryPageState {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.error_outline,
-              color: AppTheme.destructive,
-              size: 32,
-            ),
+            Icon(Icons.error_outline, color: AppTheme.destructive, size: 32),
             const SizedBox(height: 4),
             Text(
               message,
-              style: const TextStyle(color: AppTheme.destructive, fontSize: 12),
+              style: TextStyle(color: AppTheme.destructive, fontSize: 12),
             ),
           ],
         ),

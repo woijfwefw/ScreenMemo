@@ -4970,7 +4970,7 @@ abstract class AppLocalizations {
   /// No description provided for @themeColorDesc.
   ///
   /// In en, this message translates to:
-  /// **'Customize the app\'s primary color'**
+  /// **'Customize the semantic colors currently used by the app'**
   String get themeColorDesc;
 
   /// No description provided for @chooseThemeColorTitle.
@@ -4978,6 +4978,216 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Choose theme color'**
   String get chooseThemeColorTitle;
+
+  /// No description provided for @themeColorsSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom theme colors'**
+  String get themeColorsSheetTitle;
+
+  /// No description provided for @themeColorsLightBaseGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Light base colors'**
+  String get themeColorsLightBaseGroup;
+
+  /// No description provided for @themeColorsStatusGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Status and accent colors'**
+  String get themeColorsStatusGroup;
+
+  /// No description provided for @themeColorsLightSurfaceGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Light surface levels'**
+  String get themeColorsLightSurfaceGroup;
+
+  /// No description provided for @themeColorsDarkBaseGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark base colors'**
+  String get themeColorsDarkBaseGroup;
+
+  /// No description provided for @themeColorsDarkSurfaceGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark surface levels'**
+  String get themeColorsDarkSurfaceGroup;
+
+  /// No description provided for @themeColorsDefaultBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get themeColorsDefaultBadge;
+
+  /// No description provided for @themeColorsCustomBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get themeColorsCustomBadge;
+
+  /// No description provided for @themeColorHexLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Hex color'**
+  String get themeColorHexLabel;
+
+  /// No description provided for @themeColorHexFormatHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Use #RRGGBB or #AARRGGBB'**
+  String get themeColorHexFormatHint;
+
+  /// No description provided for @themeColorInvalidHex.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid hex color, for example #66FF66 or #FF66FF66'**
+  String get themeColorInvalidHex;
+
+  /// No description provided for @themeColorSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme color saved'**
+  String get themeColorSaved;
+
+  /// No description provided for @themeColorsResetSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme colors reset to default'**
+  String get themeColorsResetSaved;
+
+  /// No description provided for @themeColorsPasteTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste theme colors'**
+  String get themeColorsPasteTooltip;
+
+  /// No description provided for @themeColorsPasteEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Clipboard is empty'**
+  String get themeColorsPasteEmpty;
+
+  /// No description provided for @themeColorsPasteInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Clipboard does not contain valid theme colors JSON'**
+  String get themeColorsPasteInvalid;
+
+  /// No description provided for @themeColorsPasteSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme colors imported'**
+  String get themeColorsPasteSaved;
+
+  /// No description provided for @themeColorsCopyTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy theme colors JSON'**
+  String get themeColorsCopyTooltip;
+
+  /// No description provided for @themeColorsCopySaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme colors JSON copied'**
+  String get themeColorsCopySaved;
+
+  /// No description provided for @themeColorsPresetGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Color presets'**
+  String get themeColorsPresetGroup;
+
+  /// No description provided for @themeColorsPresetDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default khaki'**
+  String get themeColorsPresetDefault;
+
+  /// No description provided for @themeColorsPresetGreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Fresh green'**
+  String get themeColorsPresetGreen;
+
+  /// No description provided for @themeColorsPresetSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied color preset: {name}'**
+  String themeColorsPresetSaved(Object name);
+
+  /// No description provided for @dynamicTagPaletteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Dynamic tag colors'**
+  String get dynamicTagPaletteTitle;
+
+  /// No description provided for @dynamicTagPaletteDescDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Regular tags auto-match these 7 colors by text'**
+  String get dynamicTagPaletteDescDefault;
+
+  /// No description provided for @dynamicTagPaletteDescCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Regular tags and merged-event tags are customized'**
+  String get dynamicTagPaletteDescCustom;
+
+  /// No description provided for @dynamicTagPaletteSheetDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Regular tags use a stable text hash across 7 colors. Merged-event tags use a separate color.'**
+  String get dynamicTagPaletteSheetDesc;
+
+  /// No description provided for @dynamicTagPaletteResetSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Dynamic tag colors reset to default'**
+  String get dynamicTagPaletteResetSaved;
+
+  /// No description provided for @dynamicTagPaletteSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Regular dynamic tags'**
+  String get dynamicTagPaletteSection;
+
+  /// No description provided for @dynamicTagPaletteColorLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tag color {index}'**
+  String dynamicTagPaletteColorLabel(Object index);
+
+  /// No description provided for @mergedEventTagSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Merged-event tag'**
+  String get mergedEventTagSection;
+
+  /// No description provided for @mergedEventTagColorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Merged-event tag color'**
+  String get mergedEventTagColorTitle;
+
+  /// No description provided for @dynamicTagPaletteColorSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Dynamic tag color saved'**
+  String get dynamicTagPaletteColorSaved;
+
+  /// No description provided for @themeColorSlotLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{slot, select, primary{Primary} primaryForeground{Primary foreground} secondary{Secondary} secondaryForeground{Secondary foreground} muted{Muted} mutedForeground{Muted foreground} accent{Accent} accentForeground{Accent foreground} destructive{Destructive} destructiveForeground{Destructive foreground} border{Border} input{Input background} ring{Focus ring} background{Page background} foreground{Page foreground} card{Card background} cardForeground{Card foreground} popover{Popover background} popoverForeground{Popover foreground} success{Success} successForeground{Success foreground} warning{Warning} warningForeground{Warning foreground} info{Info} infoForeground{Info foreground} mergedEventAccent{Merged event accent} lightPrimaryContainer{Light primary container} lightSecondaryContainer{Light secondary container} lightTertiaryContainer{Light tertiary container} lightErrorContainer{Light error container} lightOutlineVariant{Light outline variant} lightSurfaceHigh{Light surface high} lightSurfaceHighest{Light surface highest} lightInversePrimary{Light inverse primary} darkPrimary{Dark primary} darkPrimaryForeground{Dark primary foreground} darkSecondary{Dark secondary} darkSecondaryForeground{Dark secondary foreground} darkMuted{Dark muted} darkMutedForeground{Dark muted foreground} darkAccent{Dark accent} darkAccentForeground{Dark accent foreground} darkDestructive{Dark destructive} darkDestructiveForeground{Dark destructive foreground} darkBorder{Dark border} darkInput{Dark input background} darkRing{Dark focus ring} darkBackground{Dark page background} darkForeground{Dark page foreground} darkCard{Dark card background} darkCardForeground{Dark card foreground} darkPopover{Dark popover background} darkPopoverForeground{Dark popover foreground} darkSelectedAccent{Dark selected accent} darkPrimaryContainer{Dark primary container} darkSecondaryContainer{Dark secondary container} darkTertiaryContainer{Dark tertiary container} darkErrorContainer{Dark error container} darkOutlineVariant{Dark outline variant} darkSurfaceHigh{Dark surface high} darkSurfaceHighest{Dark surface highest} darkSurfaceContainerLowest{Dark surface container lowest} other{Color}}'**
+  String themeColorSlotLabel(String slot);
+
+  /// No description provided for @themeColorUsageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{slot, select, primary{Controls primary buttons, selected bottom navigation items, date tab underlines, enabled switches, and focused input borders.} primaryForeground{Controls limited text/icons on primary blocks, such as selected screenshot settings and rebuild/backfill actions.} secondary{Controls AI context panel icons, reasoning card accents, helper chart segments, and merge-stat helper color.} secondaryForeground{Controls text/icons on secondary blocks, such as pale screenshot setting helper blocks.} muted{Controls a few legacy muted backgrounds, such as screenshot multi-select empty states. For common backgrounds, edit input or card.} mutedForeground{Controls helper text, input hints, unselected bottom navigation items, muted icons, and empty-state text.} accent{Backup accent color. Common highlights currently follow primary.} accentForeground{Backup text on accent blocks. Common highlight text usually follows page foreground.} destructive{Controls delete/danger buttons, error text, error input borders, screenshot error, and NSFW marks.} destructiveForeground{Controls text and icons on danger buttons and error blocks.} border{Controls bottom navigation top border, settings dividers, card borders, input borders, and dialog borders.} input{Controls input/search backgrounds, bottom navigation background, dialog/bottom sheet/drawer background, and settings cards.} ring{Backup focus ring. Focused input borders and tab underlines currently follow primary.} background{Controls light-mode page background, AppBar background, and some lowest-level containers.} foreground{Controls body text, titles, AppBar text/icons, default icons, and list primary text.} card{Controls global Card background, default Chip background, custom theme color groups, and some list cards.} cardForeground{Backup card text color. Common card primary text actually follows page foreground.} popover{Backup popover background. Dialog, bottom sheet, and drawer backgrounds currently follow input.} popoverForeground{Backup popover text color. Dialog and menu text currently follows page foreground.} success{Controls permission granted, service healthy, AI request success, storage cleanup primary action, and completed states.} successForeground{Controls text and icons on success buttons/badges.} warning{Controls model/key cooldown, caution notices, pending states, and yellow warning blocks.} warningForeground{Controls text and icons on warning blocks.} info{Controls info callouts, helper block icons/text, and light-mode search result tags.} infoForeground{Controls text and icons on info blocks.} mergedEventAccent{Controls merged-event tag color. It is edited separately in screenshot settings.} lightPrimaryContainer{Controls light selected backgrounds, such as drawer selection, selected Chips, and selected calendar days.} lightSecondaryContainer{Controls light helper blocks, such as screenshot setting blue blocks and AI tool/chart helper backgrounds.} lightTertiaryContainer{Controls light success badge backgrounds and AI thinking/completed panel backgrounds.} lightErrorContainer{Controls light error callouts and import/dynamic rebuild error containers.} lightOutlineVariant{Controls light subtle dividers, such as dialog dividers, chart card borders, and log block borders.} lightSurfaceHigh{Controls light raised panels, such as disabled switch tracks and backup/stat inner cards.} lightSurfaceHighest{Controls light highest panels, such as calendar day cells, AI log blocks, and image placeholders.} lightInversePrimary{Controls light-mode inverse primary on dark surfaces. Used sparingly.} darkPrimary{Controls dark-mode primary buttons, selected bottom navigation items, date tab underlines, enabled switches, and focused input borders.} darkPrimaryForeground{Controls limited text/icons on dark primary blocks. General button text usually follows dark page foreground.} darkSecondary{Controls dark AI context panel icons, reasoning card accents, helper chart segments, and merge-stat helper color.} darkSecondaryForeground{Controls text/icons on dark secondary blocks.} darkMuted{Backup muted background. For common dark panels, edit dark popover or dark card.} darkMutedForeground{Controls dark helper text, input hints, unselected bottom navigation items, muted icons, and empty-state text.} darkAccent{Backup dark accent. Common highlights mostly follow dark primary or dark selected accent.} darkAccentForeground{Backup text on dark accent blocks.} darkDestructive{Controls dark delete/danger buttons, error text, error input borders, screenshot error, and NSFW marks.} darkDestructiveForeground{Controls text and icons on dark danger buttons and error blocks.} darkBorder{Controls dark bottom navigation top border, settings dividers, card borders, input borders, and dialog borders.} darkInput{Backup dark input field. Current input, bottom nav, and dialog backgrounds follow dark popover.} darkRing{Backup dark focus ring. Focus borders and tab underlines mostly follow dark primary.} darkBackground{Controls dark page background, AppBar background, and some lowest-level containers.} darkForeground{Controls dark body text, titles, AppBar text/icons, default icons, and list primary text.} darkCard{Controls dark global Card background, default Chip background, custom theme color groups, and some list cards.} darkCardForeground{Backup dark card text. Common card primary text actually follows dark page foreground.} darkPopover{Controls dark input/search backgrounds, bottom navigation background, dialog/bottom sheet/drawer background, and settings cards.} darkPopoverForeground{Backup dark popover text. Dialog and menu text currently follows dark page foreground.} darkSelectedAccent{Controls search result tags in dark mode: text, border, and pale fill.} darkPrimaryContainer{Controls dark selected backgrounds, such as drawer selection, selected Chips, and selected calendar days.} darkSecondaryContainer{Controls dark helper blocks, such as screenshot setting callouts and AI tool/chart helper backgrounds.} darkTertiaryContainer{Controls dark success badge backgrounds and AI thinking/completed panel backgrounds.} darkErrorContainer{Controls dark error callouts and import/dynamic rebuild error containers.} darkOutlineVariant{Controls dark subtle dividers, such as dialog dividers, chart card borders, and log block borders.} darkSurfaceHigh{Controls dark raised panels, such as disabled switch tracks and backup/stat inner cards.} darkSurfaceHighest{Controls dark highest panels, such as calendar day cells, AI log blocks, and image placeholders.} darkSurfaceContainerLowest{Controls dark lowest backgrounds, such as cloud backup input zones and the deepest page base.} other{Controls an imported custom color slot.}}'**
+  String themeColorUsageLabel(String slot);
 
   /// No description provided for @pageBackgroundTitle.
   ///

@@ -35,9 +35,8 @@ class ScreenshotStyleTabBar extends StatelessWidget
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final Color selectedColor = theme.brightness == Brightness.dark
-        ? AppTheme.darkForeground
-        : AppTheme.foreground;
+    final Color selectedColor = theme.colorScheme.primary;
+    final Color indicatorColor = theme.colorScheme.primary;
     final Color unselectedColor =
         theme.textTheme.bodySmall?.color ?? AppTheme.mutedForeground;
 
@@ -83,7 +82,7 @@ class ScreenshotStyleTabBar extends StatelessWidget
         indicatorSize: effectiveIndicatorSize,
         indicatorPadding: effectiveIndicatorPadding,
         indicator: UnderlineTabIndicator(
-          borderSide: BorderSide(width: 2.0, color: selectedColor),
+          borderSide: BorderSide(width: 2.0, color: indicatorColor),
           insets: effectiveIndicatorInsets,
         ),
       ),

@@ -11,10 +11,7 @@ extension _SearchPageViewsPart on _SearchPageState {
 
     if (_error != null) {
       return Center(
-        child: Text(
-          _error!,
-          style: const TextStyle(color: AppTheme.destructive),
-        ),
+        child: Text(_error!, style: TextStyle(color: AppTheme.destructive)),
       );
     }
 

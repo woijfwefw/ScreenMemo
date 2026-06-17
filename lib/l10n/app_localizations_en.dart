@@ -2793,10 +2793,318 @@ class AppLocalizationsEn extends AppLocalizations {
   String get themeColorTitle => 'Theme color';
 
   @override
-  String get themeColorDesc => 'Customize the app\'s primary color';
+  String get themeColorDesc =>
+      'Customize the semantic colors currently used by the app';
 
   @override
   String get chooseThemeColorTitle => 'Choose theme color';
+
+  @override
+  String get themeColorsSheetTitle => 'Custom theme colors';
+
+  @override
+  String get themeColorsLightBaseGroup => 'Light base colors';
+
+  @override
+  String get themeColorsStatusGroup => 'Status and accent colors';
+
+  @override
+  String get themeColorsLightSurfaceGroup => 'Light surface levels';
+
+  @override
+  String get themeColorsDarkBaseGroup => 'Dark base colors';
+
+  @override
+  String get themeColorsDarkSurfaceGroup => 'Dark surface levels';
+
+  @override
+  String get themeColorsDefaultBadge => 'Default';
+
+  @override
+  String get themeColorsCustomBadge => 'Custom';
+
+  @override
+  String get themeColorHexLabel => 'Hex color';
+
+  @override
+  String get themeColorHexFormatHint => 'Use #RRGGBB or #AARRGGBB';
+
+  @override
+  String get themeColorInvalidHex =>
+      'Enter a valid hex color, for example #66FF66 or #FF66FF66';
+
+  @override
+  String get themeColorSaved => 'Theme color saved';
+
+  @override
+  String get themeColorsResetSaved => 'Theme colors reset to default';
+
+  @override
+  String get themeColorsPasteTooltip => 'Paste theme colors';
+
+  @override
+  String get themeColorsPasteEmpty => 'Clipboard is empty';
+
+  @override
+  String get themeColorsPasteInvalid =>
+      'Clipboard does not contain valid theme colors JSON';
+
+  @override
+  String get themeColorsPasteSaved => 'Theme colors imported';
+
+  @override
+  String get themeColorsCopyTooltip => 'Copy theme colors JSON';
+
+  @override
+  String get themeColorsCopySaved => 'Theme colors JSON copied';
+
+  @override
+  String get themeColorsPresetGroup => 'Color presets';
+
+  @override
+  String get themeColorsPresetDefault => 'Default khaki';
+
+  @override
+  String get themeColorsPresetGreen => 'Fresh green';
+
+  @override
+  String themeColorsPresetSaved(Object name) {
+    return 'Applied color preset: $name';
+  }
+
+  @override
+  String get dynamicTagPaletteTitle => 'Dynamic tag colors';
+
+  @override
+  String get dynamicTagPaletteDescDefault =>
+      'Regular tags auto-match these 7 colors by text';
+
+  @override
+  String get dynamicTagPaletteDescCustom =>
+      'Regular tags and merged-event tags are customized';
+
+  @override
+  String get dynamicTagPaletteSheetDesc =>
+      'Regular tags use a stable text hash across 7 colors. Merged-event tags use a separate color.';
+
+  @override
+  String get dynamicTagPaletteResetSaved =>
+      'Dynamic tag colors reset to default';
+
+  @override
+  String get dynamicTagPaletteSection => 'Regular dynamic tags';
+
+  @override
+  String dynamicTagPaletteColorLabel(Object index) {
+    return 'Tag color $index';
+  }
+
+  @override
+  String get mergedEventTagSection => 'Merged-event tag';
+
+  @override
+  String get mergedEventTagColorTitle => 'Merged-event tag color';
+
+  @override
+  String get dynamicTagPaletteColorSaved => 'Dynamic tag color saved';
+
+  @override
+  String themeColorSlotLabel(String slot) {
+    String _temp0 = intl.Intl.selectLogic(slot, {
+      'primary': 'Primary',
+      'primaryForeground': 'Primary foreground',
+      'secondary': 'Secondary',
+      'secondaryForeground': 'Secondary foreground',
+      'muted': 'Muted',
+      'mutedForeground': 'Muted foreground',
+      'accent': 'Accent',
+      'accentForeground': 'Accent foreground',
+      'destructive': 'Destructive',
+      'destructiveForeground': 'Destructive foreground',
+      'border': 'Border',
+      'input': 'Input background',
+      'ring': 'Focus ring',
+      'background': 'Page background',
+      'foreground': 'Page foreground',
+      'card': 'Card background',
+      'cardForeground': 'Card foreground',
+      'popover': 'Popover background',
+      'popoverForeground': 'Popover foreground',
+      'success': 'Success',
+      'successForeground': 'Success foreground',
+      'warning': 'Warning',
+      'warningForeground': 'Warning foreground',
+      'info': 'Info',
+      'infoForeground': 'Info foreground',
+      'mergedEventAccent': 'Merged event accent',
+      'lightPrimaryContainer': 'Light primary container',
+      'lightSecondaryContainer': 'Light secondary container',
+      'lightTertiaryContainer': 'Light tertiary container',
+      'lightErrorContainer': 'Light error container',
+      'lightOutlineVariant': 'Light outline variant',
+      'lightSurfaceHigh': 'Light surface high',
+      'lightSurfaceHighest': 'Light surface highest',
+      'lightInversePrimary': 'Light inverse primary',
+      'darkPrimary': 'Dark primary',
+      'darkPrimaryForeground': 'Dark primary foreground',
+      'darkSecondary': 'Dark secondary',
+      'darkSecondaryForeground': 'Dark secondary foreground',
+      'darkMuted': 'Dark muted',
+      'darkMutedForeground': 'Dark muted foreground',
+      'darkAccent': 'Dark accent',
+      'darkAccentForeground': 'Dark accent foreground',
+      'darkDestructive': 'Dark destructive',
+      'darkDestructiveForeground': 'Dark destructive foreground',
+      'darkBorder': 'Dark border',
+      'darkInput': 'Dark input background',
+      'darkRing': 'Dark focus ring',
+      'darkBackground': 'Dark page background',
+      'darkForeground': 'Dark page foreground',
+      'darkCard': 'Dark card background',
+      'darkCardForeground': 'Dark card foreground',
+      'darkPopover': 'Dark popover background',
+      'darkPopoverForeground': 'Dark popover foreground',
+      'darkSelectedAccent': 'Dark selected accent',
+      'darkPrimaryContainer': 'Dark primary container',
+      'darkSecondaryContainer': 'Dark secondary container',
+      'darkTertiaryContainer': 'Dark tertiary container',
+      'darkErrorContainer': 'Dark error container',
+      'darkOutlineVariant': 'Dark outline variant',
+      'darkSurfaceHigh': 'Dark surface high',
+      'darkSurfaceHighest': 'Dark surface highest',
+      'darkSurfaceContainerLowest': 'Dark surface container lowest',
+      'other': 'Color',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String themeColorUsageLabel(String slot) {
+    String _temp0 = intl.Intl.selectLogic(slot, {
+      'primary':
+          'Controls primary buttons, selected bottom navigation items, date tab underlines, enabled switches, and focused input borders.',
+      'primaryForeground':
+          'Controls limited text/icons on primary blocks, such as selected screenshot settings and rebuild/backfill actions.',
+      'secondary':
+          'Controls AI context panel icons, reasoning card accents, helper chart segments, and merge-stat helper color.',
+      'secondaryForeground':
+          'Controls text/icons on secondary blocks, such as pale screenshot setting helper blocks.',
+      'muted':
+          'Controls a few legacy muted backgrounds, such as screenshot multi-select empty states. For common backgrounds, edit input or card.',
+      'mutedForeground':
+          'Controls helper text, input hints, unselected bottom navigation items, muted icons, and empty-state text.',
+      'accent':
+          'Backup accent color. Common highlights currently follow primary.',
+      'accentForeground':
+          'Backup text on accent blocks. Common highlight text usually follows page foreground.',
+      'destructive':
+          'Controls delete/danger buttons, error text, error input borders, screenshot error, and NSFW marks.',
+      'destructiveForeground':
+          'Controls text and icons on danger buttons and error blocks.',
+      'border':
+          'Controls bottom navigation top border, settings dividers, card borders, input borders, and dialog borders.',
+      'input':
+          'Controls input/search backgrounds, bottom navigation background, dialog/bottom sheet/drawer background, and settings cards.',
+      'ring':
+          'Backup focus ring. Focused input borders and tab underlines currently follow primary.',
+      'background':
+          'Controls light-mode page background, AppBar background, and some lowest-level containers.',
+      'foreground':
+          'Controls body text, titles, AppBar text/icons, default icons, and list primary text.',
+      'card':
+          'Controls global Card background, default Chip background, custom theme color groups, and some list cards.',
+      'cardForeground':
+          'Backup card text color. Common card primary text actually follows page foreground.',
+      'popover':
+          'Backup popover background. Dialog, bottom sheet, and drawer backgrounds currently follow input.',
+      'popoverForeground':
+          'Backup popover text color. Dialog and menu text currently follows page foreground.',
+      'success':
+          'Controls permission granted, service healthy, AI request success, storage cleanup primary action, and completed states.',
+      'successForeground': 'Controls text and icons on success buttons/badges.',
+      'warning':
+          'Controls model/key cooldown, caution notices, pending states, and yellow warning blocks.',
+      'warningForeground': 'Controls text and icons on warning blocks.',
+      'info':
+          'Controls info callouts, helper block icons/text, and light-mode search result tags.',
+      'infoForeground': 'Controls text and icons on info blocks.',
+      'mergedEventAccent':
+          'Controls merged-event tag color. It is edited separately in screenshot settings.',
+      'lightPrimaryContainer':
+          'Controls light selected backgrounds, such as drawer selection, selected Chips, and selected calendar days.',
+      'lightSecondaryContainer':
+          'Controls light helper blocks, such as screenshot setting blue blocks and AI tool/chart helper backgrounds.',
+      'lightTertiaryContainer':
+          'Controls light success badge backgrounds and AI thinking/completed panel backgrounds.',
+      'lightErrorContainer':
+          'Controls light error callouts and import/dynamic rebuild error containers.',
+      'lightOutlineVariant':
+          'Controls light subtle dividers, such as dialog dividers, chart card borders, and log block borders.',
+      'lightSurfaceHigh':
+          'Controls light raised panels, such as disabled switch tracks and backup/stat inner cards.',
+      'lightSurfaceHighest':
+          'Controls light highest panels, such as calendar day cells, AI log blocks, and image placeholders.',
+      'lightInversePrimary':
+          'Controls light-mode inverse primary on dark surfaces. Used sparingly.',
+      'darkPrimary':
+          'Controls dark-mode primary buttons, selected bottom navigation items, date tab underlines, enabled switches, and focused input borders.',
+      'darkPrimaryForeground':
+          'Controls limited text/icons on dark primary blocks. General button text usually follows dark page foreground.',
+      'darkSecondary':
+          'Controls dark AI context panel icons, reasoning card accents, helper chart segments, and merge-stat helper color.',
+      'darkSecondaryForeground':
+          'Controls text/icons on dark secondary blocks.',
+      'darkMuted':
+          'Backup muted background. For common dark panels, edit dark popover or dark card.',
+      'darkMutedForeground':
+          'Controls dark helper text, input hints, unselected bottom navigation items, muted icons, and empty-state text.',
+      'darkAccent':
+          'Backup dark accent. Common highlights mostly follow dark primary or dark selected accent.',
+      'darkAccentForeground': 'Backup text on dark accent blocks.',
+      'darkDestructive':
+          'Controls dark delete/danger buttons, error text, error input borders, screenshot error, and NSFW marks.',
+      'darkDestructiveForeground':
+          'Controls text and icons on dark danger buttons and error blocks.',
+      'darkBorder':
+          'Controls dark bottom navigation top border, settings dividers, card borders, input borders, and dialog borders.',
+      'darkInput':
+          'Backup dark input field. Current input, bottom nav, and dialog backgrounds follow dark popover.',
+      'darkRing':
+          'Backup dark focus ring. Focus borders and tab underlines mostly follow dark primary.',
+      'darkBackground':
+          'Controls dark page background, AppBar background, and some lowest-level containers.',
+      'darkForeground':
+          'Controls dark body text, titles, AppBar text/icons, default icons, and list primary text.',
+      'darkCard':
+          'Controls dark global Card background, default Chip background, custom theme color groups, and some list cards.',
+      'darkCardForeground':
+          'Backup dark card text. Common card primary text actually follows dark page foreground.',
+      'darkPopover':
+          'Controls dark input/search backgrounds, bottom navigation background, dialog/bottom sheet/drawer background, and settings cards.',
+      'darkPopoverForeground':
+          'Backup dark popover text. Dialog and menu text currently follows dark page foreground.',
+      'darkSelectedAccent':
+          'Controls search result tags in dark mode: text, border, and pale fill.',
+      'darkPrimaryContainer':
+          'Controls dark selected backgrounds, such as drawer selection, selected Chips, and selected calendar days.',
+      'darkSecondaryContainer':
+          'Controls dark helper blocks, such as screenshot setting callouts and AI tool/chart helper backgrounds.',
+      'darkTertiaryContainer':
+          'Controls dark success badge backgrounds and AI thinking/completed panel backgrounds.',
+      'darkErrorContainer':
+          'Controls dark error callouts and import/dynamic rebuild error containers.',
+      'darkOutlineVariant':
+          'Controls dark subtle dividers, such as dialog dividers, chart card borders, and log block borders.',
+      'darkSurfaceHigh':
+          'Controls dark raised panels, such as disabled switch tracks and backup/stat inner cards.',
+      'darkSurfaceHighest':
+          'Controls dark highest panels, such as calendar day cells, AI log blocks, and image placeholders.',
+      'darkSurfaceContainerLowest':
+          'Controls dark lowest backgrounds, such as cloud backup input zones and the deepest page base.',
+      'other': 'Controls an imported custom color slot.',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get pageBackgroundTitle => 'Page background';

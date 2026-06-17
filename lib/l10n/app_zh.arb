@@ -1429,8 +1429,63 @@
   "aiChatPerfOverlayTitle": "AIChat 性能日志悬浮窗",
   "aiChatPerfOverlayDesc": "在 AIChat 页面显示 Perf 日志窗口（仅用于排查）",
   "themeColorTitle": "主题颜色",
-  "themeColorDesc": "自定义应用主色调",
+  "themeColorDesc": "自定义应用当前使用的语义配色",
   "chooseThemeColorTitle": "选择主题颜色",
+  "themeColorsSheetTitle": "自定义主题颜色",
+  "themeColorsLightBaseGroup": "浅色基础色",
+  "themeColorsStatusGroup": "状态与强调色",
+  "themeColorsLightSurfaceGroup": "浅色界面层级",
+  "themeColorsDarkBaseGroup": "深色基础色",
+  "themeColorsDarkSurfaceGroup": "深色界面层级",
+  "themeColorsDefaultBadge": "默认",
+  "themeColorsCustomBadge": "已自定义",
+  "themeColorHexLabel": "Hex 颜色",
+  "themeColorHexFormatHint": "支持 #RRGGBB 或 #AARRGGBB",
+  "themeColorInvalidHex": "请输入有效的 Hex 颜色，例如 #66FF66 或 #FF66FF66",
+  "themeColorSaved": "主题颜色已保存",
+  "themeColorsResetSaved": "主题颜色已恢复默认",
+  "themeColorsPasteTooltip": "粘贴主题配色",
+  "themeColorsPasteEmpty": "剪贴板为空",
+  "themeColorsPasteInvalid": "剪贴板中没有有效的主题配色 JSON",
+  "themeColorsPasteSaved": "主题配色已导入",
+  "themeColorsCopyTooltip": "复制主题配色 JSON",
+  "themeColorsCopySaved": "主题配色 JSON 已复制",
+  "themeColorsPresetGroup": "配色预设",
+  "themeColorsPresetDefault": "默认卡其",
+  "themeColorsPresetGreen": "清新绿",
+  "themeColorsPresetSaved": "已应用配色预设：{name}",
+  "@themeColorsPresetSaved": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "dynamicTagPaletteTitle": "动态标签配色",
+  "dynamicTagPaletteDescDefault": "普通标签按文字自动匹配 7 色",
+  "dynamicTagPaletteDescCustom": "普通标签和合并事件标签已自定义",
+  "dynamicTagPaletteSheetDesc": "普通标签按文字固定匹配 7 色，合并事件标签单独设置。",
+  "dynamicTagPaletteResetSaved": "动态标签配色已恢复默认",
+  "dynamicTagPaletteSection": "普通动态标签",
+  "dynamicTagPaletteColorLabel": "标签颜色 {index}",
+  "@dynamicTagPaletteColorLabel": {
+    "placeholders": {
+      "index": {}
+    }
+  },
+  "mergedEventTagSection": "合并事件标签",
+  "mergedEventTagColorTitle": "合并事件标签颜色",
+  "dynamicTagPaletteColorSaved": "动态标签颜色已保存",
+  "themeColorSlotLabel": "{slot, select, primary{主色} primaryForeground{主色文字} secondary{辅助色} secondaryForeground{辅助色文字} muted{弱化背景} mutedForeground{弱化文字} accent{强调色} accentForeground{强调色文字} destructive{危险色} destructiveForeground{危险色文字} border{边框} input{输入框背景} ring{焦点环} background{页面背景} foreground{页面文字} card{卡片背景} cardForeground{卡片文字} popover{弹层背景} popoverForeground{弹层文字} success{成功色} successForeground{成功色文字} warning{警告色} warningForeground{警告色文字} info{信息色} infoForeground{信息色文字} mergedEventAccent{合并事件强调色} lightPrimaryContainer{浅色主色容器} lightSecondaryContainer{浅色辅助容器} lightTertiaryContainer{浅色第三容器} lightErrorContainer{浅色错误容器} lightOutlineVariant{浅色弱边框} lightSurfaceHigh{浅色高层表面} lightSurfaceHighest{浅色最高表面} lightInversePrimary{浅色反向主色} darkPrimary{深色主色} darkPrimaryForeground{深色主色文字} darkSecondary{深色辅助色} darkSecondaryForeground{深色辅助色文字} darkMuted{深色弱化背景} darkMutedForeground{深色弱化文字} darkAccent{深色强调色} darkAccentForeground{深色强调色文字} darkDestructive{深色危险色} darkDestructiveForeground{深色危险色文字} darkBorder{深色边框} darkInput{深色输入框背景} darkRing{深色焦点环} darkBackground{深色页面背景} darkForeground{深色页面文字} darkCard{深色卡片背景} darkCardForeground{深色卡片文字} darkPopover{深色弹层背景} darkPopoverForeground{深色弹层文字} darkSelectedAccent{深色选中强调色} darkPrimaryContainer{深色主色容器} darkSecondaryContainer{深色辅助容器} darkTertiaryContainer{深色第三容器} darkErrorContainer{深色错误容器} darkOutlineVariant{深色弱边框} darkSurfaceHigh{深色高层表面} darkSurfaceHighest{深色最高表面} darkSurfaceContainerLowest{深色最低表面} other{颜色}}",
+  "@themeColorSlotLabel": {
+    "placeholders": {
+      "slot": {}
+    }
+  },
+  "themeColorUsageLabel": "{slot, select, primary{影响：主按钮、底部菜单选中项、日期 Tab 下划线、开关开启、输入框焦点边框。} primaryForeground{影响：主色块上的少量文字/图标，如截图设置选中项、补全/重建主操作。} secondary{影响：AI 上下文面板图标、思考卡片强调、图表辅助段、合并统计辅助色。} secondaryForeground{影响：辅助色块上的文字/图标，如截图设置浅色提示块内文字。} muted{影响：少量旧弱背景，如截图批量选择空状态；常规背景请改输入框/卡片背景。} mutedForeground{影响：说明文字、输入提示、未选中底部菜单项、灰色图标、空状态文字。} accent{影响：备用强调色；当前常见高亮主要跟随主色。} accentForeground{影响：备用强调色块文字；当前常见高亮文字主要跟随页面文字。} destructive{影响：删除/危险按钮、错误文字、输入框错误边框、截图错误/NSFW 标记。} destructiveForeground{影响：危险色按钮和错误色块上的文字/图标。} border{影响：底部菜单顶部线、设置项分割线、卡片边框、输入框边框、弹窗边框。} input{影响：输入框/搜索框背景、底部菜单栏背景、弹窗/底部面板/抽屉背景、设置卡片。} ring{影响：备用焦点环；当前输入框焦点边框、日期 Tab 下划线主要跟随主色。} background{影响：浅色模式页面背景、AppBar 背景、部分最低层容器。} foreground{影响：主正文、标题、AppBar 文字/图标、默认图标、列表主文字。} card{影响：全局 Card 背景、Chip 默认背景、自定义主题颜色分组、部分列表卡片。} cardForeground{影响：备用卡片文字；常见卡片主文字实际跟随页面文字。} popover{影响：备用弹层背景；当前弹窗/底部面板/抽屉背景主要跟随输入框背景。} popoverForeground{影响：备用弹层文字；当前弹窗/菜单文字主要跟随页面文字。} success{影响：权限通过、服务正常、AI 请求成功、存储清理主操作、完成状态。} successForeground{影响：成功色按钮/徽章上的文字和图标。} warning{影响：模型/密钥冷却、注意提示、待处理状态、黄色警告块。} warningForeground{影响：警告色块上的文字和图标。} info{影响：信息提示条、说明块图标/文字、搜索结果标签浅色模式颜色。} infoForeground{影响：信息色块上的文字和图标。} mergedEventAccent{影响：合并事件标签颜色，已在截屏设置中单独编辑。} lightPrimaryContainer{影响：浅色选中背景，如侧边栏选中项、Chip 选中、日期选择选中日。} lightSecondaryContainer{影响：浅色辅助提示块，如截图设置浅蓝块、AI 工具/图表辅助背景。} lightTertiaryContainer{影响：浅色成功徽章背景、AI 思考/完成类浅色面板背景。} lightErrorContainer{影响：浅色错误提示块、导入/动态重建错误容器背景。} lightOutlineVariant{影响：浅色弱分割线，如对话框分隔线、图表卡片边框、日志块边框。} lightSurfaceHigh{影响：浅色较高层面板，如开关关闭轨道、备份/统计内层卡片。} lightSurfaceHighest{影响：浅色最高层面板，如日历日期格、AI 日志块、图片占位背景。} lightInversePrimary{影响：浅色模式深色表面上的反向主色，使用较少。} darkPrimary{影响：深色模式主按钮、底部菜单选中项、日期 Tab 下划线、开关开启、输入框焦点边框。} darkPrimaryForeground{影响：深色主色块上的少量文字/图标；通用按钮文字多跟随深色页面文字。} darkSecondary{影响：深色 AI 上下文面板图标、思考卡片强调、图表辅助段、合并统计辅助色。} darkSecondaryForeground{影响：深色辅助色块上的文字/图标。} darkMuted{影响：备用弱背景；深色常规面板背景请改深色弹层背景或深色卡片背景。} darkMutedForeground{影响：深色说明文字、输入提示、未选中底部菜单项、灰色图标、空状态文字。} darkAccent{影响：备用深色强调色；常见高亮主要跟随深色主色或深色选中强调色。} darkAccentForeground{影响：备用深色强调色块文字。} darkDestructive{影响：深色删除/危险按钮、错误文字、输入框错误边框、截图错误/NSFW 标记。} darkDestructiveForeground{影响：深色危险按钮和错误色块上的文字/图标。} darkBorder{影响：深色底部菜单顶部线、设置项分割线、卡片边框、输入框边框、弹窗边框。} darkInput{影响：备用深色输入框字段；当前输入框/底部菜单/弹窗背景跟随深色弹层背景。} darkRing{影响：备用深色焦点环；当前焦点边框和 Tab 下划线主要跟随深色主色。} darkBackground{影响：深色页面背景、AppBar 背景、部分最低层容器。} darkForeground{影响：深色正文、标题、AppBar 文字/图标、默认图标、列表主文字。} darkCard{影响：深色全局 Card 背景、Chip 默认背景、自定义主题颜色分组、部分列表卡片。} darkCardForeground{影响：备用深色卡片文字；常见卡片主文字实际跟随深色页面文字。} darkPopover{影响：深色输入框/搜索框背景、底部菜单栏背景、弹窗/底部面板/抽屉背景、设置卡片。} darkPopoverForeground{影响：备用深色弹层文字；当前弹窗/菜单文字主要跟随深色页面文字。} darkSelectedAccent{影响：搜索结果标签在深色模式的文字、边框和浅底色。} darkPrimaryContainer{影响：深色选中背景，如侧边栏选中项、Chip 选中、日期选择选中日。} darkSecondaryContainer{影响：深色辅助提示块，如截图设置提示块、AI 工具/图表辅助背景。} darkTertiaryContainer{影响：深色成功徽章背景、AI 思考/完成类面板背景。} darkErrorContainer{影响：深色错误提示块、导入/动态重建错误容器背景。} darkOutlineVariant{影响：深色弱分割线，如对话框分隔线、图表卡片边框、日志块边框。} darkSurfaceHigh{影响：深色较高层面板，如开关关闭轨道、备份/统计内层卡片。} darkSurfaceHighest{影响：深色最高层面板，如日历日期格、AI 日志块、图片占位背景。} darkSurfaceContainerLowest{影响：深色最低层背景，如云备份输入区和极深页面底色。} other{影响：导入的自定义颜色槽。}}",
+  "@themeColorUsageLabel": {
+    "placeholders": {
+      "slot": {}
+    }
+  },
   "pageBackgroundTitle": "页面背景",
   "pageBackgroundDesc": "浅色模式下主页面的背景颜色",
   "loggingTitle": "日志打印",

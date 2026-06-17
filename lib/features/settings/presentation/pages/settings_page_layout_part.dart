@@ -269,6 +269,7 @@ extension _SettingsLayoutPart on _SettingsPageState {
               context: context,
               children: [
                 _buildThemeModeItem(context),
+                _buildThemeColorsItem(context),
                 _buildPrivacyModeItem(context),
                 _buildNsfwEntryItem(context),
               ],
@@ -289,6 +290,7 @@ extension _SettingsLayoutPart on _SettingsPageState {
                 _buildScreenshotQualityItem(context),
                 _buildGlobalHistoryCompressionItem(context),
                 _buildAiImageSendFormatItem(context),
+                _buildDynamicTagPaletteItem(context),
                 _buildScreenshotExpireItem(context),
               ],
             ),

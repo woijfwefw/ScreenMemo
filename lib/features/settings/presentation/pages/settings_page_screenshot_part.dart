@@ -725,6 +725,496 @@ extension _SettingsScreenshotPart on _SettingsPageState {
     );
   }
 
+  Widget _buildDynamicTagPaletteItem(BuildContext context) {
+    final AppLocalizations l10n = AppLocalizations.of(context);
+    final AppThemeColors colors = widget.themeService.themeColors;
+    final bool paletteCustom = !_dynamicTagPaletteEquals(
+      colors.dynamicTagPalette,
+      AppThemeColors.defaults.dynamicTagPalette,
+    );
+    final bool mergedCustom =
+        colors.mergedEventAccent.toARGB32() !=
+        AppThemeColors.defaults.mergedEventAccent.toARGB32();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.spacing4,
+        vertical: AppTheme.spacing3 - 2,
+      ),
+      decoration: BoxDecoration(
+        border: Border(top: _settingsDividerSide(context)),
+      ),
+      child: Row(
+        children: [
+          _buildSettingsLeadingIcon(context, Icons.local_offer_outlined),
+          const SizedBox(width: AppTheme.spacing3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.dynamicTagPaletteTitle,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  paletteCustom || mergedCustom
+                      ? l10n.dynamicTagPaletteDescCustom
+                      : l10n.dynamicTagPaletteDescDefault,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spacing2),
+                _buildDynamicTagPalettePreview(context, colors),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppTheme.spacing2),
+          TextButton(
+            onPressed: _showDynamicTagPaletteSheet,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTheme.spacing3,
+                vertical: AppTheme.spacing1 - 1,
+              ),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              minimumSize: Size.zero,
+              visualDensity: VisualDensity.compact,
+            ),
+            child: Text(AppLocalizations.of(context).actionSet),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDynamicTagPalettePreview(
+    BuildContext context,
+    AppThemeColors colors,
+  ) {
+    return Wrap(
+      spacing: 5,
+      runSpacing: 5,
+      children: [
+        for (int i = 0; i < colors.dynamicTagPalette.length; i += 1)
+          _buildThemeColorSwatch(
+            context,
+            colors.dynamicTagPalette[i],
+            size: 18,
+            tooltip: AppLocalizations.of(
+              context,
+            ).dynamicTagPaletteColorLabel(i + 1),
+          ),
+        _buildThemeColorSwatch(
+          context,
+          colors.mergedEventAccent,
+          size: 18,
+          tooltip: AppLocalizations.of(context).mergedEventTagSection,
+        ),
+      ],
+    );
+  }
+
+  void _showDynamicTagPaletteSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            final AppLocalizations l10n = AppLocalizations.of(sheetContext);
+            final ThemeData theme = Theme.of(sheetContext);
+            final AppThemeColors colors = widget.themeService.themeColors;
+            final List<Color> palette = colors.dynamicTagPalette;
+            final bool paletteCustom = !_dynamicTagPaletteEquals(
+              palette,
+              AppThemeColors.defaults.dynamicTagPalette,
+            );
+            final bool mergedCustom =
+                colors.mergedEventAccent.toARGB32() !=
+                AppThemeColors.defaults.mergedEventAccent.toARGB32();
+
+            return UISheetSurface(
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: AppTheme.spacing3),
+                    const UISheetHandle(),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppTheme.spacing4,
+                        AppTheme.spacing3,
+                        AppTheme.spacing3,
+                        AppTheme.spacing2,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  l10n.dynamicTagPaletteTitle,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  l10n.dynamicTagPaletteSheetDesc,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: AppLocalizations.of(
+                              sheetContext,
+                            ).actionResetToDefault,
+                            onPressed: paletteCustom || mergedCustom
+                                ? () async {
+                                    await widget.themeService.setThemeColors(
+                                      widget.themeService.themeColors
+                                          .copyWithDynamicTagPalette(
+                                            AppThemeColors
+                                                .defaults
+                                                .dynamicTagPalette,
+                                          )
+                                          .copyWithColor(
+                                            AppThemeColors.mergedEventAccentKey,
+                                            AppThemeColors
+                                                .defaults
+                                                .mergedEventAccent,
+                                          ),
+                                    );
+                                    if (!mounted || !sheetContext.mounted) {
+                                      return;
+                                    }
+                                    _settingsSetState(() {});
+                                    setSheetState(() {});
+                                    UINotifier.success(
+                                      sheetContext,
+                                      l10n.dynamicTagPaletteResetSaved,
+                                    );
+                                  }
+                                : null,
+                            icon: const Icon(Icons.restart_alt, size: 20),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Flexible(
+                      child: ListView(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.fromLTRB(
+                          AppTheme.spacing4,
+                          0,
+                          AppTheme.spacing4,
+                          AppTheme.spacing4,
+                        ),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: AppTheme.spacing2,
+                            ),
+                            child: Text(
+                              l10n.dynamicTagPaletteSection,
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Material(
+                            color: theme.colorScheme.surfaceContainer,
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.radiusLg,
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: Column(
+                              children: [
+                                for (int i = 0; i < palette.length; i += 1)
+                                  _buildDynamicTagPaletteRow(
+                                    sheetContext,
+                                    index: i,
+                                    color: palette[i],
+                                    showDivider: i < palette.length - 1,
+                                    setSheetState: setSheetState,
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: AppTheme.spacing4),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: AppTheme.spacing2,
+                            ),
+                            child: Text(
+                              l10n.mergedEventTagSection,
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Material(
+                            color: theme.colorScheme.surfaceContainer,
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.radiusLg,
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: _buildMergedEventColorRow(
+                              sheetContext,
+                              setSheetState: setSheetState,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildDynamicTagPaletteRow(
+    BuildContext context, {
+    required int index,
+    required Color color,
+    required bool showDivider,
+    required StateSetter setSheetState,
+  }) {
+    final ThemeData theme = Theme.of(context);
+    final List<Color> defaults = AppThemeColors.defaults.dynamicTagPalette;
+    final bool isCustom =
+        index >= defaults.length ||
+        color.toARGB32() != defaults[index].toARGB32();
+    final BorderSide dividerSide = BorderSide(
+      color: theme.colorScheme.outline.withValues(alpha: 0.42),
+      width: 0.8,
+    );
+
+    return InkWell(
+      onTap: () => _showDynamicTagColorEditor(
+        sheetContext: context,
+        index: index,
+        setSheetState: setSheetState,
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTheme.spacing3,
+          vertical: AppTheme.spacing3,
+        ),
+        decoration: BoxDecoration(
+          border: showDivider ? Border(bottom: dividerSide) : null,
+        ),
+        child: Row(
+          children: [
+            _buildThemeColorSwatch(context, color, size: 30),
+            const SizedBox(width: AppTheme.spacing3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    AppLocalizations.of(
+                      context,
+                    ).dynamicTagPaletteColorLabel(index + 1),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _themeColorHex(color),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isCustom) ...[
+              UIBadge(
+                text: AppLocalizations.of(context).themeColorsCustomBadge,
+                variant: UIBadgeVariant.primary,
+              ),
+              const SizedBox(width: AppTheme.spacing2),
+            ],
+            Icon(
+              Icons.chevron_right,
+              size: 18,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMergedEventColorRow(
+    BuildContext context, {
+    required StateSetter setSheetState,
+  }) {
+    final ThemeData theme = Theme.of(context);
+    final Color color = widget.themeService.themeColors.mergedEventAccent;
+    final bool isCustom =
+        color.toARGB32() !=
+        AppThemeColors.defaults.mergedEventAccent.toARGB32();
+
+    return InkWell(
+      onTap: () => _showThemeColorEditor(
+        sheetContext: context,
+        key: AppThemeColors.mergedEventAccentKey,
+        setSheetState: setSheetState,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTheme.spacing3,
+          vertical: AppTheme.spacing3,
+        ),
+        child: Row(
+          children: [
+            _buildThemeColorSwatch(context, color, size: 30),
+            const SizedBox(width: AppTheme.spacing3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    AppLocalizations.of(context).mergedEventTagColorTitle,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _themeColorHex(color),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isCustom) ...[
+              UIBadge(
+                text: AppLocalizations.of(context).themeColorsCustomBadge,
+                variant: UIBadgeVariant.primary,
+              ),
+              const SizedBox(width: AppTheme.spacing2),
+            ],
+            Icon(
+              Icons.chevron_right,
+              size: 18,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDynamicTagColorEditor({
+    required BuildContext sheetContext,
+    required int index,
+    required StateSetter setSheetState,
+  }) {
+    final Color currentColor =
+        widget.themeService.themeColors.dynamicTagPalette[index];
+    final TextEditingController controller = TextEditingController(
+      text: _themeColorHex(currentColor),
+    );
+
+    showUIDialog<void>(
+      context: sheetContext,
+      title: AppLocalizations.of(
+        sheetContext,
+      ).dynamicTagPaletteColorLabel(index + 1),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: _buildThemeColorSwatch(sheetContext, currentColor, size: 48),
+          ),
+          const SizedBox(height: AppTheme.spacing3),
+          TextField(
+            controller: controller,
+            autofocus: true,
+            textCapitalization: TextCapitalization.characters,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[0-9a-fA-F#]')),
+              LengthLimitingTextInputFormatter(9),
+            ],
+            decoration: InputDecoration(
+              labelText: AppLocalizations.of(sheetContext).themeColorHexLabel,
+              helperText: AppLocalizations.of(
+                sheetContext,
+              ).themeColorHexFormatHint,
+              floatingLabelBehavior: FloatingLabelBehavior.always,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        UIDialogAction<void>(
+          text: AppLocalizations.of(sheetContext).dialogCancel,
+        ),
+        UIDialogAction<void>(
+          text: AppLocalizations.of(sheetContext).dialogOk,
+          style: UIDialogActionStyle.primary,
+          closeOnPress: false,
+          onPressed: (dialogContext) async {
+            final Color? parsed = AppThemeColors.parseHexColor(controller.text);
+            if (parsed == null) {
+              UINotifier.error(
+                dialogContext,
+                AppLocalizations.of(dialogContext).themeColorInvalidHex,
+              );
+              return;
+            }
+            await widget.themeService.setDynamicTagPaletteColor(index, parsed);
+            if (!mounted) return;
+            _settingsSetState(() {});
+            setSheetState(() {});
+            if (dialogContext.mounted) {
+              Navigator.of(dialogContext).pop();
+            }
+            if (sheetContext.mounted) {
+              UINotifier.success(
+                sheetContext,
+                AppLocalizations.of(sheetContext).dynamicTagPaletteColorSaved,
+              );
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  bool _dynamicTagPaletteEquals(List<Color> a, List<Color> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i += 1) {
+      if (a[i].toARGB32() != b[i].toARGB32()) return false;
+    }
+    return true;
+  }
+
   void _showScreenshotDedupeModeDialog() {
     String selected = _normalizeScreenshotDedupeMode(_screenshotDedupeMode);
     showUIDialog<void>(

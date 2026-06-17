@@ -313,7 +313,7 @@ class _AppSelectionWidgetState extends State<AppSelectionWidget> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.search_off,
                         size: 48,
                         color: AppTheme.mutedForeground,
@@ -404,7 +404,7 @@ class _AppSelectionWidgetState extends State<AppSelectionWidget> {
                           height: 48,
                           fit: BoxFit.contain, // 改为contain避免裁剪
                         )
-                      : const Icon(
+                      : Icon(
                           Icons.android,
                           color: AppTheme.mutedForeground,
                           size: 32,
@@ -474,7 +474,7 @@ class _AppSelectionWidgetState extends State<AppSelectionWidget> {
                         height: 40,
                         fit: BoxFit.contain,
                       )
-                    : const Icon(
+                    : Icon(
                         Icons.android,
                         color: AppTheme.mutedForeground,
                         size: 28,

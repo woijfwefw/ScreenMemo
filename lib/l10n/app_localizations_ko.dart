@@ -2725,10 +2725,264 @@ class AppLocalizationsKo extends AppLocalizations {
   String get themeColorTitle => '테마 색상';
 
   @override
-  String get themeColorDesc => '앱의 기본 색상을 사용자 지정하세요';
+  String get themeColorDesc => '앱에서 현재 사용하는 의미 색상을 사용자 지정하세요';
 
   @override
   String get chooseThemeColorTitle => '테마 색상 선택';
+
+  @override
+  String get themeColorsSheetTitle => '테마 색상 사용자 지정';
+
+  @override
+  String get themeColorsLightBaseGroup => '라이트 기본 색상';
+
+  @override
+  String get themeColorsStatusGroup => '상태 및 강조 색상';
+
+  @override
+  String get themeColorsLightSurfaceGroup => '라이트 화면 계층';
+
+  @override
+  String get themeColorsDarkBaseGroup => '다크 기본 색상';
+
+  @override
+  String get themeColorsDarkSurfaceGroup => '다크 화면 계층';
+
+  @override
+  String get themeColorsDefaultBadge => '기본값';
+
+  @override
+  String get themeColorsCustomBadge => '사용자 지정';
+
+  @override
+  String get themeColorHexLabel => 'Hex 색상';
+
+  @override
+  String get themeColorHexFormatHint => '#RRGGBB 또는 #AARRGGBB 사용';
+
+  @override
+  String get themeColorInvalidHex =>
+      '유효한 Hex 색상을 입력하세요. 예: #66FF66 또는 #FF66FF66';
+
+  @override
+  String get themeColorSaved => '테마 색상을 저장했습니다';
+
+  @override
+  String get themeColorsResetSaved => '테마 색상을 기본값으로 재설정했습니다';
+
+  @override
+  String get themeColorsPasteTooltip => '테마 색상 붙여넣기';
+
+  @override
+  String get themeColorsPasteEmpty => '클립보드가 비어 있습니다';
+
+  @override
+  String get themeColorsPasteInvalid => '클립보드에 유효한 테마 색상 JSON이 없습니다';
+
+  @override
+  String get themeColorsPasteSaved => '테마 색상을 가져왔습니다';
+
+  @override
+  String get themeColorsCopyTooltip => '테마 색상 JSON 복사';
+
+  @override
+  String get themeColorsCopySaved => '테마 색상 JSON을 복사했습니다';
+
+  @override
+  String get themeColorsPresetGroup => '색상 프리셋';
+
+  @override
+  String get themeColorsPresetDefault => '기본 카키';
+
+  @override
+  String get themeColorsPresetGreen => '프레시 그린';
+
+  @override
+  String themeColorsPresetSaved(Object name) {
+    return '색상 프리셋을 적용했습니다: $name';
+  }
+
+  @override
+  String get dynamicTagPaletteTitle => '동적 태그 색상';
+
+  @override
+  String get dynamicTagPaletteDescDefault => '일반 태그는 텍스트 기준으로 7가지 색상에 자동 매칭됩니다';
+
+  @override
+  String get dynamicTagPaletteDescCustom => '일반 태그와 병합 이벤트 태그가 사용자 지정되었습니다';
+
+  @override
+  String get dynamicTagPaletteSheetDesc =>
+      '일반 태그는 텍스트 hash로 7가지 색상에 고정 매칭됩니다. 병합 이벤트 태그는 별도 색상을 사용합니다.';
+
+  @override
+  String get dynamicTagPaletteResetSaved => '동적 태그 색상을 기본값으로 재설정했습니다';
+
+  @override
+  String get dynamicTagPaletteSection => '일반 동적 태그';
+
+  @override
+  String dynamicTagPaletteColorLabel(Object index) {
+    return '태그 색상 $index';
+  }
+
+  @override
+  String get mergedEventTagSection => '병합 이벤트 태그';
+
+  @override
+  String get mergedEventTagColorTitle => '병합 이벤트 태그 색상';
+
+  @override
+  String get dynamicTagPaletteColorSaved => '동적 태그 색상을 저장했습니다';
+
+  @override
+  String themeColorSlotLabel(String slot) {
+    String _temp0 = intl.Intl.selectLogic(slot, {
+      'primary': '기본 색상',
+      'primaryForeground': '기본 전경',
+      'secondary': '보조 색상',
+      'secondaryForeground': '보조 전경',
+      'muted': '약한 배경',
+      'mutedForeground': '약한 전경',
+      'accent': '강조 색상',
+      'accentForeground': '강조 전경',
+      'destructive': '위험 색상',
+      'destructiveForeground': '위험 전경',
+      'border': '테두리',
+      'input': '입력 배경',
+      'ring': '포커스 링',
+      'background': '페이지 배경',
+      'foreground': '페이지 전경',
+      'card': '카드 배경',
+      'cardForeground': '카드 전경',
+      'popover': '팝오버 배경',
+      'popoverForeground': '팝오버 전경',
+      'success': '성공',
+      'successForeground': '성공 전경',
+      'warning': '경고',
+      'warningForeground': '경고 전경',
+      'info': '정보',
+      'infoForeground': '정보 전경',
+      'mergedEventAccent': '병합 이벤트 강조',
+      'lightPrimaryContainer': '라이트 기본 컨테이너',
+      'lightSecondaryContainer': '라이트 보조 컨테이너',
+      'lightTertiaryContainer': '라이트 세 번째 컨테이너',
+      'lightErrorContainer': '라이트 오류 컨테이너',
+      'lightOutlineVariant': '라이트 약한 테두리',
+      'lightSurfaceHigh': '라이트 높은 표면',
+      'lightSurfaceHighest': '라이트 가장 높은 표면',
+      'lightInversePrimary': '라이트 반전 기본',
+      'darkPrimary': '다크 기본 색상',
+      'darkPrimaryForeground': '다크 기본 전경',
+      'darkSecondary': '다크 보조 색상',
+      'darkSecondaryForeground': '다크 보조 전경',
+      'darkMuted': '다크 약한 배경',
+      'darkMutedForeground': '다크 약한 전경',
+      'darkAccent': '다크 강조 색상',
+      'darkAccentForeground': '다크 강조 전경',
+      'darkDestructive': '다크 위험 색상',
+      'darkDestructiveForeground': '다크 위험 전경',
+      'darkBorder': '다크 테두리',
+      'darkInput': '다크 입력 배경',
+      'darkRing': '다크 포커스 링',
+      'darkBackground': '다크 페이지 배경',
+      'darkForeground': '다크 페이지 전경',
+      'darkCard': '다크 카드 배경',
+      'darkCardForeground': '다크 카드 전경',
+      'darkPopover': '다크 팝오버 배경',
+      'darkPopoverForeground': '다크 팝오버 전경',
+      'darkSelectedAccent': '다크 선택 강조',
+      'darkPrimaryContainer': '다크 기본 컨테이너',
+      'darkSecondaryContainer': '다크 보조 컨테이너',
+      'darkTertiaryContainer': '다크 세 번째 컨테이너',
+      'darkErrorContainer': '다크 오류 컨테이너',
+      'darkOutlineVariant': '다크 약한 테두리',
+      'darkSurfaceHigh': '다크 높은 표면',
+      'darkSurfaceHighest': '다크 가장 높은 표면',
+      'darkSurfaceContainerLowest': '다크 가장 낮은 표면',
+      'other': '색상',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String themeColorUsageLabel(String slot) {
+    String _temp0 = intl.Intl.selectLogic(slot, {
+      'primary': '영향: 기본 버튼, 선택된 하단 메뉴, 날짜 탭 밑줄, 켜진 스위치, 입력창 포커스 테두리.',
+      'primaryForeground':
+          '영향: 기본 색상 블록 위 일부 텍스트/아이콘. 스크린샷 설정 선택 항목, 보완/재구성 동작 등.',
+      'secondary': '영향: AI 컨텍스트 패널 아이콘, 사고 카드 강조, 차트 보조 구간, 병합 통계 보조색.',
+      'secondaryForeground': '영향: 보조 색상 블록 위 텍스트/아이콘. 스크린샷 설정의 연한 보조 블록 등.',
+      'muted': '영향: 일부 기존 약한 배경. 예: 스크린샷 다중 선택 빈 상태. 일반 배경은 입력/카드 배경을 조정.',
+      'mutedForeground': '영향: 설명 문구, 입력 힌트, 선택되지 않은 하단 메뉴, 약한 아이콘, 빈 상태 텍스트.',
+      'accent': '예비 강조색. 일반 하이라이트는 현재 주로 기본 색상을 따릅니다.',
+      'accentForeground': '예비 강조색 블록 텍스트. 일반 강조 텍스트는 페이지 전경을 따릅니다.',
+      'destructive': '영향: 삭제/위험 버튼, 오류 텍스트, 입력창 오류 테두리, 스크린샷 오류, NSFW 표시.',
+      'destructiveForeground': '영향: 위험 버튼과 오류 블록 위의 텍스트/아이콘.',
+      'border': '영향: 하단 메뉴 상단선, 설정 항목 구분선, 카드 테두리, 입력창 테두리, 다이얼로그 테두리.',
+      'input': '영향: 입력/검색 배경, 하단 메뉴 배경, 다이얼로그/하단 시트/드로어 배경, 설정 카드.',
+      'ring': '예비 포커스 링. 현재 입력창 포커스 테두리와 탭 밑줄은 주로 기본 색상을 따릅니다.',
+      'background': '영향: 라이트 모드 페이지 배경, AppBar 배경, 일부 최하위 컨테이너.',
+      'foreground': '영향: 본문, 제목, AppBar 텍스트/아이콘, 기본 아이콘, 목록 주요 텍스트.',
+      'card': '영향: 전역 Card 배경, Chip 기본 배경, 사용자 지정 테마 색상 그룹, 일부 목록 카드.',
+      'cardForeground': '예비 카드 텍스트 색상. 일반 카드 주요 텍스트는 페이지 전경을 따릅니다.',
+      'popover': '예비 팝오버 배경. 현재 다이얼로그/하단 시트/드로어 배경은 입력 배경을 따릅니다.',
+      'popoverForeground': '예비 팝오버 텍스트. 현재 다이얼로그/메뉴 텍스트는 페이지 전경을 따릅니다.',
+      'success': '영향: 권한 허용, 서비스 정상, AI 요청 성공, 저장공간 정리 기본 동작, 완료 상태.',
+      'successForeground': '영향: 성공 버튼/배지 위의 텍스트와 아이콘.',
+      'warning': '영향: 모델/키 쿨다운, 주의 알림, 대기 상태, 노란 경고 블록.',
+      'warningForeground': '영향: 경고 블록 위의 텍스트와 아이콘.',
+      'info': '영향: 정보 안내, 보조 블록 아이콘/텍스트, 라이트 모드 검색 결과 태그.',
+      'infoForeground': '영향: 정보 블록 위의 텍스트와 아이콘.',
+      'mergedEventAccent': '영향: 병합 이벤트 태그 색상. 스크린샷 설정에서 별도로 편집합니다.',
+      'lightPrimaryContainer': '영향: 라이트 선택 배경. 드로어 선택, 선택된 Chip, 선택된 달력 날짜 등.',
+      'lightSecondaryContainer':
+          '영향: 라이트 보조 블록. 스크린샷 설정의 파란 블록, AI 도구/차트 보조 배경 등.',
+      'lightTertiaryContainer': '영향: 라이트 성공 배지 배경, AI 사고/완료 패널 배경.',
+      'lightErrorContainer': '영향: 라이트 오류 안내와 가져오기/동적 재구성 오류 컨테이너.',
+      'lightOutlineVariant':
+          '영향: 라이트 약한 구분선. 다이얼로그 구분선, 차트 카드 테두리, 로그 블록 테두리 등.',
+      'lightSurfaceHigh': '영향: 라이트 높은 표면. 꺼진 스위치 트랙, 백업/통계 내부 카드 등.',
+      'lightSurfaceHighest': '영향: 라이트 최상위 표면. 달력 날짜 칸, AI 로그 블록, 이미지 플레이스홀더 등.',
+      'lightInversePrimary': '영향: 라이트 모드 어두운 표면 위 반전 기본색. 사용은 적습니다.',
+      'darkPrimary':
+          '영향: 다크 모드 기본 버튼, 선택된 하단 메뉴, 날짜 탭 밑줄, 켜진 스위치, 입력창 포커스 테두리.',
+      'darkPrimaryForeground':
+          '영향: 다크 기본 색상 블록 위 일부 텍스트/아이콘. 일반 버튼 텍스트는 보통 다크 페이지 전경을 따릅니다.',
+      'darkSecondary': '영향: 다크 AI 컨텍스트 패널 아이콘, 사고 카드 강조, 차트 보조 구간, 병합 통계 보조색.',
+      'darkSecondaryForeground': '영향: 다크 보조 색상 블록 위 텍스트/아이콘.',
+      'darkMuted': '예비 약한 배경. 다크 일반 패널은 다크 팝오버 또는 다크 카드 배경을 조정.',
+      'darkMutedForeground':
+          '영향: 다크 설명 문구, 입력 힌트, 선택되지 않은 하단 메뉴, 약한 아이콘, 빈 상태 텍스트.',
+      'darkAccent': '예비 다크 강조색. 일반 하이라이트는 주로 다크 기본색 또는 다크 선택 강조색을 따릅니다.',
+      'darkAccentForeground': '예비 다크 강조색 블록 텍스트.',
+      'darkDestructive':
+          '영향: 다크 삭제/위험 버튼, 오류 텍스트, 입력창 오류 테두리, 스크린샷 오류, NSFW 표시.',
+      'darkDestructiveForeground': '영향: 다크 위험 버튼과 오류 블록 위의 텍스트/아이콘.',
+      'darkBorder': '영향: 다크 하단 메뉴 상단선, 설정 항목 구분선, 카드 테두리, 입력창 테두리, 다이얼로그 테두리.',
+      'darkInput': '예비 다크 입력창. 현재 입력창/하단 메뉴/다이얼로그 배경은 다크 팝오버를 따릅니다.',
+      'darkRing': '예비 다크 포커스 링. 포커스 테두리와 탭 밑줄은 주로 다크 기본색을 따릅니다.',
+      'darkBackground': '영향: 다크 페이지 배경, AppBar 배경, 일부 최하위 컨테이너.',
+      'darkForeground': '영향: 다크 본문, 제목, AppBar 텍스트/아이콘, 기본 아이콘, 목록 주요 텍스트.',
+      'darkCard': '영향: 다크 전역 Card 배경, Chip 기본 배경, 사용자 지정 테마 색상 그룹, 일부 목록 카드.',
+      'darkCardForeground': '예비 다크 카드 텍스트. 일반 카드 주요 텍스트는 다크 페이지 전경을 따릅니다.',
+      'darkPopover': '영향: 다크 입력/검색 배경, 하단 메뉴 배경, 다이얼로그/하단 시트/드로어 배경, 설정 카드.',
+      'darkPopoverForeground':
+          '예비 다크 팝오버 텍스트. 현재 다이얼로그/메뉴 텍스트는 다크 페이지 전경을 따릅니다.',
+      'darkSelectedAccent': '영향: 다크 모드 검색 결과 태그의 텍스트, 테두리, 연한 채움.',
+      'darkPrimaryContainer': '영향: 다크 선택 배경. 드로어 선택, 선택된 Chip, 선택된 달력 날짜 등.',
+      'darkSecondaryContainer': '영향: 다크 보조 블록. 스크린샷 설정 안내, AI 도구/차트 보조 배경 등.',
+      'darkTertiaryContainer': '영향: 다크 성공 배지 배경, AI 사고/완료 패널 배경.',
+      'darkErrorContainer': '영향: 다크 오류 안내와 가져오기/동적 재구성 오류 컨테이너.',
+      'darkOutlineVariant': '영향: 다크 약한 구분선. 다이얼로그 구분선, 차트 카드 테두리, 로그 블록 테두리 등.',
+      'darkSurfaceHigh': '영향: 다크 높은 표면. 꺼진 스위치 트랙, 백업/통계 내부 카드 등.',
+      'darkSurfaceHighest': '영향: 다크 최상위 표면. 달력 날짜 칸, AI 로그 블록, 이미지 플레이스홀더 등.',
+      'darkSurfaceContainerLowest':
+          '영향: 다크 최하위 배경. 클라우드 백업 입력 영역과 가장 깊은 페이지 바탕 등.',
+      'other': '영향: 가져온 사용자 지정 색상 슬롯.',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get pageBackgroundTitle => '페이지 배경';

@@ -550,18 +550,11 @@ class ScreenshotItemWidget extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.broken_image,
-            size: 32,
-            color: AppTheme.mutedForeground,
-          ),
+          Icon(Icons.broken_image, size: 32, color: AppTheme.mutedForeground),
           const SizedBox(height: 4),
           Text(
             AppLocalizations.of(context).imageError,
-            style: const TextStyle(
-              color: AppTheme.mutedForeground,
-              fontSize: 11,
-            ),
+            style: TextStyle(color: AppTheme.mutedForeground, fontSize: 11),
           ),
         ],
       ),

@@ -2727,10 +2727,258 @@ class AppLocalizationsJa extends AppLocalizations {
   String get themeColorTitle => 'テーマカラー';
 
   @override
-  String get themeColorDesc => 'アプリのキーカラーをカスタマイズ';
+  String get themeColorDesc => 'アプリで使用中のセマンティックカラーをカスタマイズ';
 
   @override
   String get chooseThemeColorTitle => 'テーマカラーを選択';
+
+  @override
+  String get themeColorsSheetTitle => 'テーマカラーをカスタマイズ';
+
+  @override
+  String get themeColorsLightBaseGroup => 'ライト基本色';
+
+  @override
+  String get themeColorsStatusGroup => '状態とアクセント色';
+
+  @override
+  String get themeColorsLightSurfaceGroup => 'ライトのサーフェス階層';
+
+  @override
+  String get themeColorsDarkBaseGroup => 'ダーク基本色';
+
+  @override
+  String get themeColorsDarkSurfaceGroup => 'ダークのサーフェス階層';
+
+  @override
+  String get themeColorsDefaultBadge => 'デフォルト';
+
+  @override
+  String get themeColorsCustomBadge => 'カスタム';
+
+  @override
+  String get themeColorHexLabel => 'Hex カラー';
+
+  @override
+  String get themeColorHexFormatHint => '#RRGGBB または #AARRGGBB を使用';
+
+  @override
+  String get themeColorInvalidHex =>
+      '有効な Hex カラーを入力してください。例: #66FF66 または #FF66FF66';
+
+  @override
+  String get themeColorSaved => 'テーマカラーを保存しました';
+
+  @override
+  String get themeColorsResetSaved => 'テーマカラーをデフォルトに戻しました';
+
+  @override
+  String get themeColorsPasteTooltip => 'テーマカラーを貼り付け';
+
+  @override
+  String get themeColorsPasteEmpty => 'クリップボードが空です';
+
+  @override
+  String get themeColorsPasteInvalid => 'クリップボードに有効なテーマカラー JSON がありません';
+
+  @override
+  String get themeColorsPasteSaved => 'テーマカラーをインポートしました';
+
+  @override
+  String get themeColorsCopyTooltip => 'テーマカラー JSON をコピー';
+
+  @override
+  String get themeColorsCopySaved => 'テーマカラー JSON をコピーしました';
+
+  @override
+  String get themeColorsPresetGroup => 'カラープリセット';
+
+  @override
+  String get themeColorsPresetDefault => '既定カーキ';
+
+  @override
+  String get themeColorsPresetGreen => 'フレッシュグリーン';
+
+  @override
+  String themeColorsPresetSaved(Object name) {
+    return 'カラープリセットを適用しました: $name';
+  }
+
+  @override
+  String get dynamicTagPaletteTitle => '動的タグカラー';
+
+  @override
+  String get dynamicTagPaletteDescDefault => '通常タグはテキストに応じて 7 色から自動割り当て';
+
+  @override
+  String get dynamicTagPaletteDescCustom => '通常タグと結合イベントタグをカスタマイズ済み';
+
+  @override
+  String get dynamicTagPaletteSheetDesc =>
+      '通常タグはテキスト hash で 7 色に固定割り当て。結合イベントタグは別色です。';
+
+  @override
+  String get dynamicTagPaletteResetSaved => '動的タグカラーをデフォルトに戻しました';
+
+  @override
+  String get dynamicTagPaletteSection => '通常の動的タグ';
+
+  @override
+  String dynamicTagPaletteColorLabel(Object index) {
+    return 'タグカラー $index';
+  }
+
+  @override
+  String get mergedEventTagSection => '結合イベントタグ';
+
+  @override
+  String get mergedEventTagColorTitle => '結合イベントタグカラー';
+
+  @override
+  String get dynamicTagPaletteColorSaved => '動的タグカラーを保存しました';
+
+  @override
+  String themeColorSlotLabel(String slot) {
+    String _temp0 = intl.Intl.selectLogic(slot, {
+      'primary': 'プライマリ',
+      'primaryForeground': 'プライマリ前景',
+      'secondary': 'セカンダリ',
+      'secondaryForeground': 'セカンダリ前景',
+      'muted': 'ミュート',
+      'mutedForeground': 'ミュート前景',
+      'accent': 'アクセント',
+      'accentForeground': 'アクセント前景',
+      'destructive': '破壊的操作',
+      'destructiveForeground': '破壊的操作の前景',
+      'border': 'ボーダー',
+      'input': '入力背景',
+      'ring': 'フォーカスリング',
+      'background': 'ページ背景',
+      'foreground': 'ページ前景',
+      'card': 'カード背景',
+      'cardForeground': 'カード前景',
+      'popover': 'ポップオーバー背景',
+      'popoverForeground': 'ポップオーバー前景',
+      'success': '成功',
+      'successForeground': '成功の前景',
+      'warning': '警告',
+      'warningForeground': '警告の前景',
+      'info': '情報',
+      'infoForeground': '情報の前景',
+      'mergedEventAccent': '結合イベントアクセント',
+      'lightPrimaryContainer': 'ライト主コンテナ',
+      'lightSecondaryContainer': 'ライト副コンテナ',
+      'lightTertiaryContainer': 'ライト第三コンテナ',
+      'lightErrorContainer': 'ライトエラーコンテナ',
+      'lightOutlineVariant': 'ライト弱ボーダー',
+      'lightSurfaceHigh': 'ライト高サーフェス',
+      'lightSurfaceHighest': 'ライト最高サーフェス',
+      'lightInversePrimary': 'ライト反転プライマリ',
+      'darkPrimary': 'ダークプライマリ',
+      'darkPrimaryForeground': 'ダークプライマリ前景',
+      'darkSecondary': 'ダークセカンダリ',
+      'darkSecondaryForeground': 'ダークセカンダリ前景',
+      'darkMuted': 'ダークミュート',
+      'darkMutedForeground': 'ダークミュート前景',
+      'darkAccent': 'ダークアクセント',
+      'darkAccentForeground': 'ダークアクセント前景',
+      'darkDestructive': 'ダーク破壊的操作',
+      'darkDestructiveForeground': 'ダーク破壊的操作の前景',
+      'darkBorder': 'ダークボーダー',
+      'darkInput': 'ダーク入力背景',
+      'darkRing': 'ダークフォーカスリング',
+      'darkBackground': 'ダークページ背景',
+      'darkForeground': 'ダークページ前景',
+      'darkCard': 'ダークカード背景',
+      'darkCardForeground': 'ダークカード前景',
+      'darkPopover': 'ダークポップオーバー背景',
+      'darkPopoverForeground': 'ダークポップオーバー前景',
+      'darkSelectedAccent': 'ダーク選択アクセント',
+      'darkPrimaryContainer': 'ダーク主コンテナ',
+      'darkSecondaryContainer': 'ダーク副コンテナ',
+      'darkTertiaryContainer': 'ダーク第三コンテナ',
+      'darkErrorContainer': 'ダークエラーコンテナ',
+      'darkOutlineVariant': 'ダーク弱ボーダー',
+      'darkSurfaceHigh': 'ダーク高サーフェス',
+      'darkSurfaceHighest': 'ダーク最高サーフェス',
+      'darkSurfaceContainerLowest': 'ダーク最低サーフェス',
+      'other': 'カラー',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String themeColorUsageLabel(String slot) {
+    String _temp0 = intl.Intl.selectLogic(slot, {
+      'primary': '影響: 主ボタン、選択中の下部メニュー、日付タブ下線、オンのスイッチ、入力欄フォーカス枠。',
+      'primaryForeground': '影響: プライマリ色ブロック上の一部文字/アイコン。スクショ設定の選択項目、補完/再構築操作など。',
+      'secondary': '影響: AI コンテキストパネルのアイコン、思考カード強調、グラフ補助セグメント、結合統計補助色。',
+      'secondaryForeground': '影響: セカンダリ色ブロック上の文字/アイコン。スクショ設定の淡い補助ブロックなど。',
+      'muted': '影響: 一部の旧ミュート背景。例: スクショ複数選択の空状態。通常背景は入力背景/カード背景を変更。',
+      'mutedForeground': '影響: 説明文、入力ヒント、未選択の下部メニュー、控えめなアイコン、空状態テキスト。',
+      'accent': '予備のアクセント色。一般的なハイライトは現在プライマリに従います。',
+      'accentForeground': '予備のアクセントブロック文字。一般的な強調文字はページ前景に従います。',
+      'destructive': '影響: 削除/危険ボタン、エラー文字、入力欄エラー枠、スクショエラー、NSFW マーク。',
+      'destructiveForeground': '影響: 危険ボタンやエラーブロック上の文字/アイコン。',
+      'border': '影響: 下部メニュー上線、設定項目区切り線、カード枠、入力欄枠、ダイアログ枠。',
+      'input': '影響: 入力/検索背景、下部メニュー背景、ダイアログ/ボトムシート/ドロワー背景、設定カード。',
+      'ring': '予備のフォーカスリング。現在の入力欄フォーカス枠とタブ下線は主にプライマリに従います。',
+      'background': '影響: ライトモードのページ背景、AppBar 背景、一部の最下層コンテナ。',
+      'foreground': '影響: 本文、見出し、AppBar の文字/アイコン、標準アイコン、リスト主文字。',
+      'card': '影響: グローバル Card 背景、Chip 標準背景、カスタムテーマ色グループ、一部リストカード。',
+      'cardForeground': '予備のカード文字色。一般的なカード主文字はページ前景に従います。',
+      'popover': '予備のポップオーバー背景。現在のダイアログ/ボトムシート/ドロワー背景は入力背景に従います。',
+      'popoverForeground': '予備のポップオーバー文字。現在のダイアログ/メニュー文字はページ前景に従います。',
+      'success': '影響: 権限許可、サービス正常、AI リクエスト成功、ストレージ整理の主操作、完了状態。',
+      'successForeground': '影響: 成功ボタン/バッジ上の文字とアイコン。',
+      'warning': '影響: モデル/キーのクールダウン、注意表示、保留状態、黄色の警告ブロック。',
+      'warningForeground': '影響: 警告ブロック上の文字とアイコン。',
+      'info': '影響: 情報コールアウト、補助ブロックのアイコン/文字、ライトモード検索結果タグ。',
+      'infoForeground': '影響: 情報ブロック上の文字とアイコン。',
+      'mergedEventAccent': '影響: 結合イベントタグ色。スクショ設定で個別に編集します。',
+      'lightPrimaryContainer': '影響: ライトの選択背景。ドロワー選択、選択 Chip、選択カレンダー日など。',
+      'lightSecondaryContainer':
+          '影響: ライトの補助ブロック。スクショ設定の青いブロック、AI ツール/グラフ補助背景など。',
+      'lightTertiaryContainer': '影響: ライトの成功バッジ背景、AI 思考/完了パネル背景。',
+      'lightErrorContainer': '影響: ライトのエラー表示、インポート/動的再構築エラーコンテナ。',
+      'lightOutlineVariant': '影響: ライトの弱い区切り。ダイアログ区切り、グラフカード枠、ログブロック枠など。',
+      'lightSurfaceHigh': '影響: ライトの高めの面。オフのスイッチ軌道、バックアップ/統計の内側カードなど。',
+      'lightSurfaceHighest': '影響: ライトの最上位面。カレンダー日セル、AI ログブロック、画像プレースホルダーなど。',
+      'lightInversePrimary': '影響: ライトモードの暗い面上の反転プライマリ。使用は少なめ。',
+      'darkPrimary': '影響: ダークモードの主ボタン、選択中の下部メニュー、日付タブ下線、オンのスイッチ、入力欄フォーカス枠。',
+      'darkPrimaryForeground':
+          '影響: ダークのプライマリ色ブロック上の一部文字/アイコン。通常のボタン文字はダークページ前景に従います。',
+      'darkSecondary': '影響: ダークの AI コンテキストパネルのアイコン、思考カード強調、グラフ補助セグメント、結合統計補助色。',
+      'darkSecondaryForeground': '影響: ダークのセカンダリ色ブロック上の文字/アイコン。',
+      'darkMuted': '予備のミュート背景。ダークの通常パネルはダークポップオーバーまたはダークカードを変更。',
+      'darkMutedForeground': '影響: ダークの説明文、入力ヒント、未選択の下部メニュー、控えめなアイコン、空状態テキスト。',
+      'darkAccent': '予備のダークアクセント。一般的なハイライトは主にダークプライマリまたはダーク選択アクセントに従います。',
+      'darkAccentForeground': '予備のダークアクセントブロック文字。',
+      'darkDestructive': '影響: ダークの削除/危険ボタン、エラー文字、入力欄エラー枠、スクショエラー、NSFW マーク。',
+      'darkDestructiveForeground': '影響: ダークの危険ボタンやエラーブロック上の文字/アイコン。',
+      'darkBorder': '影響: ダークの下部メニュー上線、設定項目区切り線、カード枠、入力欄枠、ダイアログ枠。',
+      'darkInput': '予備のダーク入力欄。現在の入力欄/下部メニュー/ダイアログ背景はダークポップオーバーに従います。',
+      'darkRing': '予備のダークフォーカスリング。フォーカス枠とタブ下線は主にダークプライマリに従います。',
+      'darkBackground': '影響: ダークのページ背景、AppBar 背景、一部の最下層コンテナ。',
+      'darkForeground': '影響: ダークの本文、見出し、AppBar の文字/アイコン、標準アイコン、リスト主文字。',
+      'darkCard': '影響: ダークのグローバル Card 背景、Chip 標準背景、カスタムテーマ色グループ、一部リストカード。',
+      'darkCardForeground': '予備のダークカード文字。一般的なカード主文字はダークページ前景に従います。',
+      'darkPopover': '影響: ダークの入力/検索背景、下部メニュー背景、ダイアログ/ボトムシート/ドロワー背景、設定カード。',
+      'darkPopoverForeground': '予備のダークポップオーバー文字。現在のダイアログ/メニュー文字はダークページ前景に従います。',
+      'darkSelectedAccent': '影響: ダークモードの検索結果タグの文字、枠線、淡い塗り。',
+      'darkPrimaryContainer': '影響: ダークの選択背景。ドロワー選択、選択 Chip、選択カレンダー日など。',
+      'darkSecondaryContainer': '影響: ダークの補助ブロック。スクショ設定の補助表示、AI ツール/グラフ補助背景など。',
+      'darkTertiaryContainer': '影響: ダークの成功バッジ背景、AI 思考/完了パネル背景。',
+      'darkErrorContainer': '影響: ダークのエラー表示、インポート/動的再構築エラーコンテナ。',
+      'darkOutlineVariant': '影響: ダークの弱い区切り。ダイアログ区切り、グラフカード枠、ログブロック枠など。',
+      'darkSurfaceHigh': '影響: ダークの高めの面。オフのスイッチ軌道、バックアップ/統計の内側カードなど。',
+      'darkSurfaceHighest': '影響: ダークの最上位面。カレンダー日セル、AI ログブロック、画像プレースホルダーなど。',
+      'darkSurfaceContainerLowest':
+          '影響: ダークの最下層背景。クラウドバックアップ入力エリアや最深部のページ底色など。',
+      'other': '影響: インポートされたカスタムカラー枠。',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get pageBackgroundTitle => 'ページ背景';

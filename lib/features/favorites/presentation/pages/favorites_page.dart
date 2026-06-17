@@ -6,7 +6,6 @@ import 'package:screen_memo/models/favorite_record.dart';
 import 'package:screen_memo/models/screenshot_record.dart';
 import 'package:screen_memo/models/app_info.dart';
 import 'package:screen_memo/features/favorites/application/favorite_service.dart';
-import 'package:screen_memo/features/capture/application/screenshot_service.dart';
 import 'package:screen_memo/data/platform/path_service.dart';
 import 'package:screen_memo/features/apps/application/app_selection_service.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
@@ -189,6 +188,7 @@ class _FavoritesPageState extends State<FavoritesPage>
         icon: Icons.favorite_outline,
         title: AppLocalizations.of(context).noFavoritesTitle,
         message: AppLocalizations.of(context).noFavoritesSubtitle,
+        showIconBackground: false,
       );
     }
 
@@ -486,8 +486,8 @@ class _FavoriteItemWidgetState extends State<_FavoriteItemWidget> {
               ),
             )
           else
-            const Padding(
-              padding: EdgeInsets.only(right: 8),
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
               child: Icon(
                 Icons.android,
                 size: 16,
