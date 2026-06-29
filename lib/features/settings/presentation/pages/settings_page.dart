@@ -161,10 +161,11 @@ class _SettingsPageState extends State<SettingsPage>
   // 截图过期清理设置
   bool _expireEnabled = false; // 是否启用过期自动删除
   int _expireDays = 30; // 过期天数，下限 1
-  // 每日总结提醒设置
+  // 通知提醒设置
   bool _dailyNotifyEnabled = true;
   int _dailyNotifyHour = 22;
   int _dailyNotifyMinute = 0;
+  bool _morningNotifyEnabled = false;
   // 日志开关（默认开启）
   bool _loggingEnabled = true;
   int _logRetentionDays = FlutterLogger.defaultLogRetentionDays;
@@ -252,10 +253,16 @@ class _SettingsPageState extends State<SettingsPage>
         defaultValue: 0,
         legacyPrefKeys: const <String>['daily_notify_minute'],
       );
+      final bool morningEnabled = await UserSettingsService.instance.getBool(
+        UserSettingKeys.morningNotifyEnabled,
+        defaultValue: false,
+        legacyPrefKeys: const <String>['morning_notify_enabled'],
+      );
       await DailySummaryService.instance.scheduleDailyNotification(
         hour: hour.clamp(0, 23),
         minute: minute.clamp(0, 59),
         enabled: enabled,
+        morningEnabled: morningEnabled,
       );
       await DailySummaryService.instance.refreshAutoRefreshSchedule();
     } catch (_) {}

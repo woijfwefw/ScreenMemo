@@ -16,7 +16,7 @@ extension _SettingsLayoutPart on _SettingsPageState {
     } else if (_subPage == _SettingsSubPage.segmentSummary) {
       title = l10n.segmentSummarySectionTitle;
     } else if (_subPage == _SettingsSubPage.dailyReminder) {
-      title = l10n.dailyReminderSectionTitle;
+      title = l10n.notificationReminderSectionTitle;
     } else if (_subPage == _SettingsSubPage.appHealth) {
       title = 'App 运行状态';
     } else if (_subPage == _SettingsSubPage.mcpService) {
@@ -323,6 +323,7 @@ extension _SettingsLayoutPart on _SettingsPageState {
               context: context,
               children: [
                 _buildDailyNotifyItem(context),
+                _buildMorningNotifyItem(context),
                 _buildDailyNotifyBannerItem(context),
                 _buildDailyNotifyTestItem(context),
               ],

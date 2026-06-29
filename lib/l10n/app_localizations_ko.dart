@@ -465,10 +465,16 @@ class AppLocalizationsKo extends AppLocalizations {
   String get segmentSummarySectionDesc => '샘플링/길이/AI 간격';
 
   @override
-  String get dailyReminderSectionTitle => '일일 요약 알림';
+  String get dailyReminderSectionTitle => '알림 리마인더';
 
   @override
-  String get dailyReminderSectionDesc => '시간/배너 권한/테스트';
+  String get dailyReminderSectionDesc => '시간/아침 알림/배너 권한/테스트';
+
+  @override
+  String get notificationReminderSectionTitle => '알림 리마인더';
+
+  @override
+  String get notificationReminderSectionDesc => '시간/아침 알림/배너 권한/테스트';
 
   @override
   String get aiAssistantSectionTitle => 'AI 어시스턴트';
@@ -1070,7 +1076,19 @@ class AppLocalizationsKo extends AppLocalizations {
   String get dynamicMergeLimitInvalidError => '0 이상의 유효한 정수를 입력하세요';
 
   @override
-  String get dailyReminderTimeTitle => '일일 요약 알림 시간';
+  String get dailyReminderTimeTitle => '알림 리마인더 시간';
+
+  @override
+  String get morningNotifyTitle => '아침 알림';
+
+  @override
+  String get morningNotifyDesc => '매일 08:00에 아침 브리핑을 보냅니다. 기본값은 꺼짐입니다.';
+
+  @override
+  String get morningNotifyEnabledSuccess => '아침 알림을 켰습니다';
+
+  @override
+  String get morningNotifyDisabledSuccess => '아침 알림을 껐습니다';
 
   @override
   String get currentTimeLabel => '현재:';
@@ -1251,14 +1269,15 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String reminderScheduleSuccess(Object hour, Object minute) {
-    return '일일 알림 시간을 $hour:$minute로 설정했습니다';
+    return '알림 리마인더 시간을 $hour:$minute로 설정했습니다';
   }
 
   @override
-  String get reminderDisabledSuccess => '일일 알림을 비활성화했습니다';
+  String get reminderDisabledSuccess => '알림 리마인더를 비활성화했습니다';
 
   @override
-  String get reminderScheduleFailed => '일일 알림을 예약하지 못했습니다(플랫폼에서 지원하지 않을 수 있음)';
+  String get reminderScheduleFailed =>
+      '알림 리마인더를 예약하지 못했습니다(플랫폼에서 지원하지 않을 수 있음)';
 
   @override
   String saveReminderSettingsFailed(Object error) {

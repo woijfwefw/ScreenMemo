@@ -57,15 +57,12 @@ class BootReceiver : BroadcastReceiver() {
                 } else {
                     FileLogger.d(TAG, "服务之前未运行，跳过启动")
                 }
-                // 恢复每日提醒调度
+                // 恢复通知提醒调度
                 try {
                     DailySummaryScheduler.restore(context)
-                    FileLogger.d(TAG, "每日提醒调度已恢复")
-                    // 同时安排固定时段
-                    val ok = DailySummaryScheduler.scheduleFixedSlots(context)
-                    FileLogger.d(TAG, "固定时段调度结果: $ok")
+                    FileLogger.d(TAG, "通知提醒调度已恢复")
                 } catch (e: Exception) {
-                    FileLogger.e(TAG, "恢复每日提醒调度失败", e)
+                    FileLogger.e(TAG, "恢复通知提醒调度失败", e)
                 }
 
                 try {

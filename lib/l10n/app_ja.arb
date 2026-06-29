@@ -190,8 +190,10 @@
   "screenshotSectionDesc": "間隔/品質/期限削除",
   "segmentSummarySectionTitle": "ダイナミック設定",
   "segmentSummarySectionDesc": "サンプリング/長さ/AI間隔",
-  "dailyReminderSectionTitle": "毎日の概要リマインダー",
-  "dailyReminderSectionDesc": "時刻/バナー権限/テスト",
+  "dailyReminderSectionTitle": "通知リマインダー",
+  "dailyReminderSectionDesc": "時刻/朝のリマインダー/バナー権限/テスト",
+  "notificationReminderSectionTitle": "通知リマインダー",
+  "notificationReminderSectionDesc": "時刻/朝のリマインダー/バナー権限/テスト",
   "aiAssistantSectionTitle": "AIアシスタント",
   "dataBackupSectionTitle": "データとバックアップ",
   "dataBackupSectionDesc": "ストレージ/インポート/エクスポート/再集計",
@@ -512,7 +514,11 @@
   },
   "dynamicMergeLimitInputHint": "0 以上の整数を入力（0 = 無制限）",
   "dynamicMergeLimitInvalidError": "0 以上の有効な整数を入力してください",
-  "dailyReminderTimeTitle": "毎日のサマリー通知時刻",
+  "dailyReminderTimeTitle": "通知リマインダー時刻",
+  "morningNotifyTitle": "朝のリマインダー",
+  "morningNotifyDesc": "毎日 08:00 に朝のブリーフィングを通知します。初期設定はオフです。",
+  "morningNotifyEnabledSuccess": "朝のリマインダーを有効にしました",
+  "morningNotifyDisabledSuccess": "朝のリマインダーを無効にしました",
   "currentTimeLabel": "現在：",
   "testNotificationTitle": "通知をテスト",
   "testNotificationDesc": "「毎日のサマリー」通知を今すぐトリガー",
@@ -607,15 +613,15 @@
       "minute": {}
     }
   },
-  "reminderScheduleSuccess": "毎日のリマインダーを {hour}:{minute} に設定しました",
+  "reminderScheduleSuccess": "通知リマインダーを {hour}:{minute} に設定しました",
   "@reminderScheduleSuccess": {
     "placeholders": {
       "hour": {},
       "minute": {}
     }
   },
-  "reminderDisabledSuccess": "毎日のリマインダーを無効にしました",
-  "reminderScheduleFailed": "毎日のリマインダーをスケジュールできませんでした（プラットフォームが非対応の可能性があります）",
+  "reminderDisabledSuccess": "通知リマインダーを無効にしました",
+  "reminderScheduleFailed": "通知リマインダーをスケジュールできませんでした（プラットフォームが非対応の可能性があります）",
   "saveReminderSettingsFailed": "リマインダー設定の保存に失敗しました：{error}",
   "@saveReminderSettingsFailed": {
     "placeholders": {

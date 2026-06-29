@@ -466,10 +466,16 @@ class AppLocalizationsJa extends AppLocalizations {
   String get segmentSummarySectionDesc => 'サンプリング/長さ/AI間隔';
 
   @override
-  String get dailyReminderSectionTitle => '毎日の概要リマインダー';
+  String get dailyReminderSectionTitle => '通知リマインダー';
 
   @override
-  String get dailyReminderSectionDesc => '時刻/バナー権限/テスト';
+  String get dailyReminderSectionDesc => '時刻/朝のリマインダー/バナー権限/テスト';
+
+  @override
+  String get notificationReminderSectionTitle => '通知リマインダー';
+
+  @override
+  String get notificationReminderSectionDesc => '時刻/朝のリマインダー/バナー権限/テスト';
 
   @override
   String get aiAssistantSectionTitle => 'AIアシスタント';
@@ -1072,7 +1078,19 @@ class AppLocalizationsJa extends AppLocalizations {
   String get dynamicMergeLimitInvalidError => '0 以上の有効な整数を入力してください';
 
   @override
-  String get dailyReminderTimeTitle => '毎日のサマリー通知時刻';
+  String get dailyReminderTimeTitle => '通知リマインダー時刻';
+
+  @override
+  String get morningNotifyTitle => '朝のリマインダー';
+
+  @override
+  String get morningNotifyDesc => '毎日 08:00 に朝のブリーフィングを通知します。初期設定はオフです。';
+
+  @override
+  String get morningNotifyEnabledSuccess => '朝のリマインダーを有効にしました';
+
+  @override
+  String get morningNotifyDisabledSuccess => '朝のリマインダーを無効にしました';
 
   @override
   String get currentTimeLabel => '現在：';
@@ -1253,15 +1271,15 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String reminderScheduleSuccess(Object hour, Object minute) {
-    return '毎日のリマインダーを $hour:$minute に設定しました';
+    return '通知リマインダーを $hour:$minute に設定しました';
   }
 
   @override
-  String get reminderDisabledSuccess => '毎日のリマインダーを無効にしました';
+  String get reminderDisabledSuccess => '通知リマインダーを無効にしました';
 
   @override
   String get reminderScheduleFailed =>
-      '毎日のリマインダーをスケジュールできませんでした（プラットフォームが非対応の可能性があります）';
+      '通知リマインダーをスケジュールできませんでした（プラットフォームが非対応の可能性があります）';
 
   @override
   String saveReminderSettingsFailed(Object error) {

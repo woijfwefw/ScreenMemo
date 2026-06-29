@@ -2,6 +2,10 @@ package com.fqyw.screen_memo.channel
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -32,6 +36,7 @@ import com.fqyw.screen_memo.settings.UserSettingsStorage
 import com.fqyw.screen_memo.storage.StorageAnalyzer
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
 
@@ -75,6 +80,7 @@ class ExtractedMainMethodHandler(
             }
             "getPermissionStatus" -> result.success(PermissionGuideHelper.checkPermissionStatus(activity))
             "getPermissionReport" -> result.success(PermissionGuideHelper.generatePermissionReport(activity))
+            "getAppIcon" -> getAppIcon(call, result)
             "getDeviceInfo" -> result.success(OEMCompatibilityHelper.getDeviceInfo())
             "getEnabledImeList" -> getEnabledImeList(result)
             "getDefaultInputMethod" -> getDefaultInputMethod(result)
@@ -210,6 +216,46 @@ class ExtractedMainMethodHandler(
         } catch (e: Exception) {
             result.error("log_retention_read_error", e.message, null)
         }
+    }
+
+    private fun getAppIcon(call: MethodCall, result: MethodChannel.Result) {
+        val packageName = call.argument<String>("packageName")
+            ?: call.argument<String>("package_name")
+            ?: ""
+        if (packageName.isBlank()) {
+            result.success(null)
+            return
+        }
+
+        val sizePx = (call.argument<Int>("sizePx") ?: 96).coerceIn(32, 192)
+        Thread({
+            try {
+                val pm = activity.packageManager
+                val appInfo = pm.getApplicationInfo(packageName, 0)
+                val drawable = appInfo.loadIcon(pm)
+                val bitmap = drawableToBitmap(drawable, sizePx)
+                val out = ByteArrayOutputStream()
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                result.success(out.toByteArray())
+            } catch (_: Throwable) {
+                result.success(null)
+            }
+        }, "ScreenMemo-AppIconLoader").start()
+    }
+
+    private fun drawableToBitmap(drawable: Drawable, sizePx: Int): Bitmap {
+        if (drawable is BitmapDrawable) {
+            val bmp = drawable.bitmap
+            if (bmp != null && !bmp.isRecycled) {
+                return Bitmap.createScaledBitmap(bmp, sizePx, sizePx, true)
+            }
+        }
+
+        val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable.draw(canvas)
+        return bitmap
     }
 
     private fun getSegmentsAIConfig(result: MethodChannel.Result) {
@@ -800,12 +846,13 @@ class ExtractedMainMethodHandler(
             val hour = call.argument<Int>("hour") ?: 20
             val minute = call.argument<Int>("minute") ?: 0
             val enabled = call.argument<Boolean>("enabled") ?: true
+            val morningEnabled = call.argument<Boolean>("morningEnabled") ?: false
             val ok = if (enabled) {
-                DailySummaryScheduler.schedule(activity, hour, minute)
+                DailySummaryScheduler.schedule(activity, hour, minute, morningEnabled = morningEnabled)
             } else {
-                DailySummaryScheduler.cancel(activity)
+                DailySummaryScheduler.cancel(activity, morningEnabled = morningEnabled)
             }
-            try { FileLogger.i(tag, "调度每日总结通知：启用=$enabled 小时=$hour 分钟=$minute 结果=$ok") } catch (_: Exception) {}
+            try { FileLogger.i(tag, "调度通知提醒：启用=$enabled 晨间=$morningEnabled 小时=$hour 分钟=$minute 结果=$ok") } catch (_: Exception) {}
             result.success(ok)
         } catch (e: Exception) {
             result.error("schedule_failed", e.message, null)

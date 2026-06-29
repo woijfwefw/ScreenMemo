@@ -454,10 +454,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get segmentSummarySectionDesc => '采样/时长/AI 请求间隔';
 
   @override
-  String get dailyReminderSectionTitle => '每日总结提醒';
+  String get dailyReminderSectionTitle => '通知提醒';
 
   @override
-  String get dailyReminderSectionDesc => '提醒时间/横幅权限/测试触发';
+  String get dailyReminderSectionDesc => '通知时间/晨间提醒/横幅权限/测试触发';
+
+  @override
+  String get notificationReminderSectionTitle => '通知提醒';
+
+  @override
+  String get notificationReminderSectionDesc => '通知时间/晨间提醒/横幅权限/测试触发';
 
   @override
   String get aiAssistantSectionTitle => 'AI 助手';
@@ -1052,7 +1058,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get dynamicMergeLimitInvalidError => '请输入 >= 0 的有效整数';
 
   @override
-  String get dailyReminderTimeTitle => '每日总结提醒时间';
+  String get dailyReminderTimeTitle => '通知提醒时间';
+
+  @override
+  String get morningNotifyTitle => '晨间提醒';
+
+  @override
+  String get morningNotifyDesc => '每天 08:00 推送晨间速览，默认关闭';
+
+  @override
+  String get morningNotifyEnabledSuccess => '已开启晨间提醒';
+
+  @override
+  String get morningNotifyDisabledSuccess => '已关闭晨间提醒';
 
   @override
   String get currentTimeLabel => '当前：';
@@ -1231,14 +1249,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String reminderScheduleSuccess(Object hour, Object minute) {
-    return '已设置每日提醒时间为 $hour:$minute';
+    return '已设置通知提醒时间为 $hour:$minute';
   }
 
   @override
-  String get reminderDisabledSuccess => '已关闭每日提醒';
+  String get reminderDisabledSuccess => '已关闭通知提醒';
 
   @override
-  String get reminderScheduleFailed => '调度每日提醒失败（可能平台不支持）';
+  String get reminderScheduleFailed => '调度通知提醒失败（可能平台不支持）';
 
   @override
   String saveReminderSettingsFailed(Object error) {

@@ -190,8 +190,10 @@
   "screenshotSectionDesc": "간격/품질/만료 정리",
   "segmentSummarySectionTitle": "다이내믹 설정",
   "segmentSummarySectionDesc": "샘플링/길이/AI 간격",
-  "dailyReminderSectionTitle": "일일 요약 알림",
-  "dailyReminderSectionDesc": "시간/배너 권한/테스트",
+  "dailyReminderSectionTitle": "알림 리마인더",
+  "dailyReminderSectionDesc": "시간/아침 알림/배너 권한/테스트",
+  "notificationReminderSectionTitle": "알림 리마인더",
+  "notificationReminderSectionDesc": "시간/아침 알림/배너 권한/테스트",
   "aiAssistantSectionTitle": "AI 어시스턴트",
   "dataBackupSectionTitle": "데이터 및 백업",
   "dataBackupSectionDesc": "저장소/가져오기/내보내기/재계산",
@@ -512,7 +514,11 @@
   },
   "dynamicMergeLimitInputHint": "0 이상의 정수를 입력하세요(0 = 제한 없음)",
   "dynamicMergeLimitInvalidError": "0 이상의 유효한 정수를 입력하세요",
-  "dailyReminderTimeTitle": "일일 요약 알림 시간",
+  "dailyReminderTimeTitle": "알림 리마인더 시간",
+  "morningNotifyTitle": "아침 알림",
+  "morningNotifyDesc": "매일 08:00에 아침 브리핑을 보냅니다. 기본값은 꺼짐입니다.",
+  "morningNotifyEnabledSuccess": "아침 알림을 켰습니다",
+  "morningNotifyDisabledSuccess": "아침 알림을 껐습니다",
   "currentTimeLabel": "현재:",
   "testNotificationTitle": "알림 테스트",
   "testNotificationDesc": "\"일일 요약\" 알림을 지금 트리거합니다",
@@ -607,15 +613,15 @@
       "minute": {}
     }
   },
-  "reminderScheduleSuccess": "일일 알림 시간을 {hour}:{minute}로 설정했습니다",
+  "reminderScheduleSuccess": "알림 리마인더 시간을 {hour}:{minute}로 설정했습니다",
   "@reminderScheduleSuccess": {
     "placeholders": {
       "hour": {},
       "minute": {}
     }
   },
-  "reminderDisabledSuccess": "일일 알림을 비활성화했습니다",
-  "reminderScheduleFailed": "일일 알림을 예약하지 못했습니다(플랫폼에서 지원하지 않을 수 있음)",
+  "reminderDisabledSuccess": "알림 리마인더를 비활성화했습니다",
+  "reminderScheduleFailed": "알림 리마인더를 예약하지 못했습니다(플랫폼에서 지원하지 않을 수 있음)",
   "saveReminderSettingsFailed": "알림 설정 저장 실패: {error}",
   "@saveReminderSettingsFailed": {
     "placeholders": {

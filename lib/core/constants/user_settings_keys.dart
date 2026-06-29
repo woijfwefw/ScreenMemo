@@ -39,10 +39,11 @@ class UserSettingKeys {
   static const String mergeDynamicMaxSpanSec = 'merge_dynamic_max_span_sec';
   static const String mergeDynamicMaxGapSec = 'merge_dynamic_max_gap_sec';
 
-  // 每日总结提醒
+  // 通知提醒
   static const String dailyNotifyEnabled = 'daily_notify_enabled';
   static const String dailyNotifyHour = 'daily_notify_hour';
   static const String dailyNotifyMinute = 'daily_notify_minute';
+  static const String morningNotifyEnabled = 'morning_notify_enabled';
 
   // 动态页 UI
   static const String dynamicEntryLogIconEnabled =

@@ -1,6 +1,6 @@
 part of 'settings_page.dart';
 
-// ========== 扩展：每日总结提醒设置（提示时间 + 测试按钮） ==========
+// ========== 扩展：通知提醒设置（提示时间 + 测试按钮） ==========
 extension _DailySummaryNotifyExt on _SettingsPageState {
   Future<void> _loadDailyNotifySettings() async {
     try {
@@ -19,21 +19,28 @@ extension _DailySummaryNotifyExt on _SettingsPageState {
         defaultValue: 0,
         legacyPrefKeys: const <String>['daily_notify_minute'],
       );
+      final bool morningEnabled = await UserSettingsService.instance.getBool(
+        UserSettingKeys.morningNotifyEnabled,
+        defaultValue: false,
+        legacyPrefKeys: const <String>['morning_notify_enabled'],
+      );
       if (mounted) {
         _settingsSetState(() {
           _dailyNotifyEnabled = enabled;
           _dailyNotifyHour = hour.clamp(0, 23);
           _dailyNotifyMinute = minute.clamp(0, 59);
+          _morningNotifyEnabled = morningEnabled;
         });
       }
       await FlutterLogger.nativeInfo(
         'DailySummaryUI',
-        '加载设置：启用=${_dailyNotifyEnabled} 时间=${_two(_dailyNotifyHour)}:${_two(_dailyNotifyMinute)}',
+        '加载设置：通知启用=${_dailyNotifyEnabled} 晨间启用=${_morningNotifyEnabled} 时间=${_two(_dailyNotifyHour)}:${_two(_dailyNotifyMinute)}',
       );
       final ok = await DailySummaryService.instance.scheduleDailyNotification(
         hour: _dailyNotifyHour,
         minute: _dailyNotifyMinute,
         enabled: _dailyNotifyEnabled,
+        morningEnabled: _morningNotifyEnabled,
       );
       // 启动一次"自动预生成"调度
       await DailySummaryService.instance.refreshAutoRefreshSchedule();
@@ -47,12 +54,14 @@ extension _DailySummaryNotifyExt on _SettingsPageState {
     bool? enabled,
     int? hour,
     int? minute,
+    bool? morningEnabled,
     bool toast = true,
   }) async {
     try {
       final newEnabled = enabled ?? _dailyNotifyEnabled;
       final newHour = (hour ?? _dailyNotifyHour).clamp(0, 23);
       final newMinute = (minute ?? _dailyNotifyMinute).clamp(0, 59);
+      final newMorningEnabled = morningEnabled ?? _morningNotifyEnabled;
 
       await UserSettingsService.instance.setBool(
         UserSettingKeys.dailyNotifyEnabled,
@@ -69,12 +78,18 @@ extension _DailySummaryNotifyExt on _SettingsPageState {
         newMinute,
         legacyPrefKeys: const <String>['daily_notify_minute'],
       );
+      await UserSettingsService.instance.setBool(
+        UserSettingKeys.morningNotifyEnabled,
+        newMorningEnabled,
+        legacyPrefKeys: const <String>['morning_notify_enabled'],
+      );
 
       if (mounted) {
         _settingsSetState(() {
           _dailyNotifyEnabled = newEnabled;
           _dailyNotifyHour = newHour;
           _dailyNotifyMinute = newMinute;
+          _morningNotifyEnabled = newMorningEnabled;
         });
       }
 
@@ -82,19 +97,24 @@ extension _DailySummaryNotifyExt on _SettingsPageState {
         hour: newHour,
         minute: newMinute,
         enabled: newEnabled,
+        morningEnabled: newMorningEnabled,
       );
       // 刷新"预生成"定时器，使得在提醒前1分钟自动刷新当日总结
       await DailySummaryService.instance.refreshAutoRefreshSchedule();
       if (toast && mounted) {
         if (ok) {
-          UINotifier.success(
-            context,
-            newEnabled
-                ? AppLocalizations.of(
-                    context,
-                  ).reminderScheduleSuccess(_two(newHour), _two(newMinute))
-                : AppLocalizations.of(context).reminderDisabledSuccess,
-          );
+          final l10n = AppLocalizations.of(context);
+          final String message = morningEnabled != null && enabled == null
+              ? (newMorningEnabled
+                    ? l10n.morningNotifyEnabledSuccess
+                    : l10n.morningNotifyDisabledSuccess)
+              : (newEnabled
+                    ? l10n.reminderScheduleSuccess(
+                        _two(newHour),
+                        _two(newMinute),
+                      )
+                    : l10n.reminderDisabledSuccess);
+          UINotifier.success(context, message);
         } else {
           UINotifier.warning(
             context,
@@ -447,7 +467,56 @@ extension _DailySummaryNotifyExt on _SettingsPageState {
     );
   }
 
-  // 打开"每日总结提醒"渠道设置（开启横幅/悬浮通知等）
+  Widget _buildMorningNotifyItem(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.spacing4,
+        vertical: AppTheme.spacing3 - 2,
+      ),
+      decoration: BoxDecoration(
+        border: Border(bottom: _settingsDividerSide(context)),
+      ),
+      child: Row(
+        children: [
+          _buildSettingsLeadingIcon(context, Icons.wb_twilight_outlined),
+          const SizedBox(width: AppTheme.spacing3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  AppLocalizations.of(context).morningNotifyTitle,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  AppLocalizations.of(context).morningNotifyDesc,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppTheme.spacing2),
+          Transform.scale(
+            scale: 0.9,
+            child: Switch(
+              value: _morningNotifyEnabled,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              onChanged: (v) async {
+                await _saveDailyNotifySettings(morningEnabled: v);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 打开"通知提醒"渠道设置（开启横幅/悬浮通知等）
   Future<void> _openDailyChannelSettings() async {
     try {
       await FlutterLogger.nativeInfo('DailySummaryUI', '打开通知渠道设置');

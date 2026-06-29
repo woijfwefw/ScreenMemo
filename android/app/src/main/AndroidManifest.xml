@@ -193,7 +193,7 @@
                 android:resource="@xml/file_paths" />
         </provider>
  
-        <!-- 每日总结提醒闹钟接收器 -->
+        <!-- 通知提醒闹钟接收器 -->
         <receiver
             android:name=".daily.DailySummaryAlarmReceiver"
             android:exported="false" />

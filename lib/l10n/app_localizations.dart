@@ -957,14 +957,26 @@ abstract class AppLocalizations {
   /// No description provided for @dailyReminderSectionTitle.
   ///
   /// In en, this message translates to:
-  /// **'Daily summary reminder'**
+  /// **'Notification reminder'**
   String get dailyReminderSectionTitle;
 
   /// No description provided for @dailyReminderSectionDesc.
   ///
   /// In en, this message translates to:
-  /// **'Time, banner permission, test'**
+  /// **'Time, morning reminder, banner permission, test'**
   String get dailyReminderSectionDesc;
+
+  /// No description provided for @notificationReminderSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification reminder'**
+  String get notificationReminderSectionTitle;
+
+  /// No description provided for @notificationReminderSectionDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Time, morning reminder, banner permission, test'**
+  String get notificationReminderSectionDesc;
 
   /// No description provided for @aiAssistantSectionTitle.
   ///
@@ -2031,8 +2043,32 @@ abstract class AppLocalizations {
   /// No description provided for @dailyReminderTimeTitle.
   ///
   /// In en, this message translates to:
-  /// **'Daily summary reminder time'**
+  /// **'Notification reminder time'**
   String get dailyReminderTimeTitle;
+
+  /// No description provided for @morningNotifyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Morning reminder'**
+  String get morningNotifyTitle;
+
+  /// No description provided for @morningNotifyDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Send the morning briefing every day at 08:00. Off by default.'**
+  String get morningNotifyDesc;
+
+  /// No description provided for @morningNotifyEnabledSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Morning reminder enabled'**
+  String get morningNotifyEnabledSuccess;
+
+  /// No description provided for @morningNotifyDisabledSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Morning reminder disabled'**
+  String get morningNotifyDisabledSuccess;
 
   /// No description provided for @currentTimeLabel.
   ///
@@ -2355,19 +2391,19 @@ abstract class AppLocalizations {
   /// No description provided for @reminderScheduleSuccess.
   ///
   /// In en, this message translates to:
-  /// **'Daily reminder time set to {hour}:{minute}'**
+  /// **'Notification reminder time set to {hour}:{minute}'**
   String reminderScheduleSuccess(Object hour, Object minute);
 
   /// No description provided for @reminderDisabledSuccess.
   ///
   /// In en, this message translates to:
-  /// **'Daily reminder disabled'**
+  /// **'Notification reminder disabled'**
   String get reminderDisabledSuccess;
 
   /// No description provided for @reminderScheduleFailed.
   ///
   /// In en, this message translates to:
-  /// **'Failed to schedule daily reminder (platform may not support)'**
+  /// **'Failed to schedule notification reminder (platform may not support)'**
   String get reminderScheduleFailed;
 
   /// No description provided for @saveReminderSettingsFailed.

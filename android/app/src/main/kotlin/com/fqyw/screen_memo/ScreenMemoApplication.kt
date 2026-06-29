@@ -10,6 +10,7 @@ import com.fqyw.screen_memo.health.AppHealthScheduler
 import com.fqyw.screen_memo.importing.ImportOcrRepairService
 import com.fqyw.screen_memo.logging.FileLogger
 import com.fqyw.screen_memo.logging.OutputFileLogger
+import com.fqyw.screen_memo.prefs.LegacyAppPrefsSanitizer
 
 import android.app.Application
 import android.content.Context
@@ -25,6 +26,7 @@ class ScreenMemoApplication : Application() {
         installUncaughtExceptionLogger(base)
         try {
             RuntimeDiagnostics.noteProcessState(base, "application_attachBaseContext")
+            LegacyAppPrefsSanitizer.sanitize(base)
             OutputFileLogger.infoForce(
                 base,
                 TAG,
@@ -49,12 +51,12 @@ class ScreenMemoApplication : Application() {
         // 让 MainActivity 使用默认 Engine 生命周期，可以在每次用户可见启动时重建干净的 Flutter UI。
         FileLogger.i(TAG, "FlutterEngine pre-cache disabled; MainActivity will use a standalone Engine")
 
-        // 应用启动时恢复每日提醒调度（读取 SharedPreferences 中的上次设置）
+        // 应用启动时恢复通知提醒调度（读取 SharedPreferences 中的上次设置）
         try {
             DailySummaryScheduler.restore(this)
-            OutputFileLogger.info(this, TAG, "应用启动时已恢复每日总结调度")
+            OutputFileLogger.info(this, TAG, "应用启动时已恢复通知提醒调度")
         } catch (e: Exception) {
-            FileLogger.w(TAG, "恢复每日总结调度失败：${e.message}")
+            FileLogger.w(TAG, "恢复通知提醒调度失败：${e.message}")
         }
 
         try {

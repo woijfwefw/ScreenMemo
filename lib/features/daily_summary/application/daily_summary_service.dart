@@ -1279,25 +1279,29 @@ class DailySummaryService {
     }
   }
 
-  /// 调度每日提醒（交由原生层实现，hour/minute 为 24 小时制；enabled=false 取消）
+  /// 调度通知提醒（交由原生层实现，hour/minute 为 24 小时制；enabled=false 取消）
   Future<bool> scheduleDailyNotification({
     required int hour,
     required int minute,
     required bool enabled,
+    bool morningEnabled = false,
   }) async {
     try {
       // ignore: discarded_futures
       FlutterLogger.nativeInfo(
         'DailySummary',
-        '安排每日通知 enabled=$enabled time=$hour:$minute',
+        '安排通知提醒 enabled=$enabled morningEnabled=$morningEnabled time=$hour:$minute',
       );
-      final res = await _channel.invokeMethod(
-        'scheduleDailySummaryNotification',
-        {'hour': hour, 'minute': minute, 'enabled': enabled},
-      );
+      final res = await _channel
+          .invokeMethod('scheduleDailySummaryNotification', {
+            'hour': hour,
+            'minute': minute,
+            'enabled': enabled,
+            'morningEnabled': morningEnabled,
+          });
       // ignore: discarded_futures
-      FlutterLogger.nativeInfo('DailySummary', '安排每日通知结果=$res');
-      // 同步安排固定时段（08:00/12:00/17:00/22:00）
+      FlutterLogger.nativeInfo('DailySummary', '安排通知提醒结果=$res');
+      // 同步安排固定时段（晨间提醒单独受 morningEnabled 控制）
       try {
         final ok = await _channel.invokeMethod(
           'scheduleDailySummaryNotification',
@@ -1307,6 +1311,7 @@ class DailySummaryService {
             'hour': hour,
             'minute': minute,
             'enabled': enabled,
+            'morningEnabled': morningEnabled,
           },
         );
         // ignore: discarded_futures
@@ -1325,7 +1330,7 @@ class DailySummaryService {
 
   /// 刷新“自动预生成”调度：
   /// - 每天 08:00、12:00、17:00 自动更新一次
-  /// - 若开启每日提醒，则在提醒时间的前 1 分钟再自动更新一次（确保内容新鲜）
+  /// - 若开启通知提醒，则在提醒时间的前 1 分钟再自动更新一次（确保内容新鲜）
   /// 说明：该调度依赖应用在前台运行；若应用未运行，则由原生闹钟按既定时间展示兜底通知。
   Future<void> refreshAutoRefreshSchedule() async {
     try {
@@ -1334,6 +1339,11 @@ class DailySummaryService {
         UserSettingKeys.dailyNotifyEnabled,
         defaultValue: true,
         legacyPrefKeys: const <String>['daily_notify_enabled'],
+      );
+      final bool morningEnabled = await UserSettingsService.instance.getBool(
+        UserSettingKeys.morningNotifyEnabled,
+        defaultValue: false,
+        legacyPrefKeys: const <String>['morning_notify_enabled'],
       );
       final int hour = await UserSettingsService.instance.getInt(
         UserSettingKeys.dailyNotifyHour,
@@ -1351,11 +1361,17 @@ class DailySummaryService {
       // 固定时间点候选（08:00、12:00、17:00）
       final List<DateTime> candidates = <DateTime>[];
       for (final pair in const <List<int>>[
-        <int>[8, 0],
         <int>[12, 0],
         <int>[17, 0],
       ]) {
         DateTime t = DateTime(now.year, now.month, now.day, pair[0], pair[1]);
+        if (!t.isAfter(now)) {
+          t = t.add(const Duration(days: 1));
+        }
+        candidates.add(t);
+      }
+      if (morningEnabled) {
+        DateTime t = DateTime(now.year, now.month, now.day, 8, 0);
         if (!t.isAfter(now)) {
           t = t.add(const Duration(days: 1));
         }

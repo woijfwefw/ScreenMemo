@@ -27,6 +27,7 @@ object UserSettingsKeysNative {
     const val DAILY_NOTIFY_ENABLED = "daily_notify_enabled"
     const val DAILY_NOTIFY_HOUR = "daily_notify_hour"
     const val DAILY_NOTIFY_MINUTE = "daily_notify_minute"
+    const val MORNING_NOTIFY_ENABLED = "morning_notify_enabled"
     const val LOG_RETENTION_DAYS = "log_retention_days"
     const val CLOUD_BACKUP_ENABLED = "cloud_backup_enabled"
     const val CLOUD_BACKUP_FREQUENCY_DAYS = "cloud_backup_frequency_days"

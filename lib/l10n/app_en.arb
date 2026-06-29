@@ -192,8 +192,10 @@
   "screenshotSectionDesc": "Interval, quality, expiration",
   "segmentSummarySectionTitle": "Dynamic settings",
   "segmentSummarySectionDesc": "Sampling, duration, AI throttle",
-  "dailyReminderSectionTitle": "Daily summary reminder",
-  "dailyReminderSectionDesc": "Time, banner permission, test",
+  "dailyReminderSectionTitle": "Notification reminder",
+  "dailyReminderSectionDesc": "Time, morning reminder, banner permission, test",
+  "notificationReminderSectionTitle": "Notification reminder",
+  "notificationReminderSectionDesc": "Time, morning reminder, banner permission, test",
   "aiAssistantSectionTitle": "AI Assistant",
   "dataBackupSectionTitle": "Data & backup",
   "dataBackupSectionDesc": "Storage, import/export, recalc stats",
@@ -514,7 +516,11 @@
   },
   "dynamicMergeLimitInputHint": "Enter an integer >= 0 (0 = unlimited)",
   "dynamicMergeLimitInvalidError": "Please enter a valid integer >= 0",
-  "dailyReminderTimeTitle": "Daily summary reminder time",
+  "dailyReminderTimeTitle": "Notification reminder time",
+  "morningNotifyTitle": "Morning reminder",
+  "morningNotifyDesc": "Send the morning briefing every day at 08:00. Off by default.",
+  "morningNotifyEnabledSuccess": "Morning reminder enabled",
+  "morningNotifyDisabledSuccess": "Morning reminder disabled",
   "currentTimeLabel": "Current: ",
   "testNotificationTitle": "Test notification",
   "testNotificationDesc": "Trigger \"Daily Summary\" notification now",
@@ -609,15 +615,15 @@
       "minute": {}
     }
   },
-  "reminderScheduleSuccess": "Daily reminder time set to {hour}:{minute}",
+  "reminderScheduleSuccess": "Notification reminder time set to {hour}:{minute}",
   "@reminderScheduleSuccess": {
     "placeholders": {
       "hour": {},
       "minute": {}
     }
   },
-  "reminderDisabledSuccess": "Daily reminder disabled",
-  "reminderScheduleFailed": "Failed to schedule daily reminder (platform may not support)",
+  "reminderDisabledSuccess": "Notification reminder disabled",
+  "reminderScheduleFailed": "Failed to schedule notification reminder (platform may not support)",
   "saveReminderSettingsFailed": "Failed to save reminder settings: {error}",
   "@saveReminderSettingsFailed": {
     "placeholders": {

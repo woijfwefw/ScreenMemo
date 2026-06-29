@@ -192,8 +192,10 @@
   "screenshotSectionDesc": "间隔/质量/过期清理",
   "segmentSummarySectionTitle": "动态设置",
   "segmentSummarySectionDesc": "采样/时长/AI 请求间隔",
-  "dailyReminderSectionTitle": "每日总结提醒",
-  "dailyReminderSectionDesc": "提醒时间/横幅权限/测试触发",
+  "dailyReminderSectionTitle": "通知提醒",
+  "dailyReminderSectionDesc": "通知时间/晨间提醒/横幅权限/测试触发",
+  "notificationReminderSectionTitle": "通知提醒",
+  "notificationReminderSectionDesc": "通知时间/晨间提醒/横幅权限/测试触发",
   "aiAssistantSectionTitle": "AI 助手",
   "dataBackupSectionTitle": "数据与备份",
   "dataBackupSectionDesc": "存储分析/导入导出/重新统计",
@@ -514,7 +516,11 @@
   },
   "dynamicMergeLimitInputHint": "请输入 >= 0 的整数（0 表示不限制）",
   "dynamicMergeLimitInvalidError": "请输入 >= 0 的有效整数",
-  "dailyReminderTimeTitle": "每日总结提醒时间",
+  "dailyReminderTimeTitle": "通知提醒时间",
+  "morningNotifyTitle": "晨间提醒",
+  "morningNotifyDesc": "每天 08:00 推送晨间速览，默认关闭",
+  "morningNotifyEnabledSuccess": "已开启晨间提醒",
+  "morningNotifyDisabledSuccess": "已关闭晨间提醒",
   "currentTimeLabel": "当前：",
   "testNotificationTitle": "测试通知",
   "testNotificationDesc": "立即触发\"今日总结\"通知",
@@ -609,15 +615,15 @@
       "minute": {}
     }
   },
-  "reminderScheduleSuccess": "已设置每日提醒时间为 {hour}:{minute}",
+  "reminderScheduleSuccess": "已设置通知提醒时间为 {hour}:{minute}",
   "@reminderScheduleSuccess": {
     "placeholders": {
       "hour": {},
       "minute": {}
     }
   },
-  "reminderDisabledSuccess": "已关闭每日提醒",
-  "reminderScheduleFailed": "调度每日提醒失败（可能平台不支持）",
+  "reminderDisabledSuccess": "已关闭通知提醒",
+  "reminderScheduleFailed": "调度通知提醒失败（可能平台不支持）",
   "saveReminderSettingsFailed": "保存提醒设置失败: {error}",
   "@saveReminderSettingsFailed": {
     "placeholders": {

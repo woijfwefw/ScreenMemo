@@ -482,10 +482,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get segmentSummarySectionDesc => 'Sampling, duration, AI throttle';
 
   @override
-  String get dailyReminderSectionTitle => 'Daily summary reminder';
+  String get dailyReminderSectionTitle => 'Notification reminder';
 
   @override
-  String get dailyReminderSectionDesc => 'Time, banner permission, test';
+  String get dailyReminderSectionDesc =>
+      'Time, morning reminder, banner permission, test';
+
+  @override
+  String get notificationReminderSectionTitle => 'Notification reminder';
+
+  @override
+  String get notificationReminderSectionDesc =>
+      'Time, morning reminder, banner permission, test';
 
   @override
   String get aiAssistantSectionTitle => 'AI Assistant';
@@ -1105,7 +1113,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Please enter a valid integer >= 0';
 
   @override
-  String get dailyReminderTimeTitle => 'Daily summary reminder time';
+  String get dailyReminderTimeTitle => 'Notification reminder time';
+
+  @override
+  String get morningNotifyTitle => 'Morning reminder';
+
+  @override
+  String get morningNotifyDesc =>
+      'Send the morning briefing every day at 08:00. Off by default.';
+
+  @override
+  String get morningNotifyEnabledSuccess => 'Morning reminder enabled';
+
+  @override
+  String get morningNotifyDisabledSuccess => 'Morning reminder disabled';
 
   @override
   String get currentTimeLabel => 'Current: ';
@@ -1295,15 +1316,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String reminderScheduleSuccess(Object hour, Object minute) {
-    return 'Daily reminder time set to $hour:$minute';
+    return 'Notification reminder time set to $hour:$minute';
   }
 
   @override
-  String get reminderDisabledSuccess => 'Daily reminder disabled';
+  String get reminderDisabledSuccess => 'Notification reminder disabled';
 
   @override
   String get reminderScheduleFailed =>
-      'Failed to schedule daily reminder (platform may not support)';
+      'Failed to schedule notification reminder (platform may not support)';
 
   @override
   String saveReminderSettingsFailed(Object error) {
