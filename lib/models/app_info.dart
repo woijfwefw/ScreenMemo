@@ -23,33 +23,47 @@ class AppInfo {
 
   /// 从installed_apps包的AppInfo对象创建AppInfo
   factory AppInfo.fromInstalledApp(dynamic app) {
+    final Uint8List? iconBytes = app.icon is Uint8List && app.icon.isNotEmpty
+        ? app.icon as Uint8List
+        : null;
     return AppInfo(
       packageName: app.packageName ?? '',
       appName: app.name ?? '',
-      icon: app.icon,
+      icon: iconBytes,
       version: app.versionName ?? '',
       isSystemApp: false, // installed_apps包默认排除系统应用
       isInstalled: true,
     );
   }
 
-  /// 转换为JSON
-  Map<String, dynamic> toJson() {
-    return {
+  /// 转换为 JSON。
+  ///
+  /// 应用图标可能很大，持久化到 SharedPreferences 后会让
+  /// shared_preferences 在启动或保存时通过 MethodChannel 传输超大字符串，
+  /// 低内存设备上会直接 OOM。默认只序列化轻量元数据；只有明确需要导出图标时
+  /// 才传入 [includeIcon]。
+  Map<String, dynamic> toJson({bool includeIcon = false}) {
+    final json = <String, dynamic>{
       'packageName': packageName,
       'appName': appName,
       'version': version,
       'isSystemApp': isSystemApp,
       'isInstalled': isInstalled,
       'isSelected': isSelected,
-      'icon': icon != null ? base64Encode(icon!) : null,
     };
+    if (includeIcon && icon != null && icon!.isNotEmpty) {
+      json['icon'] = base64Encode(icon!);
+    }
+    return json;
   }
 
   /// 从JSON创建AppInfo
-  factory AppInfo.fromJson(Map<String, dynamic> json) {
+  factory AppInfo.fromJson(
+    Map<String, dynamic> json, {
+    bool decodeIcon = true,
+  }) {
     Uint8List? iconData;
-    if (json['icon'] != null) {
+    if (decodeIcon && json['icon'] != null) {
       try {
         iconData = base64Decode(json['icon']);
       } catch (e) {

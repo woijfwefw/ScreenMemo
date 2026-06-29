@@ -3,6 +3,7 @@ import 'package:screen_memo/l10n/app_localizations.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
 import 'package:screen_memo/models/app_info.dart';
 import 'package:screen_memo/features/apps/application/app_selection_service.dart';
+import 'package:screen_memo/features/apps/presentation/widgets/lazy_app_icon.dart';
 import 'package:screen_memo/core/widgets/ui_dialog.dart';
 import 'package:screen_memo/core/widgets/selection_checkbox.dart';
 import 'package:screen_memo/core/widgets/search_styles.dart';
@@ -332,6 +333,7 @@ class _AppSelectionWidgetState extends State<AppSelectionWidget> {
                 )
               : (widget.displayAsList
                     ? ListView.separated(
+                        addAutomaticKeepAlives: false,
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppTheme.spacing2,
                           vertical: AppTheme.spacing1,
@@ -345,6 +347,7 @@ class _AppSelectionWidgetState extends State<AppSelectionWidget> {
                         },
                       )
                     : GridView.builder(
+                        addAutomaticKeepAlives: false,
                         padding: const EdgeInsets.fromLTRB(
                           AppTheme.spacing3, // left
                           AppTheme.spacing2, // top - 减少顶部间距
@@ -397,18 +400,16 @@ class _AppSelectionWidgetState extends State<AppSelectionWidget> {
                 SizedBox(
                   width: 48,
                   height: 48,
-                  child: app.icon != null
-                      ? Image.memory(
-                          app.icon!,
-                          width: 48,
-                          height: 48,
-                          fit: BoxFit.contain, // 改为contain避免裁剪
-                        )
-                      : Icon(
-                          Icons.android,
-                          color: AppTheme.mutedForeground,
-                          size: 32,
-                        ),
+                  child: LazyAppIcon(
+                    packageName: app.packageName,
+                    initialIcon: app.icon,
+                    size: 48,
+                    fallback: Icon(
+                      Icons.android,
+                      color: AppTheme.mutedForeground,
+                      size: 32,
+                    ),
+                  ),
                 ),
 
                 // 选择状态覆盖层 - 更优雅的设计
@@ -467,18 +468,16 @@ class _AppSelectionWidgetState extends State<AppSelectionWidget> {
               SizedBox(
                 width: 40,
                 height: 40,
-                child: app.icon != null
-                    ? Image.memory(
-                        app.icon!,
-                        width: 40,
-                        height: 40,
-                        fit: BoxFit.contain,
-                      )
-                    : Icon(
-                        Icons.android,
-                        color: AppTheme.mutedForeground,
-                        size: 28,
-                      ),
+                child: LazyAppIcon(
+                  packageName: app.packageName,
+                  initialIcon: app.icon,
+                  size: 40,
+                  fallback: Icon(
+                    Icons.android,
+                    color: AppTheme.mutedForeground,
+                    size: 28,
+                  ),
+                ),
               ),
               const SizedBox(width: AppTheme.spacing3),
               Expanded(

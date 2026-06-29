@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:installed_apps/installed_apps.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:screen_memo/core/constants/user_settings_keys.dart';
@@ -27,6 +26,7 @@ class AppSelectionService {
   static const String _appsCacheTsKey = 'all_apps_cache_ts';
   static const String _appIdentityCacheKey = 'app_identity_cache';
   static const int _appsCacheTtlSeconds = 28800; // 8小时TTL（秒）
+  static const int _maxPrefsJsonBytes = 1024 * 1024;
   static const String _privacyModeKey = 'privacy_mode_enabled';
 
   List<AppInfo> _allApps = [];
@@ -61,6 +61,7 @@ class AppSelectionService {
       }
 
       final prefs = await SharedPreferences.getInstance();
+      await _cleanupOversizedLegacyPrefs(prefs);
 
       // 2) 本地缓存：过期缓存也先返回，避免首屏等待全量应用扫描。
       if (!forceRefresh) {
@@ -73,7 +74,7 @@ class AppSelectionService {
             final List<dynamic> list = jsonDecode(cached);
             _allApps = list
                 .whereType<Map<String, dynamic>>()
-                .map((m) => AppInfo.fromJson(m))
+                .map((m) => AppInfo.fromJson(m, decodeIcon: false))
                 .toList();
             // 排除本应用自身
             _allApps = _allApps
@@ -113,14 +114,16 @@ class AppSelectionService {
 
       // 3) 全量扫描（较慢）
       StartupProfiler.begin('InstalledApps.getInstalledApps');
-      final apps = await InstalledApps.getInstalledApps(
+      final appsWithoutIcons = await InstalledApps.getInstalledApps(
         true, // excludeSystemApps
-        true, // withIcon
+        false, // withIcon: 大量应用时不能一次性传输全部图标
         '', // packageNamePrefix
       );
       StartupProfiler.end('InstalledApps.getInstalledApps');
 
-      _allApps = apps.map((app) => AppInfo.fromInstalledApp(app)).toList();
+      _allApps = appsWithoutIcons
+          .map((app) => AppInfo.fromInstalledApp(app))
+          .toList();
       // 排除本应用自身
       _allApps = _allApps
           .where((a) => a.packageName != 'com.fqyw.screen_memo')
@@ -129,7 +132,8 @@ class AppSelectionService {
       _allApps.sort((a, b) => a.appName.compareTo(b.appName));
       await _mergeAndSaveAppIdentityCache(_allApps, prefs);
 
-      // 4) 保存至本地缓存
+      // 4) 保存至本地缓存。不要写入 icon，否则 1000+ 应用会把
+      // SharedPreferences 膨胀到几十/上百 MB，下一次 getInstance() 可能 OOM。
       try {
         final encoded = jsonEncode(_allApps.map((a) => a.toJson()).toList());
         await prefs.setString(_appsCacheKey, encoded);
@@ -171,6 +175,7 @@ class AppSelectionService {
   Future<void> refreshAppsInBackgroundIfStale() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      await _cleanupOversizedLegacyPrefs(prefs);
       final ts = prefs.getInt(_appsCacheTsKey) ?? 0;
       final now = DateTime.now().millisecondsSinceEpoch;
       final isFresh = ts > 0 && (now - ts) <= _appsCacheTtlSeconds * 1000;
@@ -221,13 +226,20 @@ class AppSelectionService {
     try {
       StartupProfiler.begin('AppSelectionService.getSelectedApps');
       final prefs = await SharedPreferences.getInstance();
+      await _cleanupOversizedLegacyPrefs(prefs);
       final appsJsonString = prefs.getString(_selectedAppsKey);
 
       if (appsJsonString != null) {
         final appsJson = jsonDecode(appsJsonString) as List;
         final cachedByPackage = await getCachedAppInfoByPackage();
         _selectedApps = appsJson
-            .map((json) => AppInfo.fromJson(json))
+            .whereType<Map>()
+            .map(
+              (json) => AppInfo.fromJson(
+                Map<String, dynamic>.from(json),
+                decodeIcon: false,
+              ),
+            )
             .map(
               (app) =>
                   _withCachedIdentity(app, cachedByPackage[app.packageName]),
@@ -250,6 +262,7 @@ class AppSelectionService {
   Future<Map<String, AppInfo>> getCachedAppInfoByPackage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      await _cleanupOversizedLegacyPrefs(prefs);
       return _readAppIdentityCache(prefs);
     } catch (e) {
       print('应用身份缓存失败: $e');
@@ -275,7 +288,10 @@ class AppSelectionService {
       if (decoded is List) {
         for (final item in decoded) {
           if (item is! Map) continue;
-          final app = AppInfo.fromJson(Map<String, dynamic>.from(item));
+          final app = AppInfo.fromJson(
+            Map<String, dynamic>.from(item),
+            decodeIcon: false,
+          );
           final pkg = app.packageName.trim();
           if (pkg.isNotEmpty && pkg != 'com.fqyw.screen_memo') {
             result[pkg] = app;
@@ -286,7 +302,7 @@ class AppSelectionService {
           if (value is! Map) return;
           final map = Map<String, dynamic>.from(value);
           map['packageName'] ??= key.toString();
-          final app = AppInfo.fromJson(map);
+          final app = AppInfo.fromJson(map, decodeIcon: false);
           final pkg = app.packageName.trim();
           if (pkg.isNotEmpty && pkg != 'com.fqyw.screen_memo') {
             result[pkg] = app;
@@ -319,14 +335,11 @@ class AppSelectionService {
           latestName: app.appName,
           oldName: old?.appName,
         );
-        final Uint8List? nextIcon = (app.icon != null && app.icon!.isNotEmpty)
-            ? app.icon
-            : old?.icon;
-
         merged[pkg] = AppInfo(
           packageName: pkg,
           appName: nextName,
-          icon: nextIcon,
+          // 身份缓存持久化只保存名称/包名等轻量信息，不保存图标。
+          icon: null,
           version: app.version.isNotEmpty ? app.version : (old?.version ?? ''),
           isSystemApp: app.isSystemApp,
           // 这是身份缓存，不代表当前安装状态；读取方会自行结合当前安装列表判断。
@@ -351,14 +364,10 @@ class AppSelectionService {
       latestName: app.appName,
       oldName: cached.appName,
     );
-    final Uint8List? icon = (app.icon != null && app.icon!.isNotEmpty)
-        ? app.icon
-        : cached.icon;
-
     return AppInfo(
       packageName: app.packageName,
       appName: name,
-      icon: icon,
+      icon: app.icon,
       version: app.version.isNotEmpty ? app.version : cached.version,
       isSystemApp: app.isSystemApp,
       isInstalled: app.isInstalled,
@@ -417,6 +426,56 @@ class AppSelectionService {
       }
     }
     return suspicious >= 5 && suspicious * 2 >= apps.length;
+  }
+
+  Future<void> _cleanupOversizedLegacyPrefs(SharedPreferences prefs) async {
+    try {
+      bool changed = false;
+      for (final key in const <String>[
+        _appsCacheKey,
+        _appIdentityCacheKey,
+        _selectedAppsKey,
+      ]) {
+        final raw = prefs.getString(key);
+        if (raw == null) continue;
+        final int bytes = raw.length * 2;
+        final bool hasLegacyIconPayload =
+            raw.contains('"icon":"') || raw.contains('"icon": "');
+        final bool oversized = bytes > _maxPrefsJsonBytes;
+        if (hasLegacyIconPayload) {
+          final sanitized = _stripLegacyIconFields(raw);
+          if (sanitized != null &&
+              sanitized.isNotEmpty &&
+              sanitized.length < raw.length &&
+              sanitized.length * 2 <= _maxPrefsJsonBytes) {
+            await prefs.setString(key, sanitized);
+          } else if (key == _selectedAppsKey) {
+            // 选中应用是用户配置，不能因为图标缓存异常就清空。
+            continue;
+          } else {
+            await prefs.remove(key);
+          }
+          changed = true;
+        } else if (oversized && key != _selectedAppsKey) {
+          await prefs.remove(key);
+          changed = true;
+        }
+      }
+      if (changed) {
+        await prefs.remove(_appsCacheTsKey);
+      }
+    } catch (_) {
+      // 清理失败不能影响读取流程；后续解析失败时会继续回退全量扫描。
+    }
+  }
+
+  String? _stripLegacyIconFields(String raw) {
+    final stripped = raw
+        .replaceAll(RegExp(r',\s*"icon"\s*:\s*"[^"]*"'), '')
+        .replaceAll(RegExp(r',\s*"icon"\s*:\s*null'), '')
+        .replaceAll(RegExp(r'\{\s*"icon"\s*:\s*"[^"]*"\s*,\s*'), '{')
+        .replaceAll(RegExp(r'\{\s*"icon"\s*:\s*null\s*,\s*'), '{');
+    return stripped == raw ? null : stripped;
   }
 
   /// 保存显示模式
@@ -578,9 +637,7 @@ class AppSelectionService {
       );
       _autoAddNewAppsToCapture = enabled;
     } catch (e) {
-      unawaited(
-        FlutterLogger.warn('保存新安装应用自动加入截屏列表开关失败: $e'),
-      );
+      unawaited(FlutterLogger.warn('保存新安装应用自动加入截屏列表开关失败: $e'));
     }
   }
 
@@ -594,9 +651,7 @@ class AppSelectionService {
       );
       return _autoAddNewAppsToCapture;
     } catch (e) {
-      unawaited(
-        FlutterLogger.warn('获取新安装应用自动加入截屏列表开关失败: $e'),
-      );
+      unawaited(FlutterLogger.warn('获取新安装应用自动加入截屏列表开关失败: $e'));
       return false;
     }
   }
