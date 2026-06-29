@@ -29,18 +29,14 @@ class AppHealthComponents {
   AppHealthComponents._();
 
   static const String captureService = 'capture_service';
-  static const String permissions = 'permissions';
   static const String database = 'database';
   static const String storage = 'storage';
-  static const String aiProcessing = 'ai_processing';
   static const String backgroundTasks = 'background_tasks';
 
   static const List<String> core = <String>[
     captureService,
-    permissions,
     database,
     storage,
-    aiProcessing,
     backgroundTasks,
   ];
 }

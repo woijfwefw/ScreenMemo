@@ -1,14 +1,9 @@
 ﻿package com.fqyw.screen_memo.health
 
-import android.Manifest
-import android.app.AlarmManager
 import android.content.Context
-import android.content.pm.PackageManager
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.os.Build
-import android.os.PowerManager
-import android.provider.Settings
 import com.fqyw.screen_memo.capture.ScreenCaptureAccessibilityService
 import com.fqyw.screen_memo.database.ScreenshotDatabaseHelper
 import com.fqyw.screen_memo.dynamic.DynamicRebuildService
@@ -45,20 +40,16 @@ object AppHealthNativeRecorder {
     private const val SEVERITY_CRITICAL = 3
 
     private const val COMPONENT_CAPTURE = "capture_service"
-    private const val COMPONENT_PERMISSIONS = "permissions"
     private const val COMPONENT_DATABASE = "database"
     private const val COMPONENT_STORAGE = "storage"
-    private const val COMPONENT_AI = "ai_processing"
     private const val COMPONENT_BACKGROUND = "background_tasks"
 
     fun recordSnapshot(context: Context, source: String = "native") {
         val appContext = context.applicationContext ?: context
         recordDatabaseHealth(appContext, source)
-        recordPermissionHealth(appContext, source)
         recordCaptureHealth(appContext, source)
         recordStorageHealth(appContext, source)
         recordBackgroundTaskHealth(appContext, source)
-        seedAiHealthIfMissing(appContext, source)
     }
 
     fun recordStatus(
@@ -218,56 +209,6 @@ object AppHealthNativeRecorder {
         }
     }
 
-    private fun recordPermissionHealth(context: Context, source: String) {
-        val missing = mutableListOf<String>()
-        val accessibility = safeBool { ServiceDebugHelper.isAccessibilityServiceEnabledInSystem(context) }
-        val notifications = safeBool {
-            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-                context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        }
-        val overlay = safeBool { Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context) }
-        val battery = safeBool {
-            val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-            pm.isIgnoringBatteryOptimizations(context.packageName)
-        }
-        val exactAlarm = safeBool {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-                alarmManager.canScheduleExactAlarms()
-            } else {
-                true
-            }
-        }
-        if (!accessibility) missing.add("accessibility")
-        if (!notifications) missing.add("notification")
-        if (!overlay) missing.add("overlay")
-        if (!battery) missing.add("battery_optimization")
-        if (!exactAlarm) missing.add("exact_alarm")
-
-        val critical = !accessibility
-        val anyMissing = missing.isNotEmpty()
-        recordStatus(
-            context,
-            component = COMPONENT_PERMISSIONS,
-            status = if (!anyMissing) STATUS_OK else if (critical) STATUS_FAILED else STATUS_DEGRADED,
-            severity = if (!anyMissing) SEVERITY_NONE else if (critical) SEVERITY_CRITICAL else SEVERITY_WARNING,
-            countSuccess = !anyMissing,
-            countFailure = anyMissing,
-            eventType = if (anyMissing) "native_permission_missing" else "native_permission_check",
-            errorType = if (anyMissing) "permission_missing" else null,
-            errorMessage = if (anyMissing) "Missing permission: ${missing.joinToString(", ")}" else null,
-            detail = mapOf(
-                "source" to source,
-                "accessibility" to accessibility,
-                "notification" to notifications,
-                "overlay" to overlay,
-                "battery_optimization" to battery,
-                "exact_alarm" to exactAlarm,
-                "missing_permissions" to missing
-            )
-        )
-    }
-
     private fun recordCaptureHealth(context: Context, source: String) {
         val enabled = UserSettingsStorage.getBoolean(
             context,
@@ -420,39 +361,6 @@ object AppHealthNativeRecorder {
                 errorMessage = "Background task check failed: ${clip(t.message, 160) ?: t.javaClass.simpleName}",
                 detail = mapOf("source" to source)
             )
-        }
-    }
-
-    private fun seedAiHealthIfMissing(context: Context, source: String) {
-        var db: SQLiteDatabase? = null
-        var cursor: Cursor? = null
-        try {
-            val path = ScreenshotDatabaseHelper.resolveMasterDbPath(context) ?: return
-            db = SQLiteDatabase.openDatabase(path, null, SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.CREATE_IF_NECESSARY)
-            ensureTables(db)
-            cursor = db.query(
-                "app_health_current",
-                arrayOf("component"),
-                "component = ?",
-                arrayOf(COMPONENT_AI),
-                null,
-                null,
-                null,
-                "1"
-            )
-            if (cursor.moveToFirst()) return
-            recordStatus(
-                context,
-                component = COMPONENT_AI,
-                status = STATUS_IDLE,
-                severity = SEVERITY_INFO,
-                eventType = "native_ai_idle",
-                detail = mapOf("source" to source, "message" to "No AI request recorded yet")
-            )
-        } catch (_: Throwable) {
-        } finally {
-            try { cursor?.close() } catch (_: Throwable) {}
-            try { db?.close() } catch (_: Throwable) {}
         }
     }
 

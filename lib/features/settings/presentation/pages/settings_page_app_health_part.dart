@@ -999,14 +999,10 @@ extension _SettingsAppHealthPart on _SettingsPageState {
     switch (component) {
       case AppHealthComponents.captureService:
         return Icons.camera_alt_outlined;
-      case AppHealthComponents.permissions:
-        return Icons.verified_user_outlined;
       case AppHealthComponents.database:
         return Icons.storage_outlined;
       case AppHealthComponents.storage:
         return Icons.folder_outlined;
-      case AppHealthComponents.aiProcessing:
-        return Icons.auto_awesome_outlined;
       case AppHealthComponents.backgroundTasks:
         return Icons.sync_outlined;
       default:
@@ -1016,15 +1012,11 @@ extension _SettingsAppHealthPart on _SettingsPageState {
 
   String? _appHealthActionLabel(String component) {
     switch (component) {
-      case AppHealthComponents.permissions:
-        return '检查权限';
       case AppHealthComponents.captureService:
         return '打开截屏设置';
       case AppHealthComponents.storage:
       case AppHealthComponents.database:
         return '查看数据与备份';
-      case AppHealthComponents.aiProcessing:
-        return '查看 AI 设置';
       case AppHealthComponents.backgroundTasks:
         return '查看后台任务';
       default:
@@ -1034,9 +1026,6 @@ extension _SettingsAppHealthPart on _SettingsPageState {
 
   void _handleAppHealthAction(String component) {
     switch (component) {
-      case AppHealthComponents.permissions:
-        _switchSubPage(_SettingsSubPage.permissions);
-        break;
       case AppHealthComponents.captureService:
         _switchSubPage(_SettingsSubPage.screenshot);
         break;
@@ -1044,9 +1033,6 @@ extension _SettingsAppHealthPart on _SettingsPageState {
       case AppHealthComponents.database:
       case AppHealthComponents.backgroundTasks:
         _switchSubPage(_SettingsSubPage.dataBackup);
-        break;
-      case AppHealthComponents.aiProcessing:
-        _switchSubPage(_SettingsSubPage.segmentSummary);
         break;
     }
   }

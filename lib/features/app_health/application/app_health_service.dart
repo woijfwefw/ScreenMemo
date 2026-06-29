@@ -89,11 +89,9 @@ class AppHealthService {
   }) async {
     await _db.ensureAppHealthTables();
     await _refreshDatabaseHealth();
-    await _refreshPermissionHealth();
     await _refreshCaptureHealth();
     await _refreshStorageHealth();
     await _refreshBackgroundTaskHealth();
-    await _seedAiHealthIfNeeded();
     return loadDashboardSnapshot(range: range, slotSize: slotSize);
   }
 
@@ -115,12 +113,19 @@ class AppHealthService {
         sinceMs: window.firstSlotStart,
         untilMs: window.currentSlotStart,
       );
+      final Set<String> visibleComponents = AppHealthComponents.core.toSet();
+      final visibleBucketRows = bucketRows
+          .where(
+            (row) =>
+                visibleComponents.contains((row['component'] as String?) ?? ''),
+          )
+          .toList(growable: false);
 
       final Map<String, AppHealthCurrentStatus> byComponent =
           <String, AppHealthCurrentStatus>{};
       for (final row in currentRows) {
         final item = AppHealthCurrentStatus.fromDb(row);
-        if (item.component.isNotEmpty) {
+        if (visibleComponents.contains(item.component)) {
           byComponent[item.component] = item;
         }
       }
@@ -134,7 +139,7 @@ class AppHealthService {
           .toList(growable: false);
 
       final buckets = _buildBucketSlots(
-        bucketRows,
+        visibleBucketRows,
         firstSlotStart: window.firstSlotStart,
         slotCount: window.slotCount,
         slotSizeMs: window.slotSizeMs,
@@ -144,7 +149,7 @@ class AppHealthService {
           <String, List<AppHealthBucketSlot>>{};
       for (final String component in AppHealthComponents.core) {
         componentBuckets[component] = _buildBucketSlots(
-          bucketRows,
+          visibleBucketRows,
           firstSlotStart: window.firstSlotStart,
           slotCount: window.slotCount,
           slotSizeMs: window.slotSizeMs,
@@ -184,6 +189,11 @@ class AppHealthService {
         buckets: buckets,
         componentBuckets: componentBuckets,
         events: events
+            .where(
+              (row) => visibleComponents.contains(
+                (row['component'] as String?) ?? '',
+              ),
+            )
             .map((row) => AppHealthEvent.fromDb(row))
             .toList(growable: false),
         unhealthyCount: unhealthyCount,
@@ -266,58 +276,6 @@ class AppHealthService {
     );
   }
 
-  Future<void> recordApiSuccess({
-    String? model,
-    String? providerType,
-    int? promptTokens,
-    int? completionTokens,
-  }) {
-    return _db.recordAppHealthStatus(
-      component: AppHealthComponents.aiProcessing,
-      status: AppHealthStatusValues.ok,
-      severity: AppHealthSeverity.none,
-      countSuccess: true,
-      eventType: 'api_success',
-      detail: <String, Object?>{
-        if (model != null && model.trim().isNotEmpty) 'model': model,
-        if (providerType != null && providerType.trim().isNotEmpty)
-          'provider_type': providerType,
-        if (promptTokens != null) 'prompt_tokens': promptTokens,
-        if (completionTokens != null) 'completion_tokens': completionTokens,
-      },
-    );
-  }
-
-  Future<void> recordApiFailure({
-    required String errorType,
-    required String errorMessage,
-    String? model,
-    String? providerType,
-  }) {
-    final bool critical =
-        errorType == 'auth_failed' ||
-        errorType == 'model_not_found' ||
-        errorType == 'fatal';
-    return _db.recordAppHealthStatus(
-      component: AppHealthComponents.aiProcessing,
-      status: critical
-          ? AppHealthStatusValues.failed
-          : AppHealthStatusValues.degraded,
-      severity: critical
-          ? AppHealthSeverity.critical
-          : AppHealthSeverity.warning,
-      countFailure: true,
-      eventType: 'api_failure',
-      errorType: errorType,
-      errorMessage: errorMessage,
-      detail: <String, Object?>{
-        if (model != null && model.trim().isNotEmpty) 'model': model,
-        if (providerType != null && providerType.trim().isNotEmpty)
-          'provider_type': providerType,
-      },
-    );
-  }
-
   Future<void> _refreshDatabaseHealth() async {
     try {
       final db = await _db.database;
@@ -338,57 +296,6 @@ class AppHealthService {
         eventType: 'database_check_failed',
         errorType: 'db_check_failed',
         errorMessage: 'Database check failed: ${_clip(e.toString())}',
-      );
-    }
-  }
-
-  Future<void> _refreshPermissionHealth() async {
-    try {
-      final permissions = await PermissionService.instance
-          .checkAllPermissions();
-      final List<String> missing = permissions.entries
-          .where((entry) => entry.value == false)
-          .map((entry) => entry.key)
-          .toList(growable: false);
-      final bool criticalMissing =
-          permissions['accessibility'] == false ||
-          permissions['storage'] == false;
-      final bool anyMissing = missing.isNotEmpty;
-      await _db.recordAppHealthStatus(
-        component: AppHealthComponents.permissions,
-        status: anyMissing
-            ? (criticalMissing
-                  ? AppHealthStatusValues.failed
-                  : AppHealthStatusValues.degraded)
-            : AppHealthStatusValues.ok,
-        severity: anyMissing
-            ? (criticalMissing
-                  ? AppHealthSeverity.critical
-                  : AppHealthSeverity.warning)
-            : AppHealthSeverity.none,
-        countSuccess: !anyMissing,
-        countFailure: anyMissing,
-        eventType: anyMissing ? 'permission_missing' : 'permission_check',
-        errorType: anyMissing ? 'permission_missing' : null,
-        errorMessage: anyMissing
-            ? 'Missing permission: ${missing.join(', ')}'
-            : null,
-        detail: <String, Object?>{
-          'missing_permissions': missing,
-          ...permissions.map(
-            (String key, bool value) => MapEntry<String, Object?>(key, value),
-          ),
-        },
-      );
-    } catch (e) {
-      await _db.recordAppHealthStatus(
-        component: AppHealthComponents.permissions,
-        status: AppHealthStatusValues.failed,
-        severity: AppHealthSeverity.critical,
-        countFailure: true,
-        eventType: 'permission_check_failed',
-        errorType: 'permission_check_failed',
-        errorMessage: 'Permission check failed: ${_clip(e.toString())}',
       );
     }
   }
@@ -589,21 +496,6 @@ class AppHealthService {
         errorMessage: 'Background task check failed: ${_clip(e.toString())}',
       );
     }
-  }
-
-  Future<void> _seedAiHealthIfNeeded() async {
-    final current = await _db.listAppHealthCurrent();
-    final bool exists = current.any(
-      (row) => row['component'] == AppHealthComponents.aiProcessing,
-    );
-    if (exists) return;
-    await _db.recordAppHealthStatus(
-      component: AppHealthComponents.aiProcessing,
-      status: AppHealthStatusValues.idle,
-      severity: AppHealthSeverity.info,
-      eventType: 'ai_idle',
-      detail: <String, Object?>{'message': 'No AI request recorded yet'},
-    );
   }
 
   List<AppHealthBucketSlot> _buildBucketSlots(
@@ -973,14 +865,10 @@ class AppHealthCurrentStatus {
     switch (component) {
       case AppHealthComponents.captureService:
         return '采集服务';
-      case AppHealthComponents.permissions:
-        return '权限';
       case AppHealthComponents.database:
         return '数据库';
       case AppHealthComponents.storage:
         return '存储';
-      case AppHealthComponents.aiProcessing:
-        return 'OCR / AI 处理';
       case AppHealthComponents.backgroundTasks:
         return '后台任务';
       default:
