@@ -31,7 +31,11 @@ class ReplayOptions {
   final bool overlayEnabled;
   final bool appProgressBarEnabled;
   final ReplayAppProgressBarPosition appProgressBarPosition;
+  final double appProgressBarWidthScale;
   final ReplayNsfwMode nsfwMode;
+  final bool screenOffEnabled;
+  final int screenOffGapMinutes;
+  final int screenOffDisplaySeconds;
   final bool saveToGallery;
   final bool openGalleryAfterSave;
 
@@ -43,7 +47,11 @@ class ReplayOptions {
     this.overlayEnabled = true,
     this.appProgressBarEnabled = true,
     this.appProgressBarPosition = ReplayAppProgressBarPosition.right,
+    this.appProgressBarWidthScale = 1.0,
     this.nsfwMode = ReplayNsfwMode.mask,
+    this.screenOffEnabled = true,
+    this.screenOffGapMinutes = 30,
+    this.screenOffDisplaySeconds = 3,
     this.saveToGallery = false,
     this.openGalleryAfterSave = false,
   });
@@ -56,7 +64,11 @@ class ReplayOptions {
     bool? overlayEnabled,
     bool? appProgressBarEnabled,
     ReplayAppProgressBarPosition? appProgressBarPosition,
+    double? appProgressBarWidthScale,
     ReplayNsfwMode? nsfwMode,
+    bool? screenOffEnabled,
+    int? screenOffGapMinutes,
+    int? screenOffDisplaySeconds,
     bool? saveToGallery,
     bool? openGalleryAfterSave,
   }) {
@@ -71,7 +83,13 @@ class ReplayOptions {
           appProgressBarEnabled ?? this.appProgressBarEnabled,
       appProgressBarPosition:
           appProgressBarPosition ?? this.appProgressBarPosition,
+      appProgressBarWidthScale:
+          appProgressBarWidthScale ?? this.appProgressBarWidthScale,
       nsfwMode: nsfwMode ?? this.nsfwMode,
+      screenOffEnabled: screenOffEnabled ?? this.screenOffEnabled,
+      screenOffGapMinutes: screenOffGapMinutes ?? this.screenOffGapMinutes,
+      screenOffDisplaySeconds:
+          screenOffDisplaySeconds ?? this.screenOffDisplaySeconds,
       saveToGallery: saveToGallery ?? this.saveToGallery,
       openGalleryAfterSave: openGalleryAfterSave ?? this.openGalleryAfterSave,
     );
@@ -189,6 +207,9 @@ class ReplayExportService {
     final AppLocalizations? l10n = startCtx == null
         ? null
         : AppLocalizations.of(startCtx);
+    final bool useZhScreenOffLabel =
+        startCtx == null ||
+        Localizations.localeOf(startCtx).languageCode.toLowerCase() == 'zh';
 
     if (_inFlight) {
       const msg = 'Replay export already running';
@@ -290,6 +311,9 @@ class ReplayExportService {
           .replaceAll('.', '-');
       final File framesJsonl = File(p.join(base.path, 'frames_$ts.jsonl'));
       final File output = File(p.join(base.path, 'replay_$ts.mp4'));
+      final String screenOffLabel = useZhScreenOffLabel
+          ? '手机息屏中'
+          : 'Phone screen off';
 
       final Map<String, bool> nsfwMaskByFilePath =
           options.nsfwMode == ReplayNsfwMode.show
@@ -311,7 +335,12 @@ class ReplayExportService {
         'overlayEnabled': options.overlayEnabled,
         'appProgressBarEnabled': options.appProgressBarEnabled,
         'appProgressBarPosition': options.appProgressBarPosition.name,
+        'appProgressBarWidthScale': options.appProgressBarWidthScale,
         'nsfwMode': options.nsfwMode.name,
+        'screenOffEnabled': options.screenOffEnabled,
+        'screenOffGapMinutes': options.screenOffGapMinutes,
+        'screenOffDisplaySeconds': options.screenOffDisplaySeconds,
+        'screenOffLabel': screenOffLabel,
         // i18n text for NSFW mask overlay (optional on Android side).
         'nsfwTitle': l10n?.nsfwWarningTitle ?? 'Content Warning: Adult Content',
         'nsfwSubtitle':

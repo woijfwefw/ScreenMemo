@@ -35,6 +35,7 @@ object ReplayVideoComposer {
     private const val MIME_TYPE = "video/avc"
     private const val I_FRAME_INTERVAL_SEC = 1
     private const val TIMEOUT_USEC = 10_000L
+    private const val SCREEN_OFF_PKG = "__screen_off__"
 
     @Volatile private var cachedMaterialIconsTypeface: Typeface? = null
     @Volatile private var cachedMaterialIconsTypefaceTried: Boolean = false
@@ -69,6 +70,10 @@ object ReplayVideoComposer {
         val app: String,
         val pkg: String,
         val nsfw: Boolean,
+        val screenOff: Boolean = false,
+        val screenOffStartMillis: Long = 0L,
+        val screenOffEndMillis: Long = 0L,
+        val screenOffProgress: Float = 0f,
     )
 
     data class IconInfo(
@@ -129,16 +134,29 @@ object ReplayVideoComposer {
         overlayEnabled: Boolean,
         appProgressBarEnabled: Boolean,
         appProgressBarPosition: String,
+        appProgressBarWidthScale: Double,
         nsfwMode: String,
+        screenOffEnabled: Boolean,
+        screenOffGapMinutes: Int,
+        screenOffDisplaySeconds: Int,
+        screenOffLabel: String?,
         nsfwTitle: String?,
         nsfwSubtitle: String?,
         onProgress: ((processed: Int, total: Int) -> Unit)? = null,
     ): Map<String, Any> {
         val started = SystemClock.elapsedRealtime()
-        val frames = readFrames(framesJsonlPath)
-        if (frames.isEmpty()) throw RuntimeException("frames is empty")
+        val sourceFrames = readFrames(framesJsonlPath)
+        if (sourceFrames.isEmpty()) throw RuntimeException("frames is empty")
+        val frames = buildRenderFrames(
+            sourceFrames = sourceFrames,
+            fps = fps,
+            screenOffEnabled = screenOffEnabled,
+            screenOffGapMinutes = screenOffGapMinutes,
+            screenOffDisplaySeconds = screenOffDisplaySeconds,
+        )
+        if (frames.isEmpty()) throw RuntimeException("render frames is empty")
 
-        val bounds = findFirstBounds(frames)
+        val bounds = findFirstBounds(sourceFrames)
         val baseW = bounds.first
         val baseH = bounds.second
         if (baseW <= 0 || baseH <= 0) throw RuntimeException("invalid first frame bounds")
@@ -149,7 +167,7 @@ object ReplayVideoComposer {
 
         val bitrate = computeBitrate(outW, outH, fps, quality)
         val replayNsfwMode = ReplayNsfwMode.parse(nsfwMode)
-        FileLogger.i(TAG, "compose start frames=${frames.size} out=${outW}x${outH} fps=$fps bitrate=$bitrate overlay=$overlayEnabled progressBar=$appProgressBarEnabled nsfwMode=$replayNsfwMode")
+        FileLogger.i(TAG, "compose start sourceFrames=${sourceFrames.size} renderFrames=${frames.size} out=${outW}x${outH} fps=$fps bitrate=$bitrate overlay=$overlayEnabled progressBar=$appProgressBarEnabled progressBarWidthScale=$appProgressBarWidthScale screenOff=$screenOffEnabled screenOffGapMinutes=$screenOffGapMinutes screenOffDisplaySeconds=$screenOffDisplaySeconds screenOffLabel=${screenOffLabel?.isNotBlank() == true} nsfwMode=$replayNsfwMode")
         onProgress?.invoke(0, frames.size)
 
         val outFile = File(outputPath)
@@ -192,6 +210,34 @@ object ReplayVideoComposer {
             color = 0x80000000.toInt()
         }
         val timeFmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        val screenOffTimeTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textAlign = Paint.Align.CENTER
+            textSize = 30f * density
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        val screenOffLabelTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xCCFFFFFF.toInt()
+            textAlign = Paint.Align.CENTER
+            textSize = 14f * density
+            typeface = Typeface.DEFAULT_BOLD
+            letterSpacing = 0.08f
+        }
+        val screenOffHintTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0x66FFFFFF
+            textAlign = Paint.Align.CENTER
+            textSize = 11f * density
+        }
+        val screenOffDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0x66FFFFFF
+        }
+        val screenOffAccentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0x22FFFFFF
+            style = Paint.Style.STROKE
+            strokeWidth = (1.2f * density).coerceAtLeast(1f)
+        }
+        val screenOffLabelValue = screenOffLabel?.trim().takeUnless { it.isNullOrEmpty() }
+            ?: "手机息屏中"
         val nsfwLabelTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textAlign = Paint.Align.CENTER
@@ -298,7 +344,8 @@ object ReplayVideoComposer {
         val progressBarHorizontal = progressBarPosition == AppProgressBarPosition.TOP ||
             progressBarPosition == AppProgressBarPosition.BOTTOM
 
-        val appProgressBarThicknessPx = 5
+        val progressBarScale = appProgressBarWidthScale.coerceIn(1.0, 4.0).toFloat()
+        val appProgressBarThicknessPx = (5f * progressBarScale).roundToInt().coerceIn(1, 20)
         val appIconSizePx = 18f * density
         val appProgressBarMaskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xAA000000.toInt()
@@ -313,7 +360,7 @@ object ReplayVideoComposer {
         val iconInfoByPkg: Map<String, IconInfo> = if (appProgressBarEnabled || overlayEnabled) {
             buildIconInfoByPkg(
                 context = context,
-                frames = frames,
+                frames = sourceFrames,
                 iconSizePx = appIconSizePx.roundToInt().coerceAtLeast(1),
                 fallbackColor = fallbackAppColor,
             )
@@ -374,6 +421,12 @@ object ReplayVideoComposer {
                     frame = f,
                     overlayEnabled = overlayEnabled,
                     timeFmt = timeFmt,
+                    screenOffTimeTextPaint = screenOffTimeTextPaint,
+                    screenOffLabelTextPaint = screenOffLabelTextPaint,
+                    screenOffHintTextPaint = screenOffHintTextPaint,
+                    screenOffDotPaint = screenOffDotPaint,
+                    screenOffAccentPaint = screenOffAccentPaint,
+                    screenOffLabel = screenOffLabelValue,
                     overlayPadding = overlayPadding,
                     overlayTextPaint = overlayTextPaint,
                     overlayBgPaint = overlayBgPaint,
@@ -398,7 +451,7 @@ object ReplayVideoComposer {
                     nsfwBlurPaint = nsfwBlurPaint,
                 )
 
-                if (appProgressBarEnabled) {
+                if (appProgressBarEnabled && !f.screenOff) {
                     drawSegmentedAppProgressBar(
                         canvas = canvas,
                         outputW = outW,
@@ -529,6 +582,12 @@ object ReplayVideoComposer {
             } catch (_: Exception) {
             }
             try {
+                if (!nsfwBlurBitmap.isRecycled) {
+                    nsfwBlurBitmap.recycle()
+                }
+            } catch (_: Exception) {
+            }
+            try {
                 outputBitmap.recycle()
             } catch (_: Exception) {
             }
@@ -574,6 +633,59 @@ object ReplayVideoComposer {
                     out.add(Frame(path = p, tsMillis = ts, app = app, pkg = pkg, nsfw = nsfw))
                 } catch (_: Exception) {
                 }
+            }
+        }
+        return out
+    }
+
+    private fun buildRenderFrames(
+        sourceFrames: List<Frame>,
+        fps: Int,
+        screenOffEnabled: Boolean,
+        screenOffGapMinutes: Int,
+        screenOffDisplaySeconds: Int,
+    ): List<Frame> {
+        if (sourceFrames.isEmpty()) return emptyList()
+        if (!screenOffEnabled || sourceFrames.size <= 1) {
+            return sourceFrames
+        }
+
+        val gapMillis = screenOffGapMinutes.coerceIn(30, 180).toLong() * 60_000L
+        val offFrames = (max(1, fps) * screenOffDisplaySeconds.coerceIn(3, 10))
+            .coerceAtLeast(1)
+        val out = ArrayList<Frame>(sourceFrames.size + offFrames)
+        for (i in sourceFrames.indices) {
+            val current = sourceFrames[i]
+            out.add(current)
+
+            if (i >= sourceFrames.lastIndex) continue
+            val next = sourceFrames[i + 1]
+            val startMillis = current.tsMillis
+            val endMillis = next.tsMillis
+            if (endMillis - startMillis < gapMillis) continue
+
+            val denominator = (offFrames - 1).coerceAtLeast(1)
+            for (j in 0 until offFrames) {
+                val progress = if (offFrames <= 1) {
+                    1f
+                } else {
+                    j.toFloat() / denominator.toFloat()
+                }
+                val ts = startMillis +
+                    ((endMillis - startMillis).toDouble() * progress.toDouble()).toLong()
+                out.add(
+                    Frame(
+                        path = "",
+                        tsMillis = ts,
+                        app = "",
+                        pkg = SCREEN_OFF_PKG,
+                        nsfw = false,
+                        screenOff = true,
+                        screenOffStartMillis = startMillis,
+                        screenOffEndMillis = endMillis,
+                        screenOffProgress = progress,
+                    )
+                )
             }
         }
         return out
@@ -915,7 +1027,11 @@ object ReplayVideoComposer {
                         .toInt()
                         .coerceIn(0, totalFrames - 1)
                     val pkg = frames[idx].pkg
-                    val color = iconInfoByPkg[pkg]?.dominantColor ?: fallbackColor
+                    val color = if (pkg == SCREEN_OFF_PKG) {
+                        0x202020
+                    } else {
+                        iconInfoByPkg[pkg]?.dominantColor ?: fallbackColor
+                    }
                     fillPaint.color = color or (0xFF shl 24)
                     c.drawRect(x.toFloat(), 0f, (x + 1).toFloat(), h.toFloat(), fillPaint)
                 }
@@ -925,7 +1041,11 @@ object ReplayVideoComposer {
                         .toInt()
                         .coerceIn(0, totalFrames - 1)
                     val pkg = frames[idx].pkg
-                    val color = iconInfoByPkg[pkg]?.dominantColor ?: fallbackColor
+                    val color = if (pkg == SCREEN_OFF_PKG) {
+                        0x202020
+                    } else {
+                        iconInfoByPkg[pkg]?.dominantColor ?: fallbackColor
+                    }
                     fillPaint.color = color or (0xFF shl 24)
                     c.drawRect(0f, y.toFloat(), w.toFloat(), (y + 1).toFloat(), fillPaint)
                 }
@@ -950,7 +1070,11 @@ object ReplayVideoComposer {
             val nextPkg = if (i < frames.size) frames[i].pkg else null
             if (i == frames.size || nextPkg != curPkg) {
                 val len = i - startIndex
-                val color = iconInfoByPkg[curPkg]?.dominantColor ?: fallbackColor
+                val color = if (curPkg == SCREEN_OFF_PKG) {
+                    0x202020
+                } else {
+                    iconInfoByPkg[curPkg]?.dominantColor ?: fallbackColor
+                }
                 out.add(
                     AppRun(
                         pkg = curPkg,
@@ -1026,6 +1150,12 @@ object ReplayVideoComposer {
         frame: Frame,
         overlayEnabled: Boolean,
         timeFmt: SimpleDateFormat,
+        screenOffTimeTextPaint: Paint,
+        screenOffLabelTextPaint: Paint,
+        screenOffHintTextPaint: Paint,
+        screenOffDotPaint: Paint,
+        screenOffAccentPaint: Paint,
+        screenOffLabel: String,
         overlayPadding: Float,
         overlayTextPaint: Paint,
         overlayBgPaint: Paint,
@@ -1050,6 +1180,23 @@ object ReplayVideoComposer {
         nsfwBlurPaint: Paint,
     ) {
         canvas.drawColor(Color.BLACK)
+
+        if (frame.screenOff) {
+            drawScreenOffFrame(
+                canvas = canvas,
+                outputW = outputW,
+                outputH = outputH,
+                frame = frame,
+                timeFmt = timeFmt,
+                timePaint = screenOffTimeTextPaint,
+                labelPaint = screenOffLabelTextPaint,
+                hintPaint = screenOffHintTextPaint,
+                dotPaint = screenOffDotPaint,
+                accentPaint = screenOffAccentPaint,
+                label = screenOffLabel,
+            )
+            return
+        }
 
         if (frame.nsfw && nsfwMode == ReplayNsfwMode.MASK) {
             drawNsfwBlurMask(
@@ -1160,6 +1307,109 @@ object ReplayVideoComposer {
                 }
             } catch (_: Exception) {
             }
+        }
+    }
+
+    private fun drawScreenOffFrame(
+        canvas: Canvas,
+        outputW: Int,
+        outputH: Int,
+        frame: Frame,
+        timeFmt: SimpleDateFormat,
+        timePaint: Paint,
+        labelPaint: Paint,
+        hintPaint: Paint,
+        dotPaint: Paint,
+        accentPaint: Paint,
+        label: String,
+    ) {
+        val progress = frame.screenOffProgress.coerceIn(0f, 1f)
+        val start = frame.screenOffStartMillis
+        val end = frame.screenOffEndMillis
+        val displayMillis = if (end > start) {
+            start + ((end - start).toDouble() * progress.toDouble()).toLong()
+        } else {
+            frame.tsMillis
+        }
+        val text = try {
+            timeFmt.format(java.util.Date(displayMillis))
+        } catch (_: Exception) {
+            displayMillis.toString()
+        }
+        val originalTimeTextSize = timePaint.textSize
+        val originalLabelTextSize = labelPaint.textSize
+        val originalHintTextSize = hintPaint.textSize
+        val originalDotAlpha = dotPaint.alpha
+        val originalAccentAlpha = accentPaint.alpha
+        try {
+            val maxTextWidth = outputW.toFloat() * 0.86f
+            val measured = timePaint.measureText(text)
+            if (measured > maxTextWidth && measured > 0f) {
+                timePaint.textSize = max(12f, originalTimeTextSize * (maxTextWidth / measured))
+            }
+            val labelMaxWidth = outputW.toFloat() * 0.72f
+            val labelMeasured = labelPaint.measureText(label)
+            if (labelMeasured > labelMaxWidth && labelMeasured > 0f) {
+                labelPaint.textSize = max(10f, originalLabelTextSize * (labelMaxWidth / labelMeasured))
+            }
+
+            val hint = if (label.contains("手机")) "时间快进中" else "time-lapse"
+            val hintMaxWidth = outputW.toFloat() * 0.72f
+            val hintMeasured = hintPaint.measureText(hint)
+            if (hintMeasured > hintMaxWidth && hintMeasured > 0f) {
+                hintPaint.textSize = max(8f, originalHintTextSize * (hintMaxWidth / hintMeasured))
+            }
+
+            val timeFm = timePaint.fontMetrics
+            val labelFm = labelPaint.fontMetrics
+            val hintFm = hintPaint.fontMetrics
+            val density = (timePaint.textSize / 30f).coerceAtLeast(0.5f)
+            val gapLabelTime = 13f * density
+            val gapTimeHint = 16f * density
+            val timeH = timeFm.descent - timeFm.ascent
+            val labelH = labelFm.descent - labelFm.ascent
+            val hintH = hintFm.descent - hintFm.ascent
+            val totalH = labelH + gapLabelTime + timeH + gapTimeHint + hintH
+            val centerX = outputW.toFloat() / 2f
+            val top = (outputH.toFloat() - totalH) / 2f
+            val labelBaseline = top - labelFm.ascent
+            val timeBaseline = labelBaseline + labelFm.descent + gapLabelTime - timeFm.ascent
+            val hintBaseline = timeBaseline + timeFm.descent + gapTimeHint - hintFm.ascent
+
+            val cardW = min(outputW.toFloat() * 0.86f, max(180f * density, timePaint.measureText(text) + 56f * density))
+            val cardH = totalH + 48f * density
+            val card = RectF(
+                centerX - cardW / 2f,
+                (top - 24f * density).coerceAtLeast(12f * density),
+                centerX + cardW / 2f,
+                (top - 24f * density + cardH).coerceAtMost(outputH - 12f * density),
+            )
+            canvas.drawRoundRect(card, 22f * density, 22f * density, accentPaint)
+
+            val dotRadius = 2.2f * density
+            val dotGap = 8f * density
+            val dotY = labelBaseline + labelFm.descent + 8f * density
+            val animatedDot = (progress * 3f).toInt().coerceIn(0, 2)
+            for (i in 0..2) {
+                dotPaint.alpha = if (i == animatedDot) 170 else 70
+                canvas.drawCircle(
+                    centerX + (i - 1) * dotGap,
+                    dotY,
+                    dotRadius,
+                    dotPaint,
+                )
+            }
+            dotPaint.alpha = originalDotAlpha
+
+            canvas.drawText(label, centerX, labelBaseline, labelPaint)
+            canvas.drawText(text, centerX, timeBaseline, timePaint)
+            canvas.drawText(hint, centerX, hintBaseline, hintPaint)
+        } finally {
+            timePaint.textSize = originalTimeTextSize
+            labelPaint.textSize = originalLabelTextSize
+            hintPaint.textSize = originalHintTextSize
+            dotPaint.alpha = originalDotAlpha
+            accentPaint.alpha = originalAccentAlpha
         }
     }
 

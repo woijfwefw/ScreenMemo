@@ -381,9 +381,7 @@ extension _SegmentStatusDynamicTaskPart on _SegmentStatusPageState {
 
   String _dynamicRebuildSerialHint(DynamicRebuildTaskStatus status) {
     if (status.isPreparing || status.isPending || status.isRunning) {
-      return status.isBackfillMode
-          ? '按天并发补全中：线程会先串行补完当天缺失动态，再领取下一个未完成日期。'
-          : '按天并发重建中：线程会先串行跑完当天全部动态，再领取下一个未完成日期。';
+      return '';
     }
     if (status.canContinue || status.isCompletedWithFailures) {
       return status.isBackfillMode

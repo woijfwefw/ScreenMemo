@@ -116,26 +116,47 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
             ),
           ),
         ],
-        if (showRecentTaskDetails && currentLine.isNotEmpty)
+        if (showRecentTaskDetails &&
+            (currentLine.isNotEmpty || modelLine.isNotEmpty))
           Padding(
             padding: const EdgeInsets.only(top: AppTheme.spacing3),
-            child: Text(
-              currentLine,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: cs.onSurfaceVariant,
-              ),
-            ),
-          ),
-        if (showRecentTaskDetails && modelLine.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: AppTheme.spacing2),
-            child: Text(
-              modelLine,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: cs.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-              ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: currentLine.isEmpty
+                      ? const SizedBox.shrink()
+                      : Text(
+                          currentLine,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                ),
+                if (modelLine.isNotEmpty) ...[
+                  const SizedBox(width: AppTheme.spacing2),
+                  Flexible(
+                    flex: 2,
+                    child: Align(
+                      alignment: Alignment.topRight,
+                      child: Text(
+                        modelLine,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         if (showRecentTaskDetails && stageHeadline.isNotEmpty)
@@ -166,18 +187,35 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
             ),
           ),
         const SizedBox(height: AppTheme.spacing3),
-        if (showRecentTaskDetails && status.startedAt > 0)
-          Text(
-            '开始：${_fmtTaskDateTime(status.startedAt)}',
-            style: theme.textTheme.bodySmall,
-          ),
-        if (showRecentTaskDetails && status.updatedAt > 0)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              '更新：${_fmtTaskDateTime(status.updatedAt)}',
-              style: theme.textTheme.bodySmall,
-            ),
+        if (showRecentTaskDetails &&
+            (status.startedAt > 0 || status.updatedAt > 0))
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: status.startedAt <= 0
+                    ? const SizedBox.shrink()
+                    : Text(
+                        '开始：${_fmtTaskDateTime(status.startedAt)}',
+                        style: theme.textTheme.bodySmall,
+                      ),
+              ),
+              if (status.updatedAt > 0) ...[
+                const SizedBox(width: AppTheme.spacing2),
+                Flexible(
+                  child: Align(
+                    alignment: Alignment.topRight,
+                    child: Text(
+                      '更新：${_fmtTaskDateTime(status.updatedAt)}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         if (showRecentTaskDetails && status.completedAt > 0)
           Padding(
@@ -234,38 +272,25 @@ extension _SegmentStatusDynamicSheetPart on _SegmentStatusPageState {
 
     if (status.isActive) {
       final String stopLabel = status.isBackfillMode ? '停止补全' : '停止重建';
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: cs.error,
-                foregroundColor: cs.onError,
-                disabledBackgroundColor: cs.surfaceContainerHigh,
-                disabledForegroundColor: cs.onSurfaceVariant,
-                shape: shape,
-              ),
-              onPressed: snapshot.stopping ? null : _cancelDynamicRebuild,
-              icon: const Icon(Icons.stop_circle_outlined),
-              label: Text(
-                snapshot.stopping
-                    ? AppLocalizations.of(context).dynamicTaskStopping
-                    : stopLabel,
-              ),
-            ),
+      return SizedBox(
+        width: double.infinity,
+        height: 48,
+        child: FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: cs.error,
+            foregroundColor: cs.onError,
+            disabledBackgroundColor: cs.surfaceContainerHigh,
+            disabledForegroundColor: cs.onSurfaceVariant,
+            shape: shape,
           ),
-          const SizedBox(height: AppTheme.spacing2),
-          Text(
-            '当前${_dynamicTaskModeName(backfill: status.isBackfillMode, targetDay: status.targetDayKey.trim().isNotEmpty)}任务运行中，启动按钮已切换为停止按钮。',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: cs.onSurfaceVariant,
-              height: 1.35,
-            ),
+          onPressed: snapshot.stopping ? null : _cancelDynamicRebuild,
+          icon: const Icon(Icons.stop_circle_outlined),
+          label: Text(
+            snapshot.stopping
+                ? AppLocalizations.of(context).dynamicTaskStopping
+                : stopLabel,
           ),
-        ],
+        ),
       );
     }
 

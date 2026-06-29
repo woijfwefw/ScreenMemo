@@ -366,7 +366,12 @@ class MainActivity : FlutterActivity() {
                     val overlayEnabled = call.argument<Boolean>("overlayEnabled") ?: true
                     val appProgressBarEnabled = call.argument<Boolean>("appProgressBarEnabled") ?: false
                     val appProgressBarPosition = call.argument<String>("appProgressBarPosition") ?: "right"
+                    val appProgressBarWidthScale = call.argument<Double>("appProgressBarWidthScale") ?: 1.0
                     val nsfwMode = call.argument<String>("nsfwMode") ?: "mask"
+                    val screenOffEnabled = call.argument<Boolean>("screenOffEnabled") ?: false
+                    val screenOffGapMinutes = call.argument<Int>("screenOffGapMinutes") ?: 30
+                    val screenOffDisplaySeconds = call.argument<Int>("screenOffDisplaySeconds") ?: 3
+                    val screenOffLabel = call.argument<String>("screenOffLabel")
                     val nsfwTitle = call.argument<String>("nsfwTitle")
                     val nsfwSubtitle = call.argument<String>("nsfwSubtitle")
 
@@ -389,7 +394,12 @@ class MainActivity : FlutterActivity() {
                                 overlayEnabled = overlayEnabled,
                                 appProgressBarEnabled = appProgressBarEnabled,
                                 appProgressBarPosition = appProgressBarPosition,
+                                appProgressBarWidthScale = appProgressBarWidthScale,
                                 nsfwMode = nsfwMode,
+                                screenOffEnabled = screenOffEnabled,
+                                screenOffGapMinutes = screenOffGapMinutes,
+                                screenOffDisplaySeconds = screenOffDisplaySeconds,
+                                screenOffLabel = screenOffLabel,
                                 nsfwTitle = nsfwTitle,
                                 nsfwSubtitle = nsfwSubtitle,
                                 onProgress = { processed, total ->

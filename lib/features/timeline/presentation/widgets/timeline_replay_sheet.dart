@@ -54,15 +54,28 @@ class _TimelineReplaySheetState extends State<TimelineReplaySheet> {
   late DateTime _end;
 
   static const int _defaultFps = 24;
+  static const int _defaultScreenOffGapMinutes = 30;
+  static const int _defaultScreenOffDisplaySeconds = 3;
   late final TextEditingController _fpsController;
+  late final TextEditingController _screenOffGapController;
+  late final TextEditingController _screenOffDisplayController;
   bool _overlayEnabled = true;
   bool _appProgressBarEnabled = true;
   ReplayAppProgressBarPosition _appProgressBarPosition =
       ReplayAppProgressBarPosition.right;
+  double _appProgressBarWidthScale = 1.0;
+  bool _screenOffEnabled = true;
   ReplayNsfwMode _nsfwMode = ReplayNsfwMode.mask;
 
   int? _screenshotCount;
   int _countToken = 0;
+
+  bool get _isZhLocale =>
+      Localizations.localeOf(context).languageCode.toLowerCase() == 'zh';
+
+  String _text({required String zh, required String en}) {
+    return _isZhLocale ? zh : en;
+  }
 
   @override
   void initState() {
@@ -70,6 +83,12 @@ class _TimelineReplaySheetState extends State<TimelineReplaySheet> {
     _start = widget.initialStart;
     _end = widget.initialEnd;
     _fpsController = TextEditingController(text: _defaultFps.toString());
+    _screenOffGapController = TextEditingController(
+      text: _defaultScreenOffGapMinutes.toString(),
+    );
+    _screenOffDisplayController = TextEditingController(
+      text: _defaultScreenOffDisplaySeconds.toString(),
+    );
     // ignore: discarded_futures
     _refreshScreenshotCount();
   }
@@ -77,6 +96,8 @@ class _TimelineReplaySheetState extends State<TimelineReplaySheet> {
   @override
   void dispose() {
     _fpsController.dispose();
+    _screenOffGapController.dispose();
+    _screenOffDisplayController.dispose();
     super.dispose();
   }
 
@@ -120,6 +141,24 @@ class _TimelineReplaySheetState extends State<TimelineReplaySheet> {
     return v;
   }
 
+  int? _parseScreenOffGapMinutes() {
+    final String raw = _screenOffGapController.text.trim();
+    if (raw.isEmpty) return null;
+    final int? v = int.tryParse(raw);
+    if (v == null) return null;
+    if (v < 30 || v > 180) return null;
+    return v;
+  }
+
+  int? _parseScreenOffDisplaySeconds() {
+    final String raw = _screenOffDisplayController.text.trim();
+    if (raw.isEmpty) return null;
+    final int? v = int.tryParse(raw);
+    if (v == null) return null;
+    if (v < 3 || v > 10) return null;
+    return v;
+  }
+
   Future<void> _refreshScreenshotCount() async {
     final int token = ++_countToken;
     final int startMillis = _start.millisecondsSinceEpoch;
@@ -142,10 +181,34 @@ class _TimelineReplaySheetState extends State<TimelineReplaySheet> {
   Future<void> _runCompose() async {
     final l10n = AppLocalizations.of(context);
     final int? fps = _parseFps();
+    final int? screenOffGapMinutes = _parseScreenOffGapMinutes();
+    final int? screenOffDisplaySeconds = _parseScreenOffDisplaySeconds();
     if (fps == null) {
       UINotifier.error(
         context,
         l10n.timelineReplayFpsInvalid,
+        duration: const Duration(seconds: 3),
+      );
+      return;
+    }
+    if (_screenOffEnabled && screenOffGapMinutes == null) {
+      UINotifier.error(
+        context,
+        _text(
+          zh: '息屏间隔请输入 30-180 分钟',
+          en: 'Enter a screen-off gap from 30 to 180 minutes',
+        ),
+        duration: const Duration(seconds: 3),
+      );
+      return;
+    }
+    if (_screenOffEnabled && screenOffDisplaySeconds == null) {
+      UINotifier.error(
+        context,
+        _text(
+          zh: '息屏显示时间请输入 3-10 秒',
+          en: 'Enter a screen-off duration from 3 to 10 seconds',
+        ),
         duration: const Duration(seconds: 3),
       );
       return;
@@ -172,6 +235,12 @@ class _TimelineReplaySheetState extends State<TimelineReplaySheet> {
           overlayEnabled: _overlayEnabled,
           appProgressBarEnabled: _appProgressBarEnabled,
           appProgressBarPosition: _appProgressBarPosition,
+          appProgressBarWidthScale: _appProgressBarWidthScale,
+          screenOffEnabled: _screenOffEnabled,
+          screenOffGapMinutes:
+              screenOffGapMinutes ?? _defaultScreenOffGapMinutes,
+          screenOffDisplaySeconds:
+              screenOffDisplaySeconds ?? _defaultScreenOffDisplaySeconds,
           nsfwMode: _nsfwMode,
           saveToGallery: true,
           openGalleryAfterSave: false,
@@ -241,6 +310,11 @@ class _TimelineReplaySheetState extends State<TimelineReplaySheet> {
     final int? fps = _parseFps();
     final bool fpsValid = fps != null;
     final int effectiveFps = fpsValid ? fps : _defaultFps;
+    final int? screenOffGapMinutes = _parseScreenOffGapMinutes();
+    final int? screenOffDisplaySeconds = _parseScreenOffDisplaySeconds();
+    final bool screenOffValid =
+        !_screenOffEnabled ||
+        (screenOffGapMinutes != null && screenOffDisplaySeconds != null);
 
     final int? screenshotCount = _screenshotCount;
     final int maxFrames = ReplayExportService.maxFrames;
@@ -256,7 +330,7 @@ class _TimelineReplaySheetState extends State<TimelineReplaySheet> {
               ? estimatedVideoMinutes.toStringAsFixed(0)
               : estimatedVideoMinutes.toStringAsFixed(1));
 
-    final bool canGenerate = !_invalidRange && fpsValid;
+    final bool canGenerate = !_invalidRange && fpsValid && screenOffValid;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.78,
@@ -425,6 +499,88 @@ class _TimelineReplaySheetState extends State<TimelineReplaySheet> {
                         setState(() => _appProgressBarPosition = value),
                   ),
                 ),
+              if (_appProgressBarEnabled) ...[
+                const SizedBox(height: AppTheme.spacing2),
+                _buildSliderRow(
+                  title: _text(zh: '进度条宽度', en: 'Progress bar width'),
+                  valueLabel:
+                      '${_appProgressBarWidthScale.toStringAsFixed(1)}×',
+                  child: Slider(
+                    value: _appProgressBarWidthScale,
+                    min: 1.0,
+                    max: 4.0,
+                    divisions: 6,
+                    label: '${_appProgressBarWidthScale.toStringAsFixed(1)}×',
+                    onChanged: (value) => setState(
+                      () => _appProgressBarWidthScale = value.clamp(1.0, 4.0),
+                    ),
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: AppTheme.spacing3),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _text(zh: '显示息屏画面', en: 'Show screen-off frame'),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Switch(
+                    value: _screenOffEnabled,
+                    onChanged: (v) => setState(() => _screenOffEnabled = v),
+                  ),
+                ],
+              ),
+              if (_screenOffEnabled) ...[
+                const SizedBox(height: AppTheme.spacing1),
+                Text(
+                  _text(
+                    zh: '相邻截图间隔达到设置值时插入黑底白字时间画面，默认 30 分钟 / 3 秒。',
+                    en: 'Insert a black frame with animated white time when adjacent screenshots reach the configured gap. Default: 30 min / 3 sec.',
+                  ),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spacing2),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _LabeledNumberField(
+                        label: _text(zh: '息屏间隔(分钟)', en: 'Gap (min)'),
+                        controller: _screenOffGapController,
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    const SizedBox(width: AppTheme.spacing2),
+                    Expanded(
+                      child: _LabeledNumberField(
+                        label: _text(zh: '显示时间(秒)', en: 'Duration (sec)'),
+                        controller: _screenOffDisplayController,
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                  ],
+                ),
+                if (screenOffGapMinutes == null ||
+                    screenOffDisplaySeconds == null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppTheme.spacing2),
+                    child: Text(
+                      _text(
+                        zh: '息屏间隔范围 30-180 分钟，显示时间范围 3-10 秒',
+                        en: 'Gap: 30–180 minutes. Duration: 3–10 seconds.',
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.error,
+                      ),
+                    ),
+                  ),
+              ],
 
               const SizedBox(height: AppTheme.spacing3),
               Text(
@@ -476,6 +632,53 @@ class _TimelineReplaySheetState extends State<TimelineReplaySheet> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSliderRow({
+    required String title,
+    required String valueLabel,
+    required Widget child,
+  }) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+        AppTheme.spacing3,
+        AppTheme.spacing2,
+        AppTheme.spacing2,
+        AppTheme.spacing2,
+      ),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        border: Border.all(color: cs.outline.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Text(
+                valueLabel,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          child,
+        ],
+      ),
     );
   }
 }
