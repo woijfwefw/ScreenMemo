@@ -12,6 +12,7 @@ import 'package:screen_memo/features/nsfw/presentation/widgets/nsfw_guard.dart';
 import 'package:screen_memo/features/nsfw/application/nsfw_preference_service.dart';
 import 'package:screen_memo/features/timeline/presentation/widgets/timeline_jump_overlay.dart';
 import 'package:screen_memo/core/widgets/selection_checkbox.dart';
+import 'package:screen_memo/features/apps/presentation/widgets/lazy_app_icon.dart';
 
 /// AI 元数据徽标（可点击打开 AiMetaSheet）的显示位置。
 enum AiMetaBadgePlacement {
@@ -436,36 +437,38 @@ class ScreenshotItemWidget extends StatelessWidget {
   /// 构建应用图标
   Widget _buildAppIcon(BuildContext context) {
     final app = appInfoMap?[screenshot.appPackageName];
-    if (app != null && app.icon != null && app.icon!.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: Image.memory(
-          app.icon!,
-          width: 18,
-          height: 18,
-          fit: BoxFit.cover,
-        ),
-      );
-    }
+    final String packageName =
+        (app?.packageName.trim().isNotEmpty == true
+                ? app!.packageName
+                : screenshot.appPackageName)
+            .trim();
 
-    // 占位符
     final parts = screenshot.appPackageName.split('.');
     final head = parts.isNotEmpty ? parts.last : screenshot.appPackageName;
     final leading = head.isNotEmpty ? head[0].toUpperCase() : '?';
-    return Container(
-      width: 18,
-      height: 18,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0EDE6),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        leading,
-        style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: Color(0xFF141413),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: LazyAppIcon(
+        packageName: packageName,
+        initialIcon: app?.icon,
+        size: 18,
+        fit: BoxFit.cover,
+        fallback: Container(
+          width: 18,
+          height: 18,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF0EDE6),
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            leading,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF141413),
+            ),
+          ),
         ),
       ),
     );

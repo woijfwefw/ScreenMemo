@@ -30,6 +30,7 @@ import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_request_log
 import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_request_logs_viewer.dart';
 import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_request_logs_sheet.dart';
 import 'package:screen_memo/features/gallery/presentation/widgets/screenshot_image_widget.dart';
+import 'package:screen_memo/features/apps/presentation/widgets/lazy_app_icon.dart';
 import 'package:screen_memo/features/timeline/presentation/widgets/segment_tag_chip_colors.dart';
 import 'package:screen_memo/core/widgets/screenshot_style_tab_bar.dart';
 import 'package:screen_memo/core/widgets/ui_components.dart';

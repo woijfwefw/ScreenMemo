@@ -8,6 +8,7 @@ import 'package:screen_memo/models/app_info.dart';
 import 'package:screen_memo/features/favorites/application/favorite_service.dart';
 import 'package:screen_memo/data/platform/path_service.dart';
 import 'package:screen_memo/features/apps/application/app_selection_service.dart';
+import 'package:screen_memo/features/apps/presentation/widgets/lazy_app_icon.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
 import 'package:screen_memo/core/widgets/ui_components.dart';
 import 'package:screen_memo/l10n/app_localizations.dart';
@@ -473,27 +474,29 @@ class _FavoriteItemWidgetState extends State<_FavoriteItemWidget> {
     }
 
     Widget buildAppMeta() {
+      final AppInfo? app = widget.item.appInfo;
+      final String packageName =
+          (app?.packageName.trim().isNotEmpty == true
+                  ? app!.packageName
+                  : (widget.item.screenshot.appPackageName.trim().isNotEmpty
+                        ? widget.item.screenshot.appPackageName
+                        : widget.item.favorite.appPackageName))
+              .trim();
       return Row(
         children: [
-          if (widget.item.appInfo?.icon != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Image.memory(
-                widget.item.appInfo!.icon!,
-                width: 16,
-                height: 16,
-                fit: BoxFit.contain,
-              ),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Icon(
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: LazyAppIcon(
+              packageName: packageName,
+              initialIcon: app?.icon,
+              size: 16,
+              fallback: Icon(
                 Icons.android,
                 size: 16,
                 color: AppTheme.mutedForeground,
               ),
             ),
+          ),
           Text(
             _formatFileSize(widget.item.screenshot.fileSize),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(

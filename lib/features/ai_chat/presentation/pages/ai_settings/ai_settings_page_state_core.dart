@@ -16,6 +16,7 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
         final Map<String, Uint8List?> byPkg = <String, Uint8List?>{};
         final Map<String, Uint8List?> byName = <String, Uint8List?>{};
         final Map<String, String> nameByPkg = <String, String>{};
+        final Map<String, String> pkgByName = <String, String>{};
         for (final a in cachedApps.values) {
           final String pkg = a.packageName.trim();
           final String name = a.appName.trim();
@@ -24,7 +25,10 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
             if (name.isNotEmpty) nameByPkg[pkg] = name;
           }
           final String nameKey = name.toLowerCase();
-          if (nameKey.isNotEmpty) byName[nameKey] = a.icon;
+          if (nameKey.isNotEmpty) {
+            byName[nameKey] = a.icon;
+            if (pkg.isNotEmpty) pkgByName[nameKey] = pkg;
+          }
         }
         for (final a in apps) {
           final String pkg = a.packageName.trim();
@@ -34,13 +38,17 @@ extension _AISettingsPageStateCoreExt on _AISettingsPageState {
             if (name.isNotEmpty) nameByPkg[pkg] = name;
           }
           final String nameKey = name.toLowerCase();
-          if (nameKey.isNotEmpty) byName[nameKey] = a.icon;
+          if (nameKey.isNotEmpty) {
+            byName[nameKey] = a.icon;
+            if (pkg.isNotEmpty) pkgByName[nameKey] = pkg;
+          }
         }
         if (!mounted) return;
         _setState(() {
           _chatAppIconByPackage = byPkg;
           _chatAppIconByNameLower = byName;
           _chatAppNameByPackage = nameByPkg;
+          _chatAppPackageByNameLower = pkgByName;
           _chatAppIconCacheLoaded = true;
           _chatAppIconCacheLoading = false;
         });

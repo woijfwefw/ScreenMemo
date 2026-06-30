@@ -9,6 +9,7 @@ import 'dart:io';
 import 'package:screen_memo/data/database/screenshot_database.dart';
 import 'package:screen_memo/features/ai_chat/presentation/widgets/chat_markdown_chart.dart';
 import 'package:screen_memo/l10n/app_localizations.dart';
+import 'package:screen_memo/features/apps/presentation/widgets/lazy_app_icon.dart';
 import 'package:screen_memo/features/gallery/presentation/widgets/screenshot_image_widget.dart';
 import 'package:screen_memo/features/nsfw/application/nsfw_preference_service.dart';
 import 'package:screen_memo/app/navigation/navigation_service.dart';
@@ -617,11 +618,13 @@ class _ParsedAppRef {
   const _ParsedAppRef({
     required this.label,
     required this.packageName,
+    required this.lookupPackageName,
     required this.lookupNameLower,
   });
 
   final String label;
   final String packageName;
+  final String lookupPackageName;
   final String lookupNameLower;
 }
 
@@ -665,6 +668,7 @@ _ParsedAppRef _parseAppRef(String raw) {
   return _ParsedAppRef(
     label: label,
     packageName: packageName,
+    lookupPackageName: packageName,
     lookupNameLower: label.trim().toLowerCase(),
   );
 }
@@ -826,11 +830,13 @@ class _AppRefBuilder extends MarkdownElementBuilder {
     required this.appIconByPackage,
     required this.appIconByNameLower,
     required this.appNameByPackage,
+    required this.appPackageByNameLower,
   });
 
   final Map<String, Uint8List?> appIconByPackage;
   final Map<String, Uint8List?> appIconByNameLower;
   final Map<String, String> appNameByPackage;
+  final Map<String, String> appPackageByNameLower;
 
   @override
   Widget? visitElementAfterWithContext(
@@ -845,6 +851,7 @@ class _AppRefBuilder extends MarkdownElementBuilder {
     final _ParsedAppRef parsed = _parseAppRef(raw);
     Uint8List? iconBytes;
     String label = parsed.label.trim();
+    String packageNameForIcon = parsed.lookupPackageName.trim();
 
     if (parsed.packageName.isNotEmpty) {
       iconBytes = appIconByPackage[parsed.packageName];
@@ -856,6 +863,10 @@ class _AppRefBuilder extends MarkdownElementBuilder {
     }
     if (iconBytes == null && parsed.lookupNameLower.isNotEmpty) {
       iconBytes = appIconByNameLower[parsed.lookupNameLower];
+    }
+    if (packageNameForIcon.isEmpty && parsed.lookupNameLower.isNotEmpty) {
+      packageNameForIcon = (appPackageByNameLower[parsed.lookupNameLower] ?? '')
+          .trim();
     }
 
     if (label.isEmpty) label = raw;
@@ -883,24 +894,23 @@ class _AppRefBuilder extends MarkdownElementBuilder {
               colorScheme.onSurface,
         );
 
-    final Widget leading = (iconBytes != null && iconBytes.isNotEmpty)
-        ? ClipRRect(
-            borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-            child: Image.memory(
-              iconBytes,
-              width: 16,
-              height: 16,
-              fit: BoxFit.cover,
-              filterQuality: FilterQuality.low,
-            ),
-          )
-        : Icon(
-            Icons.apps_rounded,
-            size: 16,
-            color:
-                textStyle.color?.withValues(alpha: 0.85) ??
-                colorScheme.onSurfaceVariant,
-          );
+    final Widget fallbackLeading = Icon(
+      Icons.apps_rounded,
+      size: 16,
+      color:
+          textStyle.color?.withValues(alpha: 0.85) ??
+          colorScheme.onSurfaceVariant,
+    );
+    final Widget leading = ClipRRect(
+      borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+      child: LazyAppIcon(
+        packageName: packageNameForIcon,
+        initialIcon: iconBytes,
+        size: 16,
+        fit: BoxFit.cover,
+        fallback: fallbackLeading,
+      ),
+    );
 
     final Widget chip = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 1),
@@ -1762,6 +1772,7 @@ class MarkdownMathConfig {
     Map<String, Uint8List?>? appIconByPackage,
     Map<String, Uint8List?>? appIconByNameLower,
     Map<String, String>? appNameByPackage,
+    Map<String, String>? appPackageByNameLower,
     Map<String, String>? evidenceNameToPath,
     List<String>? orderedEvidencePaths,
     Map<String, ScreenshotRecord?>? screenshotByPath,
@@ -1770,6 +1781,8 @@ class MarkdownMathConfig {
   }) : _appIconByPackage = appIconByPackage ?? const <String, Uint8List?>{},
        _appIconByNameLower = appIconByNameLower ?? const <String, Uint8List?>{},
        _appNameByPackage = appNameByPackage ?? const <String, String>{},
+       _appPackageByNameLower =
+           appPackageByNameLower ?? const <String, String>{},
        _evidenceNameToPath = evidenceNameToPath ?? const <String, String>{},
        _orderedEvidencePaths = orderedEvidencePaths ?? const <String>[],
        _screenshotByPath =
@@ -1782,6 +1795,7 @@ class MarkdownMathConfig {
   final Map<String, Uint8List?> _appIconByPackage;
   final Map<String, Uint8List?> _appIconByNameLower;
   final Map<String, String> _appNameByPackage;
+  final Map<String, String> _appPackageByNameLower;
   final Map<String, String> _evidenceNameToPath;
   final List<String> _orderedEvidencePaths;
   final Map<String, ScreenshotRecord?> _screenshotByPath;
@@ -1795,6 +1809,7 @@ class MarkdownMathConfig {
       appIconByPackage: _appIconByPackage,
       appIconByNameLower: _appIconByNameLower,
       appNameByPackage: _appNameByPackage,
+      appPackageByNameLower: _appPackageByNameLower,
     ),
     'evidence': _EvidenceBuilder(
       evidenceNameToPath: _evidenceNameToPath,

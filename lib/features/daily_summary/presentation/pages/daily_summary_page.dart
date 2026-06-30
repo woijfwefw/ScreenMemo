@@ -43,6 +43,7 @@ class _DailySummaryPageState extends State<DailySummaryPage> {
   Map<String, Uint8List?> _appIconByPackage = <String, Uint8List?>{};
   Map<String, Uint8List?> _appIconByNameLower = <String, Uint8List?>{};
   Map<String, String> _appNameByPackage = <String, String>{};
+  Map<String, String> _appPackageByNameLower = <String, String>{};
   bool _appIconCacheLoaded = false;
   bool _appIconCacheLoading = false;
 
@@ -107,6 +108,7 @@ class _DailySummaryPageState extends State<DailySummaryPage> {
         final Map<String, Uint8List?> byPkg = <String, Uint8List?>{};
         final Map<String, Uint8List?> byName = <String, Uint8List?>{};
         final Map<String, String> nameByPkg = <String, String>{};
+        final Map<String, String> pkgByName = <String, String>{};
         for (final app in cachedApps.values) {
           final String pkg = app.packageName.trim();
           final String name = app.appName.trim();
@@ -115,7 +117,10 @@ class _DailySummaryPageState extends State<DailySummaryPage> {
             if (name.isNotEmpty) nameByPkg[pkg] = name;
           }
           final String nameKey = name.toLowerCase();
-          if (nameKey.isNotEmpty) byName[nameKey] = app.icon;
+          if (nameKey.isNotEmpty) {
+            byName[nameKey] = app.icon;
+            if (pkg.isNotEmpty) pkgByName[nameKey] = pkg;
+          }
         }
         for (final app in apps) {
           final String pkg = app.packageName.trim();
@@ -125,13 +130,17 @@ class _DailySummaryPageState extends State<DailySummaryPage> {
             if (name.isNotEmpty) nameByPkg[pkg] = name;
           }
           final String nameKey = name.toLowerCase();
-          if (nameKey.isNotEmpty) byName[nameKey] = app.icon;
+          if (nameKey.isNotEmpty) {
+            byName[nameKey] = app.icon;
+            if (pkg.isNotEmpty) pkgByName[nameKey] = pkg;
+          }
         }
         if (!mounted) return;
         setState(() {
           _appIconByPackage = byPkg;
           _appIconByNameLower = byName;
           _appNameByPackage = nameByPkg;
+          _appPackageByNameLower = pkgByName;
           _appIconCacheLoaded = true;
           _appIconCacheLoading = false;
         });
@@ -779,6 +788,7 @@ class _DailySummaryPageState extends State<DailySummaryPage> {
       appIconByPackage: _appIconByPackage,
       appIconByNameLower: _appIconByNameLower,
       appNameByPackage: _appNameByPackage,
+      appPackageByNameLower: _appPackageByNameLower,
     );
   }
 

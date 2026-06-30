@@ -1569,6 +1569,7 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
       appIconByPackage: _chatAppIconByPackage,
       appIconByNameLower: _chatAppIconByNameLower,
       appNameByPackage: _chatAppNameByPackage,
+      appPackageByNameLower: _chatAppPackageByNameLower,
       evidenceNameToPath: evidenceNameToPath,
       orderedEvidencePaths: orderedEvidencePathsFromAtts,
       screenshotByPath: _evidenceScreenshotByPath,
@@ -1648,6 +1649,7 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
         appIconByPackage: _chatAppIconByPackage,
         appIconByNameLower: _chatAppIconByNameLower,
         appNameByPackage: _chatAppNameByPackage,
+        appPackageByNameLower: _chatAppPackageByNameLower,
         evidenceNameToPath: baseMap,
         orderedEvidencePaths: orderedEvidencePathsFromMap(baseMap),
         screenshotByPath: _evidenceScreenshotByPath,
@@ -1743,6 +1745,7 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
         appIconByPackage: _chatAppIconByPackage,
         appIconByNameLower: _chatAppIconByNameLower,
         appNameByPackage: _chatAppNameByPackage,
+        appPackageByNameLower: _chatAppPackageByNameLower,
         evidenceNameToPath: baseMap,
         orderedEvidencePaths: orderedEvidencePathsFromMap(baseMap),
         screenshotByPath: _evidenceScreenshotByPath,
@@ -1801,6 +1804,7 @@ extension _AISettingsPageStateThinkingCodecExt on _AISettingsPageState {
           appIconByPackage: _chatAppIconByPackage,
           appIconByNameLower: _chatAppIconByNameLower,
           appNameByPackage: _chatAppNameByPackage,
+          appPackageByNameLower: _chatAppPackageByNameLower,
           // While the future is resolving, avoid flashing raw `[evidence: ...]`
           // text; show a fixed-size shimmer placeholder instead.
           evidenceLoading: snap.connectionState != ConnectionState.done,

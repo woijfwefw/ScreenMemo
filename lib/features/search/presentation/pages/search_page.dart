@@ -18,6 +18,7 @@ import 'package:screen_memo/features/search/application/ocr_search_service.dart'
 import 'package:screen_memo/data/database/screenshot_database.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
 import 'package:screen_memo/core/utils/merged_event_summary.dart';
+import 'package:screen_memo/features/apps/presentation/widgets/lazy_app_icon.dart';
 import 'package:screen_memo/features/gallery/presentation/widgets/screenshot_item_widget.dart';
 import 'package:screen_memo/core/widgets/search_styles.dart';
 import 'package:screen_memo/core/widgets/screenshot_style_tab_bar.dart';

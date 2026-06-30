@@ -16,6 +16,7 @@ import 'package:screen_memo/data/database/screenshot_database.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
 import 'package:screen_memo/core/utils/merged_event_summary.dart';
 import 'package:screen_memo/features/gallery/presentation/widgets/screenshot_image_widget.dart';
+import 'package:screen_memo/features/apps/presentation/widgets/lazy_app_icon.dart';
 import 'package:screen_memo/features/timeline/presentation/widgets/segment_tag_chip_colors.dart';
 import 'package:screen_memo/core/widgets/screenshot_style_tab_bar.dart';
 import 'package:screen_memo/core/widgets/ui_components.dart';
@@ -1071,25 +1072,28 @@ class _SegmentEntryCardState extends State<SegmentEntryCard> {
 
   Widget _buildAppIcon(BuildContext context, String package) {
     final app = widget.appInfoByPackage[package];
-    if (app != null && app.icon != null && app.icon!.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(6),
-        child: Image.memory(
-          app.icon!,
+    final String packageName =
+        (app?.packageName.trim().isNotEmpty == true
+                ? app!.packageName
+                : package)
+            .trim();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: LazyAppIcon(
+        packageName: packageName,
+        initialIcon: app?.icon,
+        size: 20,
+        fit: BoxFit.cover,
+        fallback: Container(
           width: 20,
           height: 20,
-          fit: BoxFit.cover,
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Icon(Icons.apps, size: 14),
         ),
-      );
-    }
-    return Container(
-      width: 20,
-      height: 20,
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(6),
       ),
-      child: const Icon(Icons.apps, size: 14),
     );
   }
 

@@ -17,6 +17,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:screen_memo/data/database/screenshot_database.dart';
 import 'package:screen_memo/features/nsfw/application/nsfw_preference_service.dart';
 import 'package:screen_memo/features/apps/application/app_selection_service.dart';
+import 'package:screen_memo/features/apps/presentation/widgets/lazy_app_icon.dart';
 import 'package:screen_memo/features/gallery/presentation/widgets/ai_meta_sheet.dart';
 import 'package:gal/gal.dart';
 
@@ -75,6 +76,56 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
 
   ScreenshotRecord? get _currentScreenshotOrNull =>
       _hasValidCurrent ? _screenshots[_currentIndex] : null;
+
+  String _displayPackageFor(ScreenshotRecord screenshot) {
+    final String recordPackage = screenshot.appPackageName.trim();
+    if (recordPackage.isNotEmpty && recordPackage.toLowerCase() != 'unknown') {
+      return recordPackage;
+    }
+    return _appInfo.packageName.trim();
+  }
+
+  String _displayAppNameFor(ScreenshotRecord screenshot) {
+    final String packageName = _displayPackageFor(screenshot);
+    final String recordName = screenshot.appName.trim();
+    if (_isUsefulAppName(recordName, packageName)) {
+      return recordName;
+    }
+
+    final bool appInfoMatchesCurrent =
+        packageName.isNotEmpty && _appInfo.packageName.trim() == packageName;
+    if (appInfoMatchesCurrent) {
+      final String infoName = _appInfo.appName.trim();
+      if (_isUsefulAppName(infoName, packageName)) return infoName;
+
+      final String routeName = _appName.trim();
+      if (_isUsefulAppName(routeName, packageName)) return routeName;
+    }
+
+    if (recordName.isNotEmpty) return recordName;
+    if (packageName.isNotEmpty) return packageName;
+    return 'Unknown';
+  }
+
+  bool _isUsefulAppName(String name, String packageName) {
+    final String value = name.trim();
+    if (value.isEmpty) return false;
+    final String lower = value.toLowerCase();
+    if (lower == 'unknown') return false;
+    if (packageName.trim().isNotEmpty && value == packageName.trim()) {
+      return false;
+    }
+    return true;
+  }
+
+  Uint8List? _initialIconForPackage(String packageName) {
+    final String currentPackage = packageName.trim();
+    if (currentPackage.isEmpty) return null;
+    if (_appInfo.packageName.trim() != currentPackage) return null;
+    final icon = _appInfo.icon;
+    if (icon == null || icon.isEmpty) return null;
+    return icon;
+  }
 
   int _coerceIndex(dynamic value) {
     if (value is int) return value;
@@ -1094,6 +1145,11 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
         body: const SizedBox.expand(),
       );
     }
+    final String currentPackageName = _displayPackageFor(current);
+    final String currentAppName = _displayAppNameFor(current);
+    final Uint8List? currentInitialIcon = _initialIconForPackage(
+      currentPackageName,
+    );
 
     return Scaffold(
       backgroundColor: Theme.of(context).brightness == Brightness.dark
@@ -1112,35 +1168,27 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // 应用图标
-                  if (_appInfo.icon != null)
-                    Container(
-                      width: 24,
-                      height: 24,
-                      margin: const EdgeInsets.only(right: 8),
-                      child: Image.memory(
-                        _appInfo.icon!,
-                        width: 24,
-                        height: 24,
-                        fit: BoxFit.contain,
-                      ),
-                    )
-                  else
-                    Container(
-                      width: 24,
-                      height: 24,
-                      margin: const EdgeInsets.only(right: 8),
-                      child: const Icon(
+                  Container(
+                    width: 24,
+                    height: 24,
+                    margin: const EdgeInsets.only(right: 8),
+                    child: LazyAppIcon(
+                      packageName: currentPackageName,
+                      initialIcon: currentInitialIcon,
+                      size: 24,
+                      fallback: const Icon(
                         Icons.android,
                         color: Colors.white,
                         size: 20,
                       ),
                     ),
+                  ),
                   // 应用名称和计数
                   Flexible(
                     child: Text(
                       _singleMode
-                          ? '$_appName (1/1)'
-                          : '$_appName (${_currentIndex + 1}/${_screenshots.length})',
+                          ? '$currentAppName (1/1)'
+                          : '$currentAppName (${_currentIndex + 1}/${_screenshots.length})',
                       style: const TextStyle(color: Colors.white),
                       overflow: TextOverflow.ellipsis,
                     ),

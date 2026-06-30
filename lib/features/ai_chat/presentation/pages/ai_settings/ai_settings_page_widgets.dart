@@ -1396,6 +1396,7 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
   final ScrollController _fallbackScrollController = ScrollController();
   Map<String, Uint8List?> _appIconByPackage = <String, Uint8List?>{};
   Map<String, Uint8List?> _appIconByNameLower = <String, Uint8List?>{};
+  Map<String, String> _appPackageByNameLower = <String, String>{};
   bool _appIconCacheLoaded = false;
 
   void _warmAppIconCache() {
@@ -1413,22 +1414,30 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
 
         final Map<String, Uint8List?> byPkg = <String, Uint8List?>{};
         final Map<String, Uint8List?> byName = <String, Uint8List?>{};
+        final Map<String, String> pkgByName = <String, String>{};
         for (final a in cachedApps.values) {
           final String pkg = a.packageName.trim();
           if (pkg.isNotEmpty) byPkg[pkg] = a.icon;
           final String nameKey = a.appName.trim().toLowerCase();
-          if (nameKey.isNotEmpty) byName[nameKey] = a.icon;
+          if (nameKey.isNotEmpty) {
+            byName[nameKey] = a.icon;
+            if (pkg.isNotEmpty) pkgByName[nameKey] = pkg;
+          }
         }
         for (final a in apps) {
           final String pkg = a.packageName.trim();
           if (pkg.isNotEmpty) byPkg[pkg] = a.icon;
           final String nameKey = a.appName.trim().toLowerCase();
-          if (nameKey.isNotEmpty) byName[nameKey] = a.icon;
+          if (nameKey.isNotEmpty) {
+            byName[nameKey] = a.icon;
+            if (pkg.isNotEmpty) pkgByName[nameKey] = pkg;
+          }
         }
         if (!mounted) return;
         setState(() {
           _appIconByPackage = byPkg;
           _appIconByNameLower = byName;
+          _appPackageByNameLower = pkgByName;
           _appIconCacheLoaded = true;
         });
       } catch (_) {
@@ -2123,14 +2132,25 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
     final List<String> shown = keys.take(maxIcons).toList(growable: false);
     final int extraCount = keys.length - shown.length;
 
-    final List<Uint8List?> icons = <Uint8List?>[];
+    final List<_ThinkingAppIconRef> icons = <_ThinkingAppIconRef>[];
     if (byName.isNotEmpty) {
       for (final name in shown) {
-        icons.add(_appIconByNameLower[name.toLowerCase()]);
+        final String nameKey = name.toLowerCase();
+        icons.add(
+          _ThinkingAppIconRef(
+            packageName: _appPackageByNameLower[nameKey] ?? '',
+            initialIcon: _appIconByNameLower[nameKey],
+          ),
+        );
       }
     } else {
       for (final pkg in shown) {
-        icons.add(_appIconByPackage[pkg]);
+        icons.add(
+          _ThinkingAppIconRef(
+            packageName: pkg,
+            initialIcon: _appIconByPackage[pkg],
+          ),
+        );
       }
     }
 
@@ -2147,7 +2167,7 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
     BuildContext context, {
     required ThemeData theme,
     required Color fg,
-    required List<Uint8List?> icons,
+    required List<_ThinkingAppIconRef> icons,
     required int extraCount,
   }) {
     const double size = 18;
@@ -2168,7 +2188,7 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
           for (int i = 0; i < shownCount; i++)
             Positioned(
               left: i * step,
-              child: _buildSingleAppIcon(bytes: icons[i], fg: fg, size: size),
+              child: _buildSingleAppIcon(icon: icons[i], fg: fg, size: size),
             ),
           if (extraCount > 0)
             Positioned(
@@ -2186,17 +2206,20 @@ class _ThinkingTimelineCardState extends State<_ThinkingTimelineCard> {
   }
 
   Widget _buildSingleAppIcon({
-    required Uint8List? bytes,
+    required _ThinkingAppIconRef icon,
     required Color fg,
     required double size,
   }) {
-    final Widget child = bytes != null
-        ? Image.memory(bytes, width: size, height: size, fit: BoxFit.contain)
-        : Icon(
-            Icons.android,
-            size: size * 0.75,
-            color: fg.withValues(alpha: 0.9),
-          );
+    final Widget child = LazyAppIcon(
+      packageName: icon.packageName,
+      initialIcon: icon.initialIcon,
+      size: size,
+      fallback: Icon(
+        Icons.android,
+        size: size * 0.75,
+        color: fg.withValues(alpha: 0.9),
+      ),
+    );
 
     // Display the icon as-is; do not add a background behind it.
     return SizedBox(

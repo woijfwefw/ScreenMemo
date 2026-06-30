@@ -24,6 +24,7 @@ import 'package:screen_memo/data/platform/path_service.dart';
 import 'package:screen_memo/core/widgets/date_jump_calendar_sheet.dart';
 import 'package:screen_memo/core/widgets/ui_components.dart';
 import 'package:screen_memo/features/nsfw/application/nsfw_preference_service.dart';
+import 'package:screen_memo/features/apps/presentation/widgets/lazy_app_icon.dart';
 
 part 'screenshot_gallery_page_tabs_part.dart';
 part 'screenshot_gallery_page_data_part.dart';
@@ -261,23 +262,15 @@ class _ScreenshotGalleryPageState extends State<ScreenshotGalleryPage>
                             hintText: AppLocalizations.of(
                               context,
                             ).searchPlaceholder,
-                            prefixIcon: (_appInfo.icon != null)
-                                ? Padding(
-                                    padding: const EdgeInsets.only(
-                                      left: 8,
-                                      right: 6,
-                                    ),
-                                    child: Image.memory(
-                                      _appInfo.icon!,
-                                      width: 18,
-                                      height: 18,
-                                      fit: BoxFit.contain,
-                                    ),
-                                  )
-                                : const Padding(
-                                    padding: EdgeInsets.only(left: 8, right: 6),
-                                    child: Icon(Icons.android, size: 18),
-                                  ),
+                            prefixIcon: Padding(
+                              padding: const EdgeInsets.only(left: 8, right: 6),
+                              child: LazyAppIcon(
+                                packageName: _appInfo.packageName,
+                                initialIcon: _appInfo.icon,
+                                size: 18,
+                                fallback: const Icon(Icons.android, size: 18),
+                              ),
+                            ),
                             prefixIconConstraints: const BoxConstraints(
                               minWidth: 0,
                               minHeight: 0,

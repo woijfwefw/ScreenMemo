@@ -27,6 +27,7 @@ import 'package:screen_memo/features/gallery/presentation/widgets/screenshot_ima
 import 'package:screen_memo/features/apps/application/app_selection_service.dart';
 import 'package:screen_memo/features/ai/application/intent_analysis_service.dart';
 import 'package:screen_memo/features/ai/application/query_context_service.dart';
+import 'package:screen_memo/features/apps/presentation/widgets/lazy_app_icon.dart';
 import 'package:screen_memo/core/logging/flutter_logger.dart';
 import 'package:screen_memo/data/database/screenshot_database.dart';
 import 'package:screen_memo/data/platform/path_service.dart';
@@ -293,6 +294,16 @@ class _ThinkingToolChip {
   String? detailRef;
 }
 
+class _ThinkingAppIconRef {
+  const _ThinkingAppIconRef({
+    required this.packageName,
+    required this.initialIcon,
+  });
+
+  final String packageName;
+  final Uint8List? initialIcon;
+}
+
 class _ThinkingEvent {
   _ThinkingEvent({
     required this.type,
@@ -412,6 +423,7 @@ class _AISettingsPageState extends State<AISettingsPage>
   Map<String, Uint8List?> _chatAppIconByPackage = <String, Uint8List?>{};
   Map<String, Uint8List?> _chatAppIconByNameLower = <String, Uint8List?>{};
   Map<String, String> _chatAppNameByPackage = <String, String>{};
+  Map<String, String> _chatAppPackageByNameLower = <String, String>{};
   bool _chatAppIconCacheLoaded = false;
   bool _chatAppIconCacheLoading = false;
 

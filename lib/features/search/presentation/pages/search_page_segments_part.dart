@@ -113,25 +113,28 @@ extension _SearchPageSegmentsPart on _SearchPageState {
   /// 构建应用图标
   Widget _buildAppIcon(String package) {
     final app = _appInfoByPackage[package];
-    if (app != null && app.icon != null && app.icon!.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(6),
-        child: Image.memory(
-          app.icon!,
+    final String packageName =
+        (app?.packageName.trim().isNotEmpty == true
+                ? app!.packageName
+                : package)
+            .trim();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: LazyAppIcon(
+        packageName: packageName,
+        initialIcon: app?.icon,
+        size: 20,
+        fit: BoxFit.cover,
+        fallback: Container(
           width: 20,
           height: 20,
-          fit: BoxFit.cover,
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Icon(Icons.apps, size: 14),
         ),
-      );
-    }
-    return Container(
-      width: 20,
-      height: 20,
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(6),
       ),
-      child: const Icon(Icons.apps, size: 14),
     );
   }
 
