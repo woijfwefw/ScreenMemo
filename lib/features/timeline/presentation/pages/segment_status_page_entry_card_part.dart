@@ -56,6 +56,9 @@ class _SegmentEntryCardState extends State<_SegmentEntryCard> {
   bool _samplesLoading = false;
   bool _samplesLoaded = false;
   List<Map<String, dynamic>> _samples = const <Map<String, dynamic>>[];
+  final Map<String, ScreenshotRecord> _sampleScreenshotsByPath =
+      <String, ScreenshotRecord>{};
+  final Set<String> _sampleHydratingPaths = <String>{};
   // 摘要展开/收起状态（防止固定高度无法展开）
   bool _summaryExpanded = false;
   // 重新生成操作状态
@@ -75,6 +78,91 @@ class _SegmentEntryCardState extends State<_SegmentEntryCard> {
 
   // part 文件需要触发 UI 刷新时统一通过该方法，避免直接访问 State.setState。
   void _entryCardSetState(VoidCallback fn) => setState(fn);
+
+  Future<void> _hydrateSampleScreenshots(
+    List<Map<String, dynamic>> samples,
+  ) async {
+    final List<String> paths = samples
+        .map((m) => (m['file_path'] as String?)?.trim() ?? '')
+        .where((p) => p.isNotEmpty)
+        .toSet()
+        .where(
+          (p) =>
+              !_sampleScreenshotsByPath.containsKey(p) &&
+              !_sampleHydratingPaths.contains(p),
+        )
+        .toList(growable: false);
+    if (paths.isEmpty) return;
+
+    _sampleHydratingPaths.addAll(paths);
+    try {
+      // listSegmentSamples 只保存 file_path，不含 page_url / 原截图 id。
+      // 小图要跟大图一样命中域名规则和手动 NSFW，必须按路径补全 ScreenshotRecord。
+      const int batchSize = 12;
+      for (int i = 0; i < paths.length; i += batchSize) {
+        final int end = math.min(i + batchSize, paths.length);
+        final List<String> batch = paths.sublist(i, end);
+        final entries = await Future.wait(
+          batch.map((path) async {
+            final rec = await ScreenshotDatabase.instance.getScreenshotByPath(
+              path,
+            );
+            return MapEntry<String, ScreenshotRecord?>(path, rec);
+          }),
+        );
+        final Map<String, ScreenshotRecord> loadedBatch =
+            <String, ScreenshotRecord>{};
+        for (final entry in entries) {
+          final rec = entry.value;
+          if (rec != null) {
+            loadedBatch[entry.key] = rec;
+          }
+        }
+        if (loadedBatch.isEmpty) continue;
+
+        final List<String> loadedPaths = loadedBatch.keys.toList(
+          growable: false,
+        );
+        try {
+          await NsfwPreferenceService.instance.ensureRulesLoaded();
+        } catch (_) {}
+        try {
+          await NsfwPreferenceService.instance.preloadAiNsfwFlags(
+            filePaths: loadedPaths,
+          );
+        } catch (_) {}
+        try {
+          await NsfwPreferenceService.instance.preloadSegmentNsfwFlags(
+            filePaths: loadedPaths,
+          );
+        } catch (_) {}
+
+        final Map<String, List<int>> idsByApp = <String, List<int>>{};
+        for (final rec in loadedBatch.values) {
+          final int? id = rec.id;
+          if (id == null) continue;
+          final String app = rec.appPackageName.trim();
+          if (app.isEmpty) continue;
+          idsByApp.putIfAbsent(app, () => <int>[]).add(id);
+        }
+        for (final entry in idsByApp.entries) {
+          try {
+            await NsfwPreferenceService.instance.preloadManualFlags(
+              appPackageName: entry.key,
+              screenshotIds: entry.value,
+            );
+          } catch (_) {}
+        }
+
+        if (!mounted) return;
+        setState(() {
+          _sampleScreenshotsByPath.addAll(loadedBatch);
+        });
+      }
+    } finally {
+      _sampleHydratingPaths.removeAll(paths);
+    }
+  }
 
   @override
   void initState() {
@@ -343,7 +431,7 @@ class _SegmentEntryCardState extends State<_SegmentEntryCard> {
           ),
           if (errorText != null) ...[
             const SizedBox(height: 6),
-            _buildErrorBanner(errorText!),
+            _buildErrorBanner(errorText),
           ] else if (summary.isNotEmpty) ...[
             const SizedBox(height: 6),
             // 根据是否超出行数动态决定是否显示“展开/收起”
@@ -472,6 +560,7 @@ class _SegmentEntryCardState extends State<_SegmentEntryCard> {
                               _samples = loaded;
                               _samplesLoaded = true;
                             });
+                            unawaited(_hydrateSampleScreenshots(loaded));
                           } catch (_) {
                           } finally {
                             if (mounted)
@@ -520,8 +609,8 @@ class _SegmentEntryCardState extends State<_SegmentEntryCard> {
                   if (merged) buffer.writeln(l10n.tagMergedCopy);
                   if (categories.isNotEmpty)
                     buffer.writeln(l10n.categoriesLabel(categories.join(', ')));
-                  if (errorText != null && errorText!.trim().isNotEmpty) {
-                    buffer.writeln(l10n.errorLabel(errorText!));
+                  if (errorText != null && errorText.trim().isNotEmpty) {
+                    buffer.writeln(l10n.errorLabel(errorText));
                   } else if (summary.trim().isNotEmpty) {
                     buffer.writeln(l10n.summaryLabel(summary));
                   }

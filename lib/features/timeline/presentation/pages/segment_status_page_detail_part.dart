@@ -102,7 +102,7 @@ extension _SegmentStatusDetailPart on _SegmentStatusPageState {
           );
 
       if (!mounted) return;
-      Navigator.pushNamed(
+      await Navigator.pushNamed(
         context,
         '/screenshot_viewer',
         arguments: {
@@ -116,6 +116,9 @@ extension _SegmentStatusDetailPart on _SegmentStatusPageState {
           if (aiStructuredJson != null) 'aiStructuredJson': aiStructuredJson,
         },
       );
+      if (mounted) {
+        _segmentStatusSetState(() {});
+      }
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -459,7 +462,7 @@ extension _SegmentStatusDetailPart on _SegmentStatusPageState {
                                               const SizedBox(width: 8),
                                               Expanded(
                                                 child: SelectableText(
-                                                  err!,
+                                                  err,
                                                   style: Theme.of(c)
                                                       .textTheme
                                                       .bodyMedium

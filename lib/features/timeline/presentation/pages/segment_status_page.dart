@@ -30,6 +30,7 @@ import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_request_log
 import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_request_logs_viewer.dart';
 import 'package:screen_memo/features/ai_chat/presentation/widgets/ai_request_logs_sheet.dart';
 import 'package:screen_memo/features/gallery/presentation/widgets/screenshot_image_widget.dart';
+import 'package:screen_memo/features/nsfw/application/nsfw_preference_service.dart';
 import 'package:screen_memo/features/apps/presentation/widgets/lazy_app_icon.dart';
 import 'package:screen_memo/features/timeline/presentation/widgets/segment_tag_chip_colors.dart';
 import 'package:screen_memo/core/widgets/screenshot_style_tab_bar.dart';
@@ -281,6 +282,11 @@ class _SegmentStatusPageState extends State<SegmentStatusPage>
     });
     _initApps();
     _loadPrivacyMode();
+    unawaited(
+      NsfwPreferenceService.instance.ensureRulesLoaded().then((_) {
+        if (mounted) setState(() {});
+      }),
+    );
     unawaited(_loadDynamicEntryLogIconEnabled());
     unawaited(_loadDynamicRebuildDayConcurrency());
     _loadSegmentsContextSelection();

@@ -636,6 +636,7 @@ extension _SegmentEntryCardUiPart on _SegmentEntryCardState {
                   privacyMode: widget.privacyMode,
                   extraNsfwMask: aiNsfw,
                   pageUrl: pageUrl.isNotEmpty ? pageUrl : null,
+                  screenshot: _sampleScreenshotsByPath[path],
                   targetWidth: targetWidthPx,
                   fit: BoxFit.cover,
                   borderRadius: BorderRadius.circular(8),
