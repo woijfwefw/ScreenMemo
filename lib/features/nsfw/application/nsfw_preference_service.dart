@@ -385,6 +385,17 @@ class NsfwPreferenceService {
     return NsfwDetector.isNsfwUrl(s.pageUrl);
   }
 
+  /// 仅基于链接同步判定是否需要 NSFW 遮罩。
+  ///
+  /// 用于动态缩略图等只有 page_url、还没有完整 [ScreenshotRecord] 的场景。
+  /// 若规则尚未预加载，自定义域名规则可能暂时返回 false；页面应先调用
+  /// [ensureRulesLoaded] 并在完成后重建一次。
+  bool shouldMaskUrlCached({String? pageUrl, String? imageUrl}) {
+    if (_matchesBlockedHost(pageUrl)) return true;
+    if (_matchesBlockedHost(imageUrl)) return true;
+    return NsfwDetector.isNsfwUrl(pageUrl) || NsfwDetector.isNsfwUrl(imageUrl);
+  }
+
   // ============ 规则匹配（仅依赖缓存） ============
 
   bool _matchesBlockedHost(String? url) {

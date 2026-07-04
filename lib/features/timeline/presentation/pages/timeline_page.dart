@@ -2000,7 +2000,6 @@ class _TimelinePageState extends State<TimelinePage>
     final bool isNsfw = NsfwPreferenceService.instance.shouldMaskCached(
       screenshot,
     );
-    final bool nsfwMasked = _privacyMode && isNsfw;
 
     final content = ScreenshotItemWidget(
       screenshot: screenshot,
@@ -2008,11 +2007,7 @@ class _TimelinePageState extends State<TimelinePage>
       privacyMode: _privacyMode,
       showNsfwButton: false,
       isNsfwFlagged: isNsfw,
-      onTap: () {
-        if (!nsfwMasked) {
-          _viewFromCurrent(index);
-        }
-      },
+      onTap: () => _viewFromCurrent(index),
       onLinkTap: (url) => _openLink(url),
     );
 

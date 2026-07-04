@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:screen_memo/core/logging/flutter_logger.dart';
 import 'package:screen_memo/core/theme/app_theme.dart';
 import 'package:screen_memo/models/screenshot_record.dart';
 import 'package:screen_memo/features/nsfw/application/nsfw_preference_service.dart';
@@ -14,7 +16,7 @@ import 'package:screen_memo/features/timeline/presentation/widgets/timeline_jump
 /// - 图片加载和错误处理
 ///
 /// 使用此组件可确保所有截图显示保持一致的样式和行为
-class ScreenshotImageWidget extends StatelessWidget {
+class ScreenshotImageWidget extends StatefulWidget {
   /// 图片文件
   final File file;
 
@@ -84,15 +86,54 @@ class ScreenshotImageWidget extends StatelessWidget {
   });
 
   @override
+  State<ScreenshotImageWidget> createState() => _ScreenshotImageWidgetState();
+}
+
+class _ScreenshotImageWidgetState extends State<ScreenshotImageWidget> {
+  bool _revealed = false;
+
+  @override
+  void didUpdateWidget(covariant ScreenshotImageWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 动态展开图会先用 file_path 建小图，再分批补全 ScreenshotRecord / pageUrl /
+    // AI 标记。补全会触发父组件重建；如果这里因元数据变化重置 reveal，
+    // 用户点“显示”后会被下一批补全立刻复遮，看起来像点击无反应。
+    // 因此 reveal 状态只跟图片身份（file path）绑定。
+    if (oldWidget.file.path != widget.file.path) {
+      _revealed = false;
+    }
+  }
+
+  void _revealNsfw() {
+    final callback = widget.onReveal;
+    unawaited(
+      FlutterLogger.nativeInfo(
+        'UI',
+        'NSFW缩略图点击显示 path=${widget.file.path} externalReveal=${callback != null}',
+      ).catchError((_) {}),
+    );
+    if (callback != null) {
+      callback();
+      return;
+    }
+    setState(() => _revealed = true);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     // 优先使用 screenshot 参数进行准确判断，否则回退到旧的 URL 判断方式
     final bool nsfwMasked =
-        privacyMode &&
-        (extraNsfwMask ||
-            (screenshot != null
-                ? NsfwPreferenceService.instance.shouldMaskCached(screenshot!)
-                : NsfwDetector.isNsfwUrl(pageUrl)));
+        widget.privacyMode &&
+        !_revealed &&
+        (widget.extraNsfwMask ||
+            (widget.screenshot != null
+                ? NsfwPreferenceService.instance.shouldMaskCached(
+                    widget.screenshot!,
+                  )
+                : NsfwPreferenceService.instance.shouldMaskUrlCached(
+                    pageUrl: widget.pageUrl,
+                  )));
 
     Widget base = _buildImage(context, isDark);
 
@@ -103,29 +144,31 @@ class ScreenshotImageWidget extends StatelessWidget {
       layers.add(
         Positioned.fill(
           child: NsfwBackdropOverlay(
-            borderRadius: borderRadius,
-            onReveal: onReveal ?? onTap,
-            showButton: showNsfwButton,
+            borderRadius: widget.borderRadius,
+            onReveal: _revealNsfw,
+            showButton: widget.showNsfwButton,
           ),
         ),
       );
     }
 
     // 时间线跳转按钮（位于最上层）
-    if (showTimelineJumpButton) {
-      layers.add(TimelineJumpOverlay(filePath: file.path));
+    if (widget.showTimelineJumpButton) {
+      layers.add(TimelineJumpOverlay(filePath: widget.file.path));
     }
 
     Widget result = layers.length == 1 ? base : Stack(children: layers);
 
     // 允许在遮罩状态下点击（例如进入查看器再选择“显示”）。
-    if (onTap != null) {
-      result = GestureDetector(onTap: onTap, child: result);
+    final bool allowWholeImageTap =
+        widget.onTap != null && (!nsfwMasked || !widget.showNsfwButton);
+    if (allowWholeImageTap) {
+      result = GestureDetector(onTap: widget.onTap, child: result);
     }
 
     // 添加圆角裁剪
-    if (borderRadius != null) {
-      result = ClipRRect(borderRadius: borderRadius!, child: result);
+    if (widget.borderRadius != null) {
+      result = ClipRRect(borderRadius: widget.borderRadius!, child: result);
     }
 
     return result;
@@ -134,16 +177,16 @@ class ScreenshotImageWidget extends StatelessWidget {
   /// 构建图片
   Widget _buildImage(BuildContext context, bool isDark) {
     final ImageProvider provider =
-        imageProvider ??
-        (targetWidth != null
-            ? ResizeImage(FileImage(file), width: targetWidth!)
-            : FileImage(file));
+        widget.imageProvider ??
+        (widget.targetWidth != null
+            ? ResizeImage(FileImage(widget.file), width: widget.targetWidth!)
+            : FileImage(widget.file));
 
     final baseImage = Image(
       image: provider,
-      width: width,
-      height: height,
-      fit: fit,
+      width: widget.width,
+      height: widget.height,
+      fit: widget.fit,
       filterQuality: FilterQuality.low,
       gaplessPlayback: true,
       errorBuilder: (context, error, stackTrace) => _buildErrorWidget(context),
@@ -166,21 +209,21 @@ class ScreenshotImageWidget extends StatelessWidget {
   /// 构建错误占位
   Widget _buildErrorWidget(BuildContext context) {
     return Container(
-      width: width,
-      height: height,
+      width: widget.width,
+      height: widget.height,
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: borderRadius,
+        borderRadius: widget.borderRadius,
       ),
       alignment: Alignment.center,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.broken_image, size: 32, color: AppTheme.mutedForeground),
-          if (errorText != null) ...[
+          if (widget.errorText != null) ...[
             const SizedBox(height: 4),
             Text(
-              errorText!,
+              widget.errorText!,
               style: TextStyle(color: AppTheme.mutedForeground, fontSize: 11),
               textAlign: TextAlign.center,
             ),

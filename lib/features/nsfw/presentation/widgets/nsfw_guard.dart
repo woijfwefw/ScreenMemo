@@ -156,74 +156,80 @@ class NsfwBackdropOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: borderRadius ?? BorderRadius.zero,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-              child: Container(color: Colors.black.withValues(alpha: 0.35)),
-            ),
+    final Widget overlay = Stack(
+      children: [
+        Positioned.fill(
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(color: Colors.black.withValues(alpha: 0.35)),
           ),
-          Positioned.fill(
-            child: Padding(
-              padding: padding ?? const EdgeInsets.symmetric(horizontal: 12),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.visibility_off_rounded,
-                    color: Colors.white70,
-                    size: 28,
+        ),
+        Positioned.fill(
+          child: Padding(
+            padding: padding ?? const EdgeInsets.symmetric(horizontal: 12),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.visibility_off_rounded,
+                  color: Colors.white70,
+                  size: 28,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  AppLocalizations.of(context).nsfwWarningTitle,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    AppLocalizations.of(context).nsfwWarningTitle,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    AppLocalizations.of(context).nsfwWarningSubtitle,
-                    style: TextStyle(color: Colors.white70, fontSize: 12),
-                    textAlign: TextAlign.center,
-                  ),
-                  if (showButton) ...[
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: 86,
-                      height: 34,
-                      child: ElevatedButton(
-                        onPressed: onReveal,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white.withValues(alpha: 0.9),
-                          foregroundColor: Colors.black87,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppTheme.radiusMd,
-                            ),
-                          ),
-                          padding: EdgeInsets.zero,
-                          elevation: 0,
-                          textStyle: const TextStyle(
-                            fontWeight: FontWeight.w700,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  AppLocalizations.of(context).nsfwWarningSubtitle,
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+                if (showButton) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: 86,
+                    height: 34,
+                    child: ElevatedButton(
+                      onPressed: onReveal,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white.withValues(alpha: 0.9),
+                        foregroundColor: Colors.black87,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.radiusMd,
                           ),
                         ),
-                        child: Text(AppLocalizations.of(context).show),
+                        padding: EdgeInsets.zero,
+                        elevation: 0,
+                        textStyle: const TextStyle(fontWeight: FontWeight.w700),
                       ),
+                      child: Text(AppLocalizations.of(context).show),
                     ),
-                  ],
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
+    );
+
+    return ClipRRect(
+      borderRadius: borderRadius ?? BorderRadius.zero,
+      child: showButton
+          ? GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onReveal,
+              child: overlay,
+            )
+          : overlay,
     );
   }
 }

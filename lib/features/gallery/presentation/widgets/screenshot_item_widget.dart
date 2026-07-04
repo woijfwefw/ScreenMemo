@@ -33,7 +33,7 @@ enum AiMetaBadgePlacement {
 /// - 隐私模式（NSFW遮罩）
 /// - 深色模式支持
 /// - 深度链接显示
-class ScreenshotItemWidget extends StatelessWidget {
+class ScreenshotItemWidget extends StatefulWidget {
   static final Map<String, int> _lazyFileSizeCache = <String, int>{};
   static final Map<String, Future<int>> _lazyFileSizeFutures =
       <String, Future<int>>{};
@@ -115,36 +115,46 @@ class ScreenshotItemWidget extends StatelessWidget {
   });
 
   @override
+  State<ScreenshotItemWidget> createState() => _ScreenshotItemWidgetState();
+}
+
+class _ScreenshotItemWidgetState extends State<ScreenshotItemWidget> {
+  bool _revealed = false;
+
+  @override
+  void didUpdateWidget(covariant ScreenshotItemWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.screenshot.filePath != widget.screenshot.filePath ||
+        oldWidget.screenshot.id != widget.screenshot.id) {
+      _revealed = false;
+    }
+  }
+
+  void _revealNsfw() {
+    if (_revealed) return;
+    setState(() => _revealed = true);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final file = _resolveFile();
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final bool nsfwMasked =
-        privacyMode &&
-        NsfwPreferenceService.instance.shouldMaskCached(screenshot);
+        widget.privacyMode &&
+        !_revealed &&
+        NsfwPreferenceService.instance.shouldMaskCached(widget.screenshot);
 
     final List<Widget> layers = <Widget>[_buildImage(context, file, isDark)];
 
     final bool hasAiMeta = NsfwPreferenceService.instance.hasAiMetaCached(
-      filePath: screenshot.filePath,
+      filePath: widget.screenshot.filePath,
     );
 
-    if (customOverlay != null) layers.add(customOverlay!);
-
-    if (nsfwMasked) {
-      layers.add(
-        Positioned.fill(
-          child: NsfwBackdropOverlay(
-            borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-            onReveal: onTap,
-            showButton: true,
-          ),
-        ),
-      );
-    }
+    if (widget.customOverlay != null) layers.add(widget.customOverlay!);
 
     if (!nsfwMasked &&
-        screenshot.pageUrl != null &&
-        screenshot.pageUrl!.isNotEmpty) {
+        widget.screenshot.pageUrl != null &&
+        widget.screenshot.pageUrl!.isNotEmpty) {
       layers.add(_buildLinkOverlay(context));
     }
 
@@ -153,38 +163,51 @@ class ScreenshotItemWidget extends StatelessWidget {
         context,
         showAiMetaBadge:
             hasAiMeta &&
-            aiMetaBadgePlacement == AiMetaBadgePlacement.bottomOverlay,
+            widget.aiMetaBadgePlacement == AiMetaBadgePlacement.bottomOverlay,
       ),
     );
 
-    if (hasAiMeta && aiMetaBadgePlacement == AiMetaBadgePlacement.topRight) {
+    if (nsfwMasked) {
+      layers.add(
+        Positioned.fill(
+          child: NsfwBackdropOverlay(
+            borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+            onReveal: _revealNsfw,
+            showButton: true,
+          ),
+        ),
+      );
+    }
+
+    if (hasAiMeta &&
+        widget.aiMetaBadgePlacement == AiMetaBadgePlacement.topRight) {
       layers.add(_buildTopRightAiMetaBadge(context));
     }
 
-    if (showCheckbox) layers.add(_buildCheckbox(context));
-    if (showFavoriteButton) layers.add(_buildFavoriteButton(context));
-    if (showNsfwButton) layers.add(_buildNsfwButton(context));
+    if (widget.showCheckbox) layers.add(_buildCheckbox(context));
+    if (widget.showFavoriteButton) layers.add(_buildFavoriteButton(context));
+    if (widget.showNsfwButton) layers.add(_buildNsfwButton(context));
 
-    if (showTimelineJumpButton) {
+    if (widget.showTimelineJumpButton) {
       layers.add(TimelineJumpOverlay(filePath: _resolveFile().path));
     }
 
     return GestureDetector(
-      onTap: onTap,
-      onLongPress: onLongPress,
+      onTap: nsfwMasked ? null : widget.onTap,
+      onLongPress: widget.onLongPress,
       child: Stack(children: layers),
     );
   }
 
   /// 解析文件路径
   File _resolveFile() {
-    if (path.isAbsolute(screenshot.filePath)) {
-      return File(screenshot.filePath);
+    if (path.isAbsolute(widget.screenshot.filePath)) {
+      return File(widget.screenshot.filePath);
     }
-    if (baseDir != null) {
-      return File(path.join(baseDir!.path, screenshot.filePath));
+    if (widget.baseDir != null) {
+      return File(path.join(widget.baseDir!.path, widget.screenshot.filePath));
     }
-    return File(screenshot.filePath);
+    return File(widget.screenshot.filePath);
   }
 
   /// 构建图片
@@ -230,7 +253,9 @@ class ScreenshotItemWidget extends StatelessWidget {
       right: 0,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: onLinkTap != null ? () => onLinkTap!(screenshot.pageUrl!) : null,
+        onTap: widget.onLinkTap != null
+            ? () => widget.onLinkTap!(widget.screenshot.pageUrl!)
+            : null,
         child: Container(
           padding: const EdgeInsets.symmetric(
             horizontal: AppTheme.spacing2,
@@ -253,7 +278,7 @@ class ScreenshotItemWidget extends StatelessWidget {
               const SizedBox(width: AppTheme.spacing1),
               Expanded(
                 child: Text(
-                  screenshot.pageUrl!,
+                  widget.screenshot.pageUrl!,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -324,7 +349,7 @@ class ScreenshotItemWidget extends StatelessWidget {
             ],
             const Spacer(),
             // 时间
-            Text(_formatTime(screenshot.captureTime), style: infoStyle),
+            Text(_formatTime(widget.screenshot.captureTime), style: infoStyle),
           ],
         ),
       ),
@@ -336,6 +361,7 @@ class ScreenshotItemWidget extends StatelessWidget {
   }
 
   Widget _buildFileSizeInfo(File file, TextStyle style) {
+    final ScreenshotRecord screenshot = widget.screenshot;
     final int bytes = screenshot.fileSize;
     if (bytes > 0) {
       return Row(
@@ -348,7 +374,7 @@ class ScreenshotItemWidget extends StatelessWidget {
     }
 
     final String key = file.path;
-    final int? cached = _lazyFileSizeCache[key];
+    final int? cached = ScreenshotItemWidget._lazyFileSizeCache[key];
     if (cached != null && cached > 0) {
       return Row(
         mainAxisSize: MainAxisSize.min,
@@ -359,30 +385,31 @@ class ScreenshotItemWidget extends StatelessWidget {
       );
     }
 
-    final Future<int> fut = _lazyFileSizeFutures.putIfAbsent(key, () async {
-      try {
-        if (!await file.exists()) return 0;
-        final int v = await file.length();
-        if (v > 0) {
-          _lazyFileSizeCache[key] = v;
-          final int? gid = screenshot.id;
-          if (gid != null) {
-            unawaited(
-              ScreenshotDatabase.instance.updateFileSizeByGid(
-                packageName: screenshot.appPackageName,
-                gid: gid,
-                newSize: v,
-              ),
-            );
+    final Future<int> fut = ScreenshotItemWidget._lazyFileSizeFutures
+        .putIfAbsent(key, () async {
+          try {
+            if (!await file.exists()) return 0;
+            final int v = await file.length();
+            if (v > 0) {
+              ScreenshotItemWidget._lazyFileSizeCache[key] = v;
+              final int? gid = screenshot.id;
+              if (gid != null) {
+                unawaited(
+                  ScreenshotDatabase.instance.updateFileSizeByGid(
+                    packageName: screenshot.appPackageName,
+                    gid: gid,
+                    newSize: v,
+                  ),
+                );
+              }
+            }
+            return v;
+          } catch (_) {
+            return 0;
+          } finally {
+            ScreenshotItemWidget._lazyFileSizeFutures.remove(key);
           }
-        }
-        return v;
-      } catch (_) {
-        return 0;
-      } finally {
-        _lazyFileSizeFutures.remove(key);
-      }
-    });
+        });
 
     return FutureBuilder<int>(
       future: fut,
@@ -405,8 +432,8 @@ class ScreenshotItemWidget extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: () => AiMetaSheet.show(
         context,
-        filePath: screenshot.filePath,
-        fallbackOcrText: screenshot.ocrText,
+        filePath: widget.screenshot.filePath,
+        fallbackOcrText: widget.screenshot.ocrText,
       ),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -436,15 +463,17 @@ class ScreenshotItemWidget extends StatelessWidget {
 
   /// 构建应用图标
   Widget _buildAppIcon(BuildContext context) {
-    final app = appInfoMap?[screenshot.appPackageName];
+    final app = widget.appInfoMap?[widget.screenshot.appPackageName];
     final String packageName =
         (app?.packageName.trim().isNotEmpty == true
                 ? app!.packageName
-                : screenshot.appPackageName)
+                : widget.screenshot.appPackageName)
             .trim();
 
-    final parts = screenshot.appPackageName.split('.');
-    final head = parts.isNotEmpty ? parts.last : screenshot.appPackageName;
+    final parts = widget.screenshot.appPackageName.split('.');
+    final head = parts.isNotEmpty
+        ? parts.last
+        : widget.screenshot.appPackageName;
     final leading = head.isNotEmpty ? head[0].toUpperCase() : '?';
     return ClipRRect(
       borderRadius: BorderRadius.circular(4),
@@ -479,7 +508,11 @@ class ScreenshotItemWidget extends StatelessWidget {
     return Positioned(
       top: 6,
       right: 6,
-      child: SelectionCheckbox(selected: isSelected, size: 24, iconSize: 16),
+      child: SelectionCheckbox(
+        selected: widget.isSelected,
+        size: 24,
+        iconSize: 16,
+      ),
     );
   }
 
@@ -489,7 +522,7 @@ class ScreenshotItemWidget extends StatelessWidget {
       top: 6,
       left: 6,
       child: GestureDetector(
-        onTap: onFavoriteToggle,
+        onTap: widget.onFavoriteToggle,
         child: Container(
           width: 32,
           height: 32,
@@ -503,9 +536,11 @@ class ScreenshotItemWidget extends StatelessWidget {
           ),
           alignment: Alignment.center,
           child: Icon(
-            isFavorited ? Icons.favorite : Icons.favorite_border,
+            widget.isFavorited ? Icons.favorite : Icons.favorite_border,
             size: 18,
-            color: isFavorited ? AppTheme.destructive : const Color(0xFFF6F1E8),
+            color: widget.isFavorited
+                ? AppTheme.destructive
+                : const Color(0xFFF6F1E8),
           ),
         ),
       ),
@@ -519,7 +554,7 @@ class ScreenshotItemWidget extends StatelessWidget {
       top: 6,
       left: 44, // 6(边距) + 32(收藏按钮宽度) + 6(间距)
       child: GestureDetector(
-        onTap: onNsfwToggle,
+        onTap: widget.onNsfwToggle,
         child: Container(
           width: 32,
           height: 32,
@@ -533,9 +568,11 @@ class ScreenshotItemWidget extends StatelessWidget {
           ),
           alignment: Alignment.center,
           child: Icon(
-            isNsfwFlagged ? Icons.visibility_off : Icons.visibility,
+            widget.isNsfwFlagged ? Icons.visibility_off : Icons.visibility,
             size: 18,
-            color: isNsfwFlagged ? colorScheme.error : const Color(0xFFF6F1E8),
+            color: widget.isNsfwFlagged
+                ? colorScheme.error
+                : const Color(0xFFF6F1E8),
           ),
         ),
       ),
