@@ -1207,6 +1207,7 @@
   "ruleAddedToast": "ルールを追加しました",
   "ruleRemovedToast": "ルールを削除しました",
   "invalidDomainInputError": "有効なドメインを入力してください（*.example.com に対応）",
+  "addCurrentSiteToNsfw": "このサイトを NSFW に追加",
   "manualMarkNsfw": "NSFW としてマーク",
   "manualUnmarkNsfw": "NSFW マークを解除",
   "manualMarkSuccess": "NSFW としてマークしました",

@@ -2324,6 +2324,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get invalidDomainInputError => '请输入合法域名（支持 *.example.com）';
 
   @override
+  String get addCurrentSiteToNsfw => '将此网站加入 NSFW';
+
+  @override
   String get manualMarkNsfw => '标记为 NSFW';
 
   @override

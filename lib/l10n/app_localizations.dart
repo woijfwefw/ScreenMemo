@@ -4314,6 +4314,12 @@ abstract class AppLocalizations {
   /// **'Please enter a valid domain (supports *.example.com)'**
   String get invalidDomainInputError;
 
+  /// No description provided for @addCurrentSiteToNsfw.
+  ///
+  /// In en, this message translates to:
+  /// **'Add this site to NSFW'**
+  String get addCurrentSiteToNsfw;
+
   /// No description provided for @manualMarkNsfw.
   ///
   /// In en, this message translates to:

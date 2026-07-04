@@ -2409,6 +2409,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Please enter a valid domain (supports *.example.com)';
 
   @override
+  String get addCurrentSiteToNsfw => 'Add this site to NSFW';
+
+  @override
   String get manualMarkNsfw => 'Mark as NSFW';
 
   @override

@@ -1209,6 +1209,7 @@
   "ruleAddedToast": "Rule added",
   "ruleRemovedToast": "Rule removed",
   "invalidDomainInputError": "Please enter a valid domain (supports *.example.com)",
+  "addCurrentSiteToNsfw": "Add this site to NSFW",
   "manualMarkNsfw": "Mark as NSFW",
   "manualUnmarkNsfw": "Unmark NSFW",
   "manualMarkSuccess": "Marked as NSFW",

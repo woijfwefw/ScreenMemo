@@ -1209,6 +1209,7 @@
   "ruleAddedToast": "规则已添加",
   "ruleRemovedToast": "规则已移除",
   "invalidDomainInputError": "请输入合法域名（支持 *.example.com）",
+  "addCurrentSiteToNsfw": "将此网站加入 NSFW",
   "manualMarkNsfw": "标记为 NSFW",
   "manualUnmarkNsfw": "取消 NSFW 标记",
   "manualMarkSuccess": "已标记为 NSFW",

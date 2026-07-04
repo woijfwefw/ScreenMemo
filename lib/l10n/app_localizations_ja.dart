@@ -2349,6 +2349,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get invalidDomainInputError => '有効なドメインを入力してください（*.example.com に対応）';
 
   @override
+  String get addCurrentSiteToNsfw => 'このサイトを NSFW に追加';
+
+  @override
   String get manualMarkNsfw => 'NSFW としてマーク';
 
   @override

@@ -2349,6 +2349,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get invalidDomainInputError => '유효한 도메인을 입력하세요 (*.example.com 지원)';
 
   @override
+  String get addCurrentSiteToNsfw => '이 사이트를 NSFW에 추가';
+
+  @override
   String get manualMarkNsfw => 'NSFW로 표시';
 
   @override

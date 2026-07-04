@@ -106,4 +106,36 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Example (1/1)'), findsOneWidget);
   });
+
+  testWidgets('查看器长按带链接图片时显示加入 NSFW 网站选项', (tester) async {
+    final screenshots = <ScreenshotRecord>[
+      ScreenshotRecord(
+        id: null,
+        appPackageName: 'com.example.app',
+        appName: 'Example',
+        filePath: '/tmp/missing-linked.png',
+        captureTime: DateTime(2026),
+        fileSize: 0,
+        pageUrl: 'https://site-to-block.test/post/1',
+      ),
+    ];
+
+    await tester.pumpWidget(
+      buildHarness(
+        arguments: <String, dynamic>{
+          'screenshots': screenshots,
+          'initialIndex': 0,
+        },
+      ),
+    );
+    await tester.pump();
+
+    await tester.longPressAt(tester.getCenter(find.byType(Scaffold)));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+
+    expect(find.text('Add this site to NSFW'), findsOneWidget);
+    expect(find.text('site-to-block.test'), findsOneWidget);
+    expect(find.text('Mark as NSFW'), findsNothing);
+  });
 }

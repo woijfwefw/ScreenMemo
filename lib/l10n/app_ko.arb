@@ -1207,6 +1207,7 @@
   "ruleAddedToast": "규칙을 추가했습니다",
   "ruleRemovedToast": "규칙을 삭제했습니다",
   "invalidDomainInputError": "유효한 도메인을 입력하세요 (*.example.com 지원)",
+  "addCurrentSiteToNsfw": "이 사이트를 NSFW에 추가",
   "manualMarkNsfw": "NSFW로 표시",
   "manualUnmarkNsfw": "NSFW 표시 해제",
   "manualMarkSuccess": "NSFW로 표시했습니다",

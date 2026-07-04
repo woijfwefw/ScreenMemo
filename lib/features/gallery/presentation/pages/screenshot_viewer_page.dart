@@ -1456,16 +1456,33 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
     } catch (_) {}
   }
 
+  String? _nsfwRuleHostFromUrl(String? url) {
+    final String raw = (url ?? '').trim();
+    if (raw.isEmpty) return null;
+    try {
+      final (host, _) = NsfwPreferenceService.instance.normalizeAndValidate(
+        raw,
+      );
+      return host;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _showNsfwMenu() async {
     final s = _currentScreenshotOrNull;
     if (s == null) return;
     final l10n = AppLocalizations.of(context);
     final id = s.id;
-    if (id == null) return;
-    final isFlagged = NsfwPreferenceService.instance.isManuallyFlaggedCached(
-      screenshotId: id,
-      appPackageName: s.appPackageName,
-    );
+    final String? nsfwRuleHost = _nsfwRuleHostFromUrl(s.pageUrl);
+    if (id == null && nsfwRuleHost == null) return;
+    final bool canManualMark = id != null;
+    final bool isFlagged =
+        canManualMark &&
+        NsfwPreferenceService.instance.isManuallyFlaggedCached(
+          screenshotId: id,
+          appPackageName: s.appPackageName,
+        );
     final actionMark = !isFlagged;
     final result = await showModalBottomSheet<String>(
       context: context,
@@ -1478,16 +1495,24 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
               const SizedBox(height: AppTheme.spacing3),
               const UISheetHandle(),
               const SizedBox(height: AppTheme.spacing2),
-              ListTile(
-                leading: Icon(
-                  actionMark ? Icons.visibility_off : Icons.visibility,
+              if (canManualMark)
+                ListTile(
+                  leading: Icon(
+                    actionMark ? Icons.visibility_off : Icons.visibility,
+                  ),
+                  title: Text(
+                    actionMark ? l10n.manualMarkNsfw : l10n.manualUnmarkNsfw,
+                  ),
+                  onTap: () =>
+                      Navigator.of(ctx).pop(actionMark ? 'mark' : 'unmark'),
                 ),
-                title: Text(
-                  actionMark ? l10n.manualMarkNsfw : l10n.manualUnmarkNsfw,
+              if (nsfwRuleHost != null)
+                ListTile(
+                  leading: const Icon(Icons.public_off_outlined),
+                  title: Text(l10n.addCurrentSiteToNsfw),
+                  subtitle: Text(nsfwRuleHost),
+                  onTap: () => Navigator.of(ctx).pop('add_domain'),
                 ),
-                onTap: () =>
-                    Navigator.of(ctx).pop(actionMark ? 'mark' : 'unmark'),
-              ),
               const SizedBox(height: AppTheme.spacing2),
             ],
           ),
@@ -1495,6 +1520,26 @@ class _ScreenshotViewerPageState extends State<ScreenshotViewerPage> {
       },
     );
     if (result == null) return;
+    if (result == 'add_domain') {
+      final String? host = nsfwRuleHost;
+      if (host == null) return;
+      final ok = await NsfwPreferenceService.instance.addRule(host);
+      if (!mounted) return;
+      if (ok) {
+        setState(() {
+          if (id != null) {
+            _revealedIds.remove(id);
+          } else {
+            _revealedPaths.remove(s.filePath);
+          }
+        });
+        UINotifier.success(context, l10n.ruleAddedToast);
+      } else {
+        UINotifier.error(context, l10n.operationFailed);
+      }
+      return;
+    }
+    if (id == null) return;
     final ok = await NsfwPreferenceService.instance.setManualFlag(
       screenshotId: id,
       appPackageName: s.appPackageName,
